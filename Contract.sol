@@ -18,8 +18,24 @@
         string blah = "blah";
         }
 
-     function myFunction()  {}
+     function myFunction()  {
+        isWorking = false;
+     }
+struct Javis{
+uint256 asd;
+string asd;
+}
 
+
+struct Post{
+uint256 asd;
+ string blah;
+ string blah;
+ string blah;
+ string blah;
+ string blah;
+ string blah;
+}
    
     bool public isWorking = true;
     bool public isWorking = false;
