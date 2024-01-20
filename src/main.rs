@@ -158,6 +158,9 @@ struct FunctionIdentifier {
 enum BraceType {
     Function,
     Struct,
+    Callback,
+    Contract,
+    Mapping,
     None,
 }
 
@@ -220,10 +223,12 @@ fn main() {
 
     let mut lex: Vec<String> = Vec::new();
 
+    // println!("{striped_contents:?}");
+
     for line in &striped_contents {
         let mut combined_char = String::new();
-        for (_, chard) in line.trim().chars().enumerate() {
-            let character = chard.to_string().to_string();
+        for chard in line.trim().chars() {
+            let character = chard.to_string();
 
             if chard.is_whitespace() && !combined_char.trim().is_empty() {
                 lex.push(combined_char.trim().to_string());
@@ -338,6 +343,11 @@ fn parse(tokens: Vec<Token>) {
         let data_type = extract_data_types_from_token(&token);
         let callback_type = extract_callback_from_token(&token);
         let visibility = extract_visibility_from_token(&token);
+        // println!(" {token:?}");
+
+        let (open_brace_type, open_brace_count) = match opened_braces {
+            OpenedBraces::Value(type_, count_) => (type_, count_),
+        };
 
         let has_opened_braces = match opened_braces {
             OpenedBraces::Value(opened, _) => match opened {
@@ -366,33 +376,58 @@ fn parse(tokens: Vec<Token>) {
                     current_expr_type = Some(ExpressionType::Mapping);
                 }
                 Token::OpenBraces => {
-                    let opened_braces_count = match opened_braces {
-                        OpenedBraces::Value(_, count) => count,
-                    };
+                    // let opened_braces_count = match opened_braces {
+                    //     OpenedBraces::Value(_, count) => count,
+                    // };
                     if let Some(val) = &current_expr_type {
                         match val {
                             ExpressionType::Struct => {
                                 opened_braces =
-                                    OpenedBraces::Value(BraceType::Struct, opened_braces_count + 1);
+                                    OpenedBraces::Value(BraceType::Struct, open_brace_count + 1);
                             }
+                            ExpressionType::Function => {
+                                opened_braces =
+                                    OpenedBraces::Value(BraceType::Function, open_brace_count + 1);
+                            }
+                            ExpressionType::Callback => {
+                                opened_braces =
+                                    OpenedBraces::Value(BraceType::Callback, open_brace_count + 1);
+                            }
+                            ExpressionType::Mapping => {
+                                opened_braces =
+                                    OpenedBraces::Value(BraceType::Mapping, open_brace_count + 1);
+                            }
+
                             _ => (),
                         }
                     }
                     // current_expr_type = Some(ExpressionType::Mapping);
                 }
                 Token::CloseBraces => {
-                    let opened_braces_count = match opened_braces {
-                        OpenedBraces::Value(_, count) => count,
-                    };
-                    if let Some(val) = &current_expr_type {
-                        match val {
-                            ExpressionType::Struct => {
-                                opened_braces =
-                                    OpenedBraces::Value(BraceType::Struct, opened_braces_count - 1);
-                            }
-                            _ => (),
-                        }
+                    // let opened_braces_count = match opened_braces {
+                    //     OpenedBraces::Value(_, count) => count,
+                    // };
+
+                    if open_brace_count - 1 == 0 {
+                        opened_braces = OpenedBraces::Value(BraceType::None, 0);
+                    } else if open_brace_count - 1 == 1 {
+                        opened_braces = OpenedBraces::Value(BraceType::Contract, 1);
+                    } else {
+                        opened_braces = OpenedBraces::Value(open_brace_type, open_brace_count - 1);
                     }
+                    // if let Some(val) = &current_expr_type {
+                    //     match val {
+                    //         ExpressionType::Struct => {
+                    //             opened_braces =
+                    //                 OpenedBraces::Value(BraceType::Struct, opened_braces_count - 1);
+                    //         }
+                    //         ExpressionType::Function => {
+                    //             opened_braces =
+                    //                 OpenedBraces::Value(BraceType::Struct, opened_braces_count - 1);
+                    //         }
+                    //         _ => (),
+                    //     }
+                    // }
                     // current_expr_type = Some(ExpressionType::Mapping);
                 }
 
@@ -426,6 +461,34 @@ fn parse(tokens: Vec<Token>) {
                         expr.push(token);
                         expr_parent.push(expr.clone());
                         expr.clear();
+                    } else if let Token::SemiColon = token {
+                        if open_brace_count > 0 {
+                            expr.push(token)
+                        } else {
+                            expr.push(token);
+                            expr_parent.push(expr.clone());
+                            expr.clear();
+                        }
+                    } else {
+                        expr.push(token);
+                    }
+                }
+
+                ExpressionType::Function => {
+                    if let Token::CloseBraces = token {
+                        expr.push(token);
+                        expr_parent.push(expr.clone());
+                        expr.clear();
+                    } else {
+                        expr.push(token);
+                    }
+                }
+
+                ExpressionType::Mapping => {
+                    if let Token::SemiColon = token {
+                        expr.push(token);
+                        expr_parent.push(expr.clone());
+                        expr.clear();
                     } else {
                         expr.push(token);
                     }
@@ -446,8 +509,6 @@ fn parse(tokens: Vec<Token>) {
         //         _ => (),
         //     }
         // }
-
-        // println!("{current_expr_type:?} {token:?}");
     }
 
     println!("{expr_parent:?}")
