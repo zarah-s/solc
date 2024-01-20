@@ -1,44 +1,85 @@
-// SPDX-License-Identifier: Unlicense
-// pragma solidity ^0.8.23;
+// SPDX-License-Identifier: MIT
+// pragma solidity ^0.8.8;
 
-// contract Name {
- 
+contract Zarah {
+    address private i_owner = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
 
+    constructor() {
+        i_owner = msg.sender;
+    }
 
+    struct NFT {
+        string _id;
+        address owner;
+        string name;
+        string storageHash;
+        uint256 price;
+        bool forSale;
+        uint256 auctionTimestamp;
+    }
 
+    struct MUSEUM {
+        string _id;
+        string name;
+        string imageHash;
+    }
 
-    // uint8 public myNumber = 255;string  private chiiiii = "Hello world";
-     function myFunc() public  returns(uint256) {
-        bool shhh = false;
-        uint256 blah = 1212;
+    struct ARTIFACT {
+        string _id;
+        string name;
+        string description;
+        string[] images;
+    }
+
+    NFT[] nfts;
+    MUSEUM[] museums;
+    ARTIFACT[] artifacts;
+
+    mapping(address => NFT) nft;
+    mapping(string => MUSEUM) museum;
+    mapping(string => ARTIFACT) artifact;
+
+    function addNft(
+        address _owner,
+        string memory _name,
+        string memory _storageHash,
+        uint256 _price,
+        bool _forSale,
+        uint256 _auctionTimestamp,
+        string memory _id
+    ) public {
+        NFT memory newNft = NFT({
+            _id: _id,
+            owner: _owner,
+            name: _name,
+            storageHash: _storageHash,
+            price: _price,
+            forSale: _forSale,
+            auctionTimestamp: _auctionTimestamp
+        });
+        nfts.push(newNft);
+    }
+
+    function getNFTs(
+        uint256 page,
+        uint256 size
+    ) public view returns (NFT[] memory) {
+        uint256 totalItems = nfts.length;
+        uint256 startIndex = (page - 1) * size;
+        uint256 endIndex = startIndex + size;
+        if (endIndex > totalItems) {
+            endIndex = totalItems;
         }
-        function myFunc2(uint256 _arg,uint8 another ) gasless view gasless returns(uint256) {
-        string blah = "blah";
-        require(blah== "blah","this is cool");
-        string blah = "blah";
+        if (startIndex > totalItems) {
+            return new NFT[](0);
         }
 
-     function myFunction()  {
-        isWorking = false;
-     }
-struct Javis{
-uint256 asd;
-string asd;
+        NFT[] memory paginatedItems = new NFT[](endIndex - startIndex);
+
+        for (uint256 i = startIndex; i < endIndex; i++) {
+            paginatedItems[i - startIndex] = nfts[i];
+        }
+
+        return paginatedItems;
+    }
 }
-
-
-struct Post{
-uint256 asd;
- string blah;
- string blah;
- string blah;
- string blah;
- string blah;
- string blah;
-}
-   
-    bool public isWorking = true;
-    bool public isWorking = false;
-    // bytes32 private oi = "sdf";
-
-// }

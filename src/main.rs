@@ -1,5 +1,121 @@
+use std::{borrow::Borrow, env, fmt::format, fs, process};
+
 use regex::Regex;
-use std::{env, fs, process};
+
+const KEYWORDS: [&str; 52] = [
+    "contract",
+    "mapping",
+    "msg",
+    "constructor",
+    "address",
+    "private",
+    "struct",
+    "function",
+    "public",
+    "views",
+    "returns",
+    "pure",
+    "return",
+    "external",
+    "memory",
+    // "uint",
+    "uint8",
+    "uint16",
+    "uint32",
+    "uint120",
+    "uint256",
+    // "int",
+    "int8",
+    "int16",
+    "int32",
+    "int120",
+    "int256",
+    "string",
+    "bool",
+    "if",
+    "else",
+    "for",
+    "+",
+    "-",
+    "/",
+    "*",
+    "(",
+    ")",
+    "[",
+    "]",
+    "{",
+    "}",
+    ">",
+    "<",
+    ".",
+    "=",
+    "!",
+    "%",
+    ";",
+    "\"",
+    "'",
+    ",",
+    "|",
+    "&",
+];
+
+#[derive(Debug, Clone)]
+enum Token {
+    Identifier(String),
+    Contract,
+    Mapping,
+    Msg,
+    Constructor,
+    Address,
+    Private,
+    Struct,
+    Function,
+    Public,
+    Views,
+    Returns,
+    Pure,
+    Return,
+    External,
+    Memory,
+    Uint,
+    Uint8,
+    Uint16,
+    Uint32,
+    Uint120,
+    Uint256,
+    Int,
+    Int8,
+    Int16,
+    Int32,
+    Int120,
+    Int256,
+    String,
+    Bool,
+    If,
+    Else,
+    For,
+    Plus,
+    Minus,
+    Divide,
+    Multiply,
+    OpenParenthesis,
+    CloseParenthesis,
+    OpenSquareBracket,
+    CloseSquareBracket,
+    OpenBraces,
+    CloseBraces,
+    GreaterThan,
+    LessThan,
+    Dot,
+    Equals,
+    Bang,
+    Modulu,
+    SemiColon,
+    Quotation,
+    Coma,
+    Pipe,
+    Ampersand,
+}
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -32,6 +148,8 @@ struct FunctionIdentifier {
     view: Option<String>,
     return_type: Option<String>,
     gasless: bool,
+    payable: bool,
+
     arms: Vec<Token>,
 }
 
@@ -55,6 +173,7 @@ impl FunctionIdentifier {
         arms: Vec<Token>,
         return_type: Option<String>,
         gasless: bool,
+        payable: bool,
         arguments: Option<Vec<Argument>>,
     ) -> Self {
         Self {
@@ -64,400 +183,309 @@ impl FunctionIdentifier {
             return_type,
             gasless,
             arms,
+            payable,
             arguments,
         }
     }
 }
 
 #[derive(Debug)]
-enum Token {
-    VariableIdentifier(String, String, String, String, Scope),
+
+enum Expression {
+    VariableIdentifier(String, String, String, Option<String>, Scope),
     //DATATYPE, VISIBILITY, NAME, VALUE;
     FunctionIdentifier(FunctionIdentifier),
     Require(String, String),
     Struct(StructIdentifier),
+    Assignment(String, String),
+    StructVariableIdentifier(String, String, Vec<Argument>),
 }
 
-const DATA_TYPES: [&str; 10] = [
-    "uint8", "uint16", "uint32", "uint256", "int8", "int16", "int32", "int256", "bool", "string",
-];
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        print_error("ERROR: Compiler needs a file path");
+    if args.len() != 2 {
+        println!("Expecting a file path but got none");
         process::exit(1);
     }
 
-    if args[1].split(".").last().unwrap() != "sol" {
-        print_error("ERROR: Invalid file format");
-        process::exit(1);
-    }
+    let mut tokens: Vec<Token> = Vec::new();
 
-    let file_content = fs::read_to_string(&args[1]).unwrap_or_else(|err| {
-        print_error(&format!("ERROR: Error opening file <{}>. {err}", args[1]));
-        process::exit(1);
-    });
+    let file_content = fs::read_to_string(args[1].trim())
+        .expect(&format!("Could not open file \"<{}>\"", args[1]));
 
-    let mut program_lines: Vec<&str> = vec![];
-    let mut func_expr: Vec<Vec<&str>> = Vec::new();
-    let mut struct_expr: Vec<Vec<&str>> = Vec::new();
-    let mut opened_braces: OpenedBraces = OpenedBraces::Value(BraceType::None, 0);
-
-    for line in file_content
+    let striped_contents: Vec<&str> = file_content
         .lines()
-        .filter(|ft| !ft.trim().starts_with("//") && !ft.is_empty())
-    {
-        let check_double: Vec<&str> = line.trim().split(";").collect();
+        .filter(|pred| !pred.trim().starts_with("//") && !pred.is_empty())
+        .collect();
 
-        if line.trim().starts_with("function") || line.trim().starts_with("struct") {
-            if line.trim().ends_with("{") {
-                let braces_num = match opened_braces {
-                    OpenedBraces::Value(_, num) => num,
-                };
-                let func_start = line.trim().find("function");
-                if let None = func_start {
-                    opened_braces = OpenedBraces::Value(BraceType::Struct, braces_num + 1);
-                } else {
-                    opened_braces = OpenedBraces::Value(BraceType::Function, braces_num + 1);
-                }
-            }
-        }
-        let (brace_num, brace_type) = match opened_braces {
-            OpenedBraces::Value(br_type, num) => (num, br_type),
-        };
-        if brace_num == 0 {
-            for db_lines in check_double {
-                if !db_lines.trim().is_empty() {
-                    program_lines.push(db_lines.trim());
-                }
-            }
-        }
+    let mut lex: Vec<String> = Vec::new();
 
-        if brace_num > 0 {
-            if let BraceType::Function = brace_type {
-                if func_expr.is_empty() {
-                    func_expr.push(vec![line.trim()])
-                } else {
-                    if func_expr[func_expr.len() - 1].ends_with(&["}"]) {
-                        func_expr.push(vec![line.trim()])
-                    } else {
-                        let last_index = func_expr.len() - 1;
-                        func_expr[last_index].push(line.trim());
-                    }
-                }
-            }
+    for line in &striped_contents {
+        let mut combined_char = String::new();
+        for (_, chard) in line.trim().chars().enumerate() {
+            let character = chard.to_string().to_string();
 
-            if let BraceType::Struct = brace_type {
-                if struct_expr.is_empty() {
-                    struct_expr.push(vec![line.trim()]);
-                } else {
-                    if struct_expr[struct_expr.len() - 1].ends_with(&["}"]) {
-                        struct_expr.push(vec![line.trim()])
-                    } else {
-                        let last_index = struct_expr.len() - 1;
-                        struct_expr[last_index].push(line.trim());
-                    }
-                }
-                // print_error(&format!("found struct at line {}", index))
-            }
-            // process::exit(1);
-            if line.trim().ends_with("}") {
-                let braces_num = match opened_braces {
-                    OpenedBraces::Value(_, num) => num,
-                };
-                opened_braces = OpenedBraces::Value(brace_type, braces_num - 1);
-            }
-        }
-    }
-
-    let mut tokens = Vec::new();
-
-    for str_expr in struct_expr {
-        tokens.push(struct_lexing(str_expr))
-    }
-
-    for pr_line in &program_lines {
-        if !pr_line.starts_with("function") {
-            tokens.push(variable_lexing(&pr_line, Scope::Global));
-        }
-    }
-
-    for expr in func_expr {
-        let tokenized_expression = function_lexing(expr);
-        tokens.push(tokenized_expression);
-    }
-
-    println!("{:#?}", tokens);
-}
-
-fn struct_lexing(input: Vec<&str>) -> Token {
-    let identifier_regex = Regex::new(r"[a-zA-Z_]\w*").unwrap();
-
-    let mut identifier: Option<&str> = None;
-    let mut types: Vec<Argument> = Vec::new();
-
-    if let Some(identifier_match) = identifier_regex.find(&input[0]["struct".len()..]) {
-        identifier = Some(identifier_match.as_str());
-    } else {
-        print_error(&format!("Missing Struct name at {}", &input[0]))
-    }
-
-    let types_strip = &input[1..&input.len() - 1];
-
-    for str_type in types_strip {
-        for db_line in str_type.split(";") {
-            if !db_line.is_empty() {
-                let args: Vec<&str> = db_line.split(" ").collect();
-                if args.len() != 2 || args[1].is_empty() {
-                    print_error(&format!(
-                        "Invalid value in \"struct {}\" {}",
-                        identifier.unwrap(),
-                        str_type
-                    ));
-                } else {
-                    if !DATA_TYPES.contains(&args[0]) {
-                        print_error(&format!("ERROR: Unidentified data type {}", args[0]));
-                    } else {
-                        types.push(Argument::Params(args[0].to_string(), args[1].to_string()))
-                    }
-                }
-            }
-        }
-    }
-    Token::Struct(StructIdentifier {
-        identifier: identifier.unwrap().to_string(),
-        types,
-    })
-}
-
-fn variable_lexing(input: &str, scope: Scope) -> Token {
-    let identifier_regex = Regex::new(r"[a-zA-Z_]\w*").unwrap();
-    let int_literal_regex = Regex::new(r"\d+").unwrap();
-    let bool_literal_regex = Regex::new(r"\b(true|false)\b").unwrap();
-    let string_literal_regex = Regex::new(r#""([^"]*)""#).unwrap();
-    let line_arm: Vec<&str> = input.split(" ").collect();
-    let mut data_type: Option<String> = None;
-    let mut visibility: Option<String> = None;
-    let mut name: Option<String> = None;
-    let mut value: Option<String> = None;
-
-    if !DATA_TYPES.contains(&line_arm[0]) {
-        print_error(&format!("ERROR: Unidentified data type {}", line_arm[0]));
-        process::exit(1);
-    } else {
-        let blah = line_arm[1..].join(" ");
-        data_type = Some(line_arm[0].to_string());
-        if let Some(identifier_match) = &identifier_regex.find(&blah) {
-            if identifier_match.as_str() == "public" {
-                if let Some(blah_match) = identifier_regex.find(&blah[identifier_match.end()..]) {
-                    name = Some(blah_match.as_str().to_string())
-                }
-            } else if identifier_match.as_str() == "private" {
-                if let Some(blah_match) = identifier_regex.find(&blah[identifier_match.end()..]) {
-                    name = Some(blah_match.as_str().to_string())
-                }
-            } else {
-                name = Some(identifier_match.as_str().to_string())
-            }
-        }
-
-        if let Some(visibility_match) = Regex::new(r"public").unwrap().find(&blah) {
-            visibility = Some(visibility_match.as_str().to_string());
-        }
-
-        if let Some(int_match) = int_literal_regex.find(&blah) {
-            value = Some(int_match.as_str().to_string());
-        }
-
-        if let Some(string_match) = string_literal_regex.find(&blah) {
-            value = Some(string_match.as_str().to_string());
-        }
-
-        if let Some(bool_match) = bool_literal_regex.find(&blah) {
-            value = Some(bool_match.as_str().to_string());
-        }
-
-        if let None = data_type {
-            print_error("Invalid syntax");
-        }
-
-        if let None = visibility {
-            visibility = Some("private".to_string());
-        }
-
-        if let None = name {
-            print_error("Variable name required");
-        }
-
-        if let None = value {
-            print_error("Missing value for variable")
-        }
-
-        let token = Token::VariableIdentifier(
-            data_type.unwrap(),
-            visibility.unwrap(),
-            name.unwrap(),
-            value.unwrap(),
-            scope,
-        );
-        token
-    }
-}
-
-fn function_lexing(input: Vec<&str>) -> Token {
-    let identifier_regex = Regex::new(r"[a-zA-Z_]\w*").unwrap();
-    let mut func_name: Option<String> = None;
-    let mut visibility: Option<String> = None;
-    let mut view: Option<String> = None;
-    let mut returns: Option<String> = None;
-    let mut arms: Vec<Token> = Vec::new();
-    let mut gasless: bool = false;
-    let mut raw_args_collection: Vec<Argument> = Vec::new();
-    let mut args_collection: Option<Vec<Argument>> = None;
-
-    if let Some(identifier_match) = identifier_regex.find(&input.join(" ")) {
-        if identifier_match.as_str() == "function" {
-            if let Some(var_name_match) =
-                identifier_regex.find(&input.join(" ")[identifier_match.end()..])
+            if chard.is_whitespace() && !combined_char.trim().is_empty() {
+                lex.push(combined_char.trim().to_string());
+                combined_char.clear();
+            } else if let Some(_) = KEYWORDS
+                .iter()
+                .find(|pred| pred == &&character.to_string().as_str())
             {
-                if var_name_match.as_str() == "public"
-                    || identifier_match.as_str() == "view"
-                    || identifier_match.as_str() == "returns"
-                    || identifier_match.as_str() == "gasless"
-                {
-                    func_name = None;
-                } else {
-                    func_name = Some(var_name_match.as_str().to_string());
-                    let args = &input.join(" ")[identifier_match.end()..][var_name_match.end()..];
-                    if args.starts_with("(") {
-                        let closing_tag_index = args.find(")");
-                        if let None = closing_tag_index {
-                            print_error("Missing argument closing tag");
-                        } else {
-                            let args_str = &args[1..closing_tag_index.unwrap()];
-                            for raw_arg in args_str
-                                .split(",")
-                                .filter(|predicate| !predicate.is_empty())
-                            {
-                                let check_arg_len: Vec<&str> = raw_arg.trim().split(" ").collect();
-                                if check_arg_len.len() != 2 {
-                                    print_error(
-                                        format!("Invalid function argument \"{}\"", raw_arg)
-                                            .as_str(),
-                                    )
-                                } else {
-                                    if !DATA_TYPES.contains(&check_arg_len[0]) {
-                                        print_error(&format!(
-                                            "Invalid datatype \"{}\"",
-                                            check_arg_len[0]
-                                        ))
-                                    }
-                                    let arg_enum = Argument::Params(
-                                        check_arg_len[0].to_string(),
-                                        check_arg_len[1].to_string(),
-                                    );
-                                    raw_args_collection.push(arg_enum)
-                                }
-                            }
-                        }
-                    } else {
-                        print_error(&format!("Expecting \"(\" but found \"{}\"", &args[..1]));
-                    }
+                if !combined_char.trim().is_empty() {
+                    lex.push(combined_char.trim().to_string());
+                    combined_char.clear();
                 }
+                lex.push(character.to_string());
+            } else if let Some(_) = KEYWORDS
+                .iter()
+                .find(|pred| pred == &&combined_char.as_str().trim())
+            {
+                lex.push(combined_char.trim().to_string());
+                combined_char.clear();
+            } else {
+                combined_char.push_str(&character)
             }
         }
     }
 
-    if let None = func_name {
-        print_error("Function name required")
+    for lexed in lex {
+        tokens.push(lex_to_token(&lexed));
     }
 
-    if let Some(visibility_match) = Regex::new(r"\b(public|private|external)\b")
-        .unwrap()
-        .find(&input[0])
-    {
-        visibility = Some(visibility_match.as_str().trim().to_string())
-    } else {
-        visibility = Some("private".to_string())
-    }
-
-    if let Some(view_match) = Regex::new(r"\b(view|pure)\b").unwrap().find(&input[0]) {
-        view = Some(view_match.as_str().trim().to_string())
-    }
-
-    if let Some(_) = Regex::new(r"\b(gasless)\b").unwrap().find(&input[0]) {
-        gasless = true;
-    }
-
-    if let Some(returns_match) = Regex::new(r"returns\(([^)]*)\)").unwrap().find(&input[0]) {
-        returns = Some(returns_match.as_str().trim().to_string())
-    }
-
-    for expr_arm in input[1..input.len() - 1]
-        .join(" ")
-        .lines()
-        .filter(|ft| !ft.trim().starts_with("//") && !ft.is_empty())
-    {
-        let check_double: Vec<&str> = expr_arm.trim().split(";").collect();
-        for db_lines in check_double {
-            if !db_lines.trim().is_empty() {
-                if db_lines.trim().starts_with("require") {
-                    let use_case = db_lines.trim();
-                    let require_keyword_index = use_case.find("(");
-                    if let None = require_keyword_index {
-                        print_error(&format!("ERROR: Unidentified argument {}", use_case));
-                    } else {
-                        let striped_expr =
-                            &use_case[require_keyword_index.unwrap() + 1..use_case.len() - 1];
-
-                        let require_arm: Vec<&str> = striped_expr.split(",").collect();
-                        if require_arm.len() != 2 {
-                            print_error(&format!(
-                                "expected 2 arguments found {} in \"{}\"",
-                                require_arm.len(),
-                                db_lines.trim()
-                            ));
-                        } else {
-                            let tokenized_expr: Token = Token::Require(
-                                require_arm[0].trim().to_string(),
-                                require_arm[1].trim().to_string(),
-                            );
-
-                            arms.push(tokenized_expr);
-                        }
-                    }
-                } else {
-                    let tokenized_expr: Token = variable_lexing(
-                        db_lines.trim(),
-                        Scope::Functional(func_name.clone().unwrap()),
-                    );
-                    arms.push(tokenized_expr);
-                }
-            }
-        }
-    }
-
-    if let None = visibility {
-        visibility = Some("private".to_string());
-    }
-
-    if !raw_args_collection.is_empty() {
-        args_collection = Some(raw_args_collection);
-    }
-
-    let function_identifier = FunctionIdentifier::new(
-        func_name.unwrap(),
-        visibility.unwrap(),
-        view,
-        arms,
-        returns,
-        gasless,
-        args_collection,
-    );
-
-    Token::FunctionIdentifier(function_identifier)
+    parse(tokens);
+    // println!("{tokens:?}");
 }
 
-fn print_error(msg: &str) {
-    panic!("ERROR: {msg}");
+fn lex_to_token(input: &str) -> Token {
+    let token = match input {
+        "contract" => Token::Contract,
+        "mapping" => Token::Mapping,
+        "msg" => Token::Msg,
+        "constructor" => Token::Constructor,
+        "address" => Token::Address,
+        "private" => Token::Private,
+        "struct" => Token::Struct,
+        "function" => Token::Function,
+        "public" => Token::Public,
+        "views" => Token::Views,
+        "returns" => Token::Returns,
+        "pure" => Token::Pure,
+        "return" => Token::Return,
+        "external" => Token::External,
+        "memory" => Token::Memory,
+        "uint" => Token::Uint,
+        "uint8" => Token::Uint8,
+        "uint16" => Token::Uint16,
+        "uint32" => Token::Uint32,
+        "uint120" => Token::Uint120,
+        "uint256" => Token::Uint256,
+        "int" => Token::Int,
+        "int8" => Token::Int8,
+        "int16" => Token::Int16,
+        "int32" => Token::Int32,
+        "int120" => Token::Int120,
+        "int256" => Token::Int256,
+        "string" => Token::String,
+        "bool" => Token::Bool,
+        "if" => Token::If,
+        "else" => Token::Else,
+        "for" => Token::For,
+        "+" => Token::Plus,
+        "-" => Token::Minus,
+        "/" => Token::Divide,
+        "*" => Token::Multiply,
+        "(" => Token::OpenParenthesis,
+        ")" => Token::CloseParenthesis,
+        "[" => Token::OpenSquareBracket,
+        "]" => Token::CloseSquareBracket,
+        "{" => Token::OpenBraces,
+        "}" => Token::CloseBraces,
+        ">" => Token::GreaterThan,
+        "<" => Token::LessThan,
+        "." => Token::Dot,
+        "=" => Token::Equals,
+        "!" => Token::Bang,
+        "%" => Token::Modulu,
+        ";" => Token::SemiColon,
+        "'" => Token::Quotation,
+        "\"" => Token::Quotation,
+        "," => Token::Coma,
+        "|" => Token::Pipe,
+        "&" => Token::Ampersand,
+
+        _ => Token::Identifier(input.to_string()),
+    };
+    token
+}
+
+#[derive(Debug)]
+enum ExpressionType {
+    Variable,
+    Struct,
+    Function,
+    Mapping,
+    Callback,
+    Identifier,
+}
+
+fn parse(tokens: Vec<Token>) {
+    let mut opened_braces: OpenedBraces = OpenedBraces::Value(BraceType::None, 0);
+    let mut current_expr_type: Option<ExpressionType> = None;
+    let mut expr_parent: Vec<Vec<Token>> = Vec::new();
+    let mut expr: Vec<Token> = vec![];
+    for token in tokens {
+        let data_type = extract_data_types_from_token(&token);
+        let callback_type = extract_callback_from_token(&token);
+        let visibility = extract_visibility_from_token(&token);
+
+        let has_opened_braces = match opened_braces {
+            OpenedBraces::Value(opened, _) => match opened {
+                BraceType::None => false,
+                _ => true,
+            },
+        };
+
+        if let Some(_) = data_type {
+            if !has_opened_braces {
+                current_expr_type = Some(ExpressionType::Variable);
+            }
+        } else if let Some(_) = callback_type {
+            current_expr_type = Some(ExpressionType::Callback);
+        } else if let Some(_) = visibility {
+        } else {
+            match token {
+                Token::Function => {
+                    current_expr_type = Some(ExpressionType::Function);
+                }
+                Token::Struct => {
+                    current_expr_type = Some(ExpressionType::Struct);
+                }
+
+                Token::Mapping => {
+                    current_expr_type = Some(ExpressionType::Mapping);
+                }
+                Token::OpenBraces => {
+                    let opened_braces_count = match opened_braces {
+                        OpenedBraces::Value(_, count) => count,
+                    };
+                    if let Some(val) = &current_expr_type {
+                        match val {
+                            ExpressionType::Struct => {
+                                opened_braces =
+                                    OpenedBraces::Value(BraceType::Struct, opened_braces_count + 1);
+                            }
+                            _ => (),
+                        }
+                    }
+                    // current_expr_type = Some(ExpressionType::Mapping);
+                }
+                Token::CloseBraces => {
+                    let opened_braces_count = match opened_braces {
+                        OpenedBraces::Value(_, count) => count,
+                    };
+                    if let Some(val) = &current_expr_type {
+                        match val {
+                            ExpressionType::Struct => {
+                                opened_braces =
+                                    OpenedBraces::Value(BraceType::Struct, opened_braces_count - 1);
+                            }
+                            _ => (),
+                        }
+                    }
+                    // current_expr_type = Some(ExpressionType::Mapping);
+                }
+
+                Token::Contract => {
+                    // current_expr_type = Some(ExpressionType::Mapping);
+                }
+
+                Token::Identifier(_) => {
+                    // current_expr_type = Some(ExpressionType::Identifier);
+                }
+                _ => {
+                    // println!("signs {token:?}");
+                }
+            }
+        }
+
+        if let Some(cr) = &current_expr_type {
+            match cr {
+                ExpressionType::Variable => {
+                    if let Token::SemiColon = token {
+                        expr.push(token);
+                        expr_parent.push(expr.clone());
+                        expr.clear();
+                    } else {
+                        expr.push(token);
+                    }
+                }
+
+                ExpressionType::Struct => {
+                    if let Token::CloseBraces = token {
+                        expr.push(token);
+                        expr_parent.push(expr.clone());
+                        expr.clear();
+                    } else {
+                        expr.push(token);
+                    }
+                }
+
+                // ExpressionType::Struct => {}
+                _ => {
+                    // println!("Empty {cr:?}")
+                }
+            }
+        }
+
+        // if let Some(dd) = &current_expr_type {
+        //     match dd {
+        //         ExpressionType::Variable => {
+
+        //         }
+        //         _ => (),
+        //     }
+        // }
+
+        // println!("{current_expr_type:?} {token:?}");
+    }
+
+    println!("{expr_parent:?}")
+}
+
+fn extract_callback_from_token(token: &Token) -> Option<Token> {
+    match token {
+        Token::Constructor => Some(Token::Constructor),
+        _ => None,
+    }
+}
+
+fn extract_visibility_from_token(token: &Token) -> Option<Token> {
+    match token {
+        Token::Private => Some(Token::Private),
+        Token::Public => Some(Token::Public),
+        Token::External => Some(Token::External),
+        _ => None,
+    }
+}
+
+fn extract_data_types_from_token(token: &Token) -> Option<Token> {
+    match token {
+        Token::Uint => Some(Token::Uint),
+        Token::Uint8 => Some(Token::Uint8),
+        Token::Uint16 => Some(Token::Uint16),
+        Token::Uint32 => Some(Token::Uint32),
+        Token::Uint120 => Some(Token::Uint120),
+        Token::Uint256 => Some(Token::Uint256),
+        Token::Int => Some(Token::Int),
+        Token::Int8 => Some(Token::Int8),
+        Token::Int16 => Some(Token::Int16),
+        Token::Int32 => Some(Token::Int32),
+        Token::Int120 => Some(Token::Int120),
+        Token::Int256 => Some(Token::Int256),
+        Token::String => Some(Token::String),
+        Token::Bool => Some(Token::Bool),
+        Token::Address => Some(Token::Address),
+        _ => None,
+    }
 }
