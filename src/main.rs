@@ -1,6 +1,4 @@
-use std::{borrow::Borrow, env, fmt::format, fs, process};
-
-use regex::Regex;
+use std::{env, fmt::Error, fs, process};
 
 const KEYWORDS: [&str; 52] = [
     "contract",
@@ -18,13 +16,11 @@ const KEYWORDS: [&str; 52] = [
     "return",
     "external",
     "memory",
-    // "uint",
     "uint8",
     "uint16",
     "uint32",
     "uint120",
     "uint256",
-    // "int",
     "int8",
     "int16",
     "int32",
@@ -59,7 +55,7 @@ const KEYWORDS: [&str; 52] = [
     "&",
 ];
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Token {
     Identifier(String),
     Contract,
@@ -83,8 +79,12 @@ enum Token {
     Uint32,
     Uint120,
     Uint256,
-    Int,
+    Receive,
+    Fallback,
+    Payable,
+    Cron,
     Int8,
+    Int,
     Int16,
     Int32,
     Int120,
@@ -116,150 +116,73 @@ enum Token {
     Pipe,
     Ampersand,
 }
-
-#[derive(Debug)]
-#[allow(dead_code)]
-enum Scope {
-    Global,
-    Functional(String),
-}
-
-#[derive(Debug)]
-#[allow(dead_code)]
-enum Argument {
-    Params(String, String),
-    //DATATYPE, NAME
-}
-
-#[derive(Debug)]
-#[allow(dead_code)]
-
-struct StructIdentifier {
-    identifier: String,
-    types: Vec<Argument>,
-}
-
-#[derive(Debug)]
-#[allow(dead_code)]
-struct FunctionIdentifier {
-    name: String,
-    arguments: Option<Vec<Argument>>,
-    visibility: String,
-    view: Option<String>,
-    return_type: Option<String>,
-    gasless: bool,
-    payable: bool,
-
-    arms: Vec<Token>,
-}
-
-#[derive(Clone, Copy)]
-
-enum BraceType {
-    Function,
-    Struct,
-    Callback,
-    Contract,
-    Mapping,
-    None,
-}
-
-enum OpenedBraces {
-    Value(BraceType, i8),
-}
-
-impl FunctionIdentifier {
-    pub fn new(
-        name: String,
-        visibility: String,
-        view: Option<String>,
-        arms: Vec<Token>,
-        return_type: Option<String>,
-        gasless: bool,
-        payable: bool,
-        arguments: Option<Vec<Argument>>,
-    ) -> Self {
-        Self {
-            name,
-            visibility,
-            view,
-            return_type,
-            gasless,
-            arms,
-            payable,
-            arguments,
-        }
-    }
-}
-
-#[derive(Debug)]
-
-enum Expression {
-    VariableIdentifier(String, String, String, Option<String>, Scope),
-    //DATATYPE, VISIBILITY, NAME, VALUE;
-    FunctionIdentifier(FunctionIdentifier),
-    Require(String, String),
-    Struct(StructIdentifier),
-    Assignment(String, String),
-    StructVariableIdentifier(String, String, Vec<Argument>),
-}
-
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
-        println!("Expecting a file path but got none");
-        process::exit(1);
+
+    if args.len() < 2 {
+        panic!("File required")
     }
 
-    let mut tokens: Vec<Token> = Vec::new();
+    let file_contents = fs::read_to_string(&args[1]).unwrap_or_else(|err| {
+        panic!("ERROR: Error reading file. {}, \"{}\"", err, args[1]);
+    });
 
-    let file_content = fs::read_to_string(args[1].trim())
-        .expect(&format!("Could not open file \"<{}>\"", args[1]));
-
-    let striped_contents: Vec<&str> = file_content
+    let stripped: String = file_contents
         .lines()
-        .filter(|pred| !pred.trim().starts_with("//") && !pred.is_empty())
+        .filter(|pred| !pred.trim().starts_with("//"))
         .collect();
-
     let mut lex: Vec<String> = Vec::new();
+    let mut combined_char = String::new();
+    let mut lexems: Vec<Token> = Vec::new();
+    let mut parsed_expression: Vec<ParsedExpression> = Vec::new();
 
-    // println!("{striped_contents:?}");
-
-    for line in &striped_contents {
-        let mut combined_char = String::new();
-        for chard in line.trim().chars() {
-            let character = chard.to_string();
-
-            if chard.is_whitespace() && !combined_char.trim().is_empty() {
+    for character in stripped.chars() {
+        if character.is_whitespace() && !combined_char.trim().is_empty() {
+            lex.push(combined_char.trim().to_string());
+            combined_char.clear();
+        } else if let Some(_) = KEYWORDS
+            .iter()
+            .find(|pred| pred == &&character.to_string().as_str())
+        {
+            if !combined_char.trim().is_empty() {
                 lex.push(combined_char.trim().to_string());
                 combined_char.clear();
-            } else if let Some(_) = KEYWORDS
-                .iter()
-                .find(|pred| pred == &&character.to_string().as_str())
-            {
-                if !combined_char.trim().is_empty() {
-                    lex.push(combined_char.trim().to_string());
-                    combined_char.clear();
-                }
-                lex.push(character.to_string());
-            } else if let Some(_) = KEYWORDS
-                .iter()
-                .find(|pred| pred == &&combined_char.as_str().trim())
-            {
-                lex.push(combined_char.trim().to_string());
-                combined_char.clear();
-            } else {
-                combined_char.push_str(&character)
             }
+            lex.push(character.to_string());
+        } else if let Some(_) = KEYWORDS
+            .iter()
+            .find(|pred| pred == &&combined_char.as_str().trim())
+        {
+            lex.push(combined_char.trim().to_string());
+            combined_char.clear();
+        } else {
+            combined_char.push_str(character.to_string().as_str())
         }
     }
 
     for lexed in lex {
-        tokens.push(lex_to_token(&lexed));
+        lexems.push(lex_to_token(&lexed));
     }
 
-    parse(tokens);
-    // println!("{tokens:?}");
+    let parsed_tokens: Vec<Vec<Token>> = parse_token(lexems);
+
+    for parse in parsed_tokens {
+        let init = &parse[0];
+
+        if let Some(_d) = extract_data_types_from_token(&init) {
+            parsed_expression.push(parse_variable(parse))
+        } else {
+            // println!("{init:?}")
+        }
+        // match init {
+        //     Token::Identifier(_d) => {
+        //         // println!("{_d:?} {parse:?}")
+        //     }
+        //     _ => (),
+        // }
+    }
+
+    println!("{:?}", parsed_expression)
 }
 
 fn lex_to_token(input: &str) -> Token {
@@ -268,6 +191,9 @@ fn lex_to_token(input: &str) -> Token {
         "mapping" => Token::Mapping,
         "msg" => Token::Msg,
         "constructor" => Token::Constructor,
+        "receive" => Token::Receive,
+        "fallback" => Token::Fallback,
+        "cron" => Token::Cron,
         "address" => Token::Address,
         "private" => Token::Private,
         "struct" => Token::Struct,
@@ -278,6 +204,7 @@ fn lex_to_token(input: &str) -> Token {
         "pure" => Token::Pure,
         "return" => Token::Return,
         "external" => Token::External,
+        "payable" => Token::Payable,
         "memory" => Token::Memory,
         "uint" => Token::Uint,
         "uint8" => Token::Uint8,
@@ -285,8 +212,6 @@ fn lex_to_token(input: &str) -> Token {
         "uint32" => Token::Uint32,
         "uint120" => Token::Uint120,
         "uint256" => Token::Uint256,
-        "int" => Token::Int,
-        "int8" => Token::Int8,
         "int16" => Token::Int16,
         "int32" => Token::Int32,
         "int120" => Token::Int120,
@@ -324,208 +249,131 @@ fn lex_to_token(input: &str) -> Token {
     token
 }
 
-#[derive(Debug)]
-enum ExpressionType {
-    Variable,
-    Struct,
-    Function,
-    Mapping,
-    Callback,
-    Identifier,
+fn parse_token(tokens: Vec<Token>) -> Vec<Vec<Token>> {
+    let mut current_expression = Expression::None;
+    let mut expression: Vec<Token> = Vec::new();
+    let mut expression_parent: Vec<Vec<Token>> = Vec::new();
+    let mut opened_braces = 0;
+
+    for token in tokens {
+        if let Expression::Contract = current_expression {}
+        match token {
+            Token::Contract => current_expression = Expression::Contract,
+            Token::Constructor => {
+                current_expression = Expression::Callback;
+                expression.push(token.clone());
+            }
+            Token::Receive => {
+                current_expression = Expression::Callback;
+                expression.push(token.clone());
+            }
+            Token::Cron => {
+                current_expression = Expression::Callback;
+                expression.push(token.clone());
+            }
+            Token::Fallback => {
+                current_expression = Expression::Callback;
+                expression.push(token.clone());
+            }
+            Token::Struct => {
+                current_expression = Expression::Struct;
+                expression.push(token);
+            }
+            Token::Mapping => {
+                current_expression = Expression::Mapping;
+                expression.push(token);
+            }
+            Token::Function => {
+                current_expression = Expression::Function;
+                expression.push(token);
+            }
+            Token::SemiColon => {
+                expression.push(token.clone());
+
+                if let Expression::Contract = current_expression {
+                    current_expression = Expression::Contract;
+                    if !expression.is_empty() {
+                        expression_parent.push(expression.clone());
+                        expression.clear();
+                    }
+                }
+
+                if let Expression::Mapping = current_expression {
+                    current_expression = Expression::Contract;
+                    expression_parent.push(expression.clone());
+                    expression.clear();
+                }
+            }
+            Token::OpenBraces => {
+                opened_braces += 1;
+                if let Expression::Contract = current_expression {
+                } else {
+                    expression.push(token);
+                }
+            }
+            Token::CloseBraces => {
+                if let Expression::Function = current_expression {
+                    if opened_braces - 1 == 1 {
+                        expression.push(token.clone());
+                        expression_parent.push(expression.clone());
+
+                        expression.clear();
+                        current_expression = Expression::Contract;
+                    } else {
+                        expression.push(token.clone());
+                    }
+                } else {
+                    expression.push(token);
+                    expression_parent.push(expression.clone());
+                    expression.clear();
+                    current_expression = Expression::Contract;
+                }
+
+                // if let Expression::Struct = current_expression {
+                // }
+
+                if opened_braces - 1 == 1 {
+                    current_expression = Expression::Contract;
+                } else if opened_braces - 1 == 0 {
+                    current_expression = Expression::None
+                }
+
+                opened_braces -= 1
+            }
+
+            _ => {
+                // if let Some(_) = extract_data_types_from_token(&token) {
+                if opened_braces > 0 {
+                    expression.push(token)
+                }
+                // }
+            }
+        }
+    }
+    // println!("{expression_parent:?}");
+    expression_parent
 }
 
-fn parse(tokens: Vec<Token>) {
-    let mut opened_braces: OpenedBraces = OpenedBraces::Value(BraceType::None, 0);
-    let mut current_expr_type: Option<ExpressionType> = None;
-    let mut expr_parent: Vec<Vec<Token>> = Vec::new();
-    let mut expr: Vec<Token> = vec![];
-    for token in tokens {
-        let data_type = extract_data_types_from_token(&token);
-        let callback_type = extract_callback_from_token(&token);
-        let visibility = extract_visibility_from_token(&token);
-        // println!(" {token:?}");
+#[derive(Debug, Clone)]
+enum Expression {
+    Contract,
+    Callback,
+    Struct,
+    Function,
+    Variable,
+    Mapping,
+    None,
+}
 
-        let (open_brace_type, open_brace_count) = match opened_braces {
-            OpenedBraces::Value(type_, count_) => (type_, count_),
-        };
-
-        let has_opened_braces = match opened_braces {
-            OpenedBraces::Value(opened, _) => match opened {
-                BraceType::None => false,
-                _ => true,
-            },
-        };
-
-        if let Some(_) = data_type {
-            if !has_opened_braces {
-                current_expr_type = Some(ExpressionType::Variable);
-            }
-        } else if let Some(_) = callback_type {
-            current_expr_type = Some(ExpressionType::Callback);
-        } else if let Some(_) = visibility {
-        } else {
-            match token {
-                Token::Function => {
-                    current_expr_type = Some(ExpressionType::Function);
-                }
-                Token::Struct => {
-                    current_expr_type = Some(ExpressionType::Struct);
-                }
-
-                Token::Mapping => {
-                    current_expr_type = Some(ExpressionType::Mapping);
-                }
-                Token::OpenBraces => {
-                    // let opened_braces_count = match opened_braces {
-                    //     OpenedBraces::Value(_, count) => count,
-                    // };
-                    if let Some(val) = &current_expr_type {
-                        match val {
-                            ExpressionType::Struct => {
-                                opened_braces =
-                                    OpenedBraces::Value(BraceType::Struct, open_brace_count + 1);
-                            }
-                            ExpressionType::Function => {
-                                opened_braces =
-                                    OpenedBraces::Value(BraceType::Function, open_brace_count + 1);
-                            }
-                            ExpressionType::Callback => {
-                                opened_braces =
-                                    OpenedBraces::Value(BraceType::Callback, open_brace_count + 1);
-                            }
-                            ExpressionType::Mapping => {
-                                opened_braces =
-                                    OpenedBraces::Value(BraceType::Mapping, open_brace_count + 1);
-                            }
-
-                            _ => (),
-                        }
-                    }
-                    // current_expr_type = Some(ExpressionType::Mapping);
-                }
-                Token::CloseBraces => {
-                    // let opened_braces_count = match opened_braces {
-                    //     OpenedBraces::Value(_, count) => count,
-                    // };
-
-                    if open_brace_count - 1 == 0 {
-                        opened_braces = OpenedBraces::Value(BraceType::None, 0);
-                    } else if open_brace_count - 1 == 1 {
-                        opened_braces = OpenedBraces::Value(BraceType::Contract, 1);
-                    } else {
-                        opened_braces = OpenedBraces::Value(open_brace_type, open_brace_count - 1);
-                    }
-                    // if let Some(val) = &current_expr_type {
-                    //     match val {
-                    //         ExpressionType::Struct => {
-                    //             opened_braces =
-                    //                 OpenedBraces::Value(BraceType::Struct, opened_braces_count - 1);
-                    //         }
-                    //         ExpressionType::Function => {
-                    //             opened_braces =
-                    //                 OpenedBraces::Value(BraceType::Struct, opened_braces_count - 1);
-                    //         }
-                    //         _ => (),
-                    //     }
-                    // }
-                    // current_expr_type = Some(ExpressionType::Mapping);
-                }
-
-                Token::Contract => {
-                    // current_expr_type = Some(ExpressionType::Mapping);
-                }
-
-                Token::Identifier(_) => {
-                    // current_expr_type = Some(ExpressionType::Identifier);
-                }
-                _ => {
-                    // println!("signs {token:?}");
-                }
-            }
-        }
-
-        if let Some(cr) = &current_expr_type {
-            match cr {
-                ExpressionType::Variable => {
-                    if let Token::SemiColon = token {
-                        expr.push(token);
-                        expr_parent.push(expr.clone());
-                        expr.clear();
-                    } else {
-                        expr.push(token);
-                    }
-                }
-
-                ExpressionType::Struct => {
-                    if let Token::CloseBraces = token {
-                        expr.push(token);
-                        expr_parent.push(expr.clone());
-                        expr.clear();
-                    } else if let Token::SemiColon = token {
-                        if open_brace_count > 0 {
-                            expr.push(token)
-                        } else {
-                            expr.push(token);
-                            expr_parent.push(expr.clone());
-                            expr.clear();
-                        }
-                    } else {
-                        expr.push(token);
-                    }
-                }
-
-                ExpressionType::Function => {
-                    if let Token::CloseBraces = token {
-                        expr.push(token);
-                        expr_parent.push(expr.clone());
-                        expr.clear();
-                    } else {
-                        expr.push(token);
-                    }
-                }
-
-                ExpressionType::Mapping => {
-                    if let Token::SemiColon = token {
-                        expr.push(token);
-                        expr_parent.push(expr.clone());
-                        expr.clear();
-                    } else {
-                        expr.push(token);
-                    }
-                }
-
-                // ExpressionType::Struct => {}
-                _ => {
-                    // println!("Empty {cr:?}")
-                }
-            }
-        }
-
-        // if let Some(dd) = &current_expr_type {
-        //     match dd {
-        //         ExpressionType::Variable => {
-
-        //         }
-        //         _ => (),
-        //     }
-        // }
-    }
-
-    println!("{expr_parent:?}")
+#[derive(Debug)]
+enum ParsedExpression {
+    VariableIdentifier(Token, Token, String, Option<String>),
+    //DATATYPE, VISIBILITY, NAME, VALUE;
 }
 
 fn extract_callback_from_token(token: &Token) -> Option<Token> {
     match token {
         Token::Constructor => Some(Token::Constructor),
-        _ => None,
-    }
-}
-
-fn extract_visibility_from_token(token: &Token) -> Option<Token> {
-    match token {
-        Token::Private => Some(Token::Private),
-        Token::Public => Some(Token::Public),
-        Token::External => Some(Token::External),
         _ => None,
     }
 }
@@ -549,4 +397,50 @@ fn extract_data_types_from_token(token: &Token) -> Option<Token> {
         Token::Address => Some(Token::Address),
         _ => None,
     }
+}
+
+fn extract_visibility_from_token(token: &Token) -> Option<Token> {
+    match token {
+        Token::Private => Some(Token::Private),
+        Token::Public => Some(Token::Public),
+        Token::External => Some(Token::External),
+        _ => None,
+    }
+}
+
+fn parse_variable(tokens: Vec<Token>) -> ParsedExpression {
+    let data_type = &tokens[0];
+    let mut visibility: Option<Token> = None;
+    let mut name: Option<String> = None;
+    let mut value: Option<String> = None;
+
+    for id in &tokens[1..] {
+        if let Some(_) = extract_visibility_from_token(&id) {
+            visibility = extract_visibility_from_token(&id);
+        } else {
+            match id {
+                Token::Identifier(_predicate) => {
+                    if let None = name {
+                        name = Some(_predicate.clone())
+                    } else {
+                        value = Some(_predicate.clone());
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
+
+    if let None = visibility {
+        visibility = Some(Token::Private);
+    }
+
+    let final_expression = ParsedExpression::VariableIdentifier(
+        data_type.clone(),
+        visibility.unwrap(),
+        name.unwrap(),
+        value.clone(),
+    );
+
+    final_expression
 }

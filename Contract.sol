@@ -1,11 +1,33 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.8;
+// pragma solidity ^0.8.8;
 
 contract Zarah {
     address private i_owner = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
+    address private j_owner;
+    string public greet = "sdf";
+    uint256 num = 1+1;
+
+    cron("23 23 23"){
+        greet = "Hello";
+        blah();
+
+    }
+
+    receive() external payable {
+        // fund();
+    }
+
+    fallback() external payable {
+        // fund();
+    }
 
     constructor() {
         i_owner = msg.sender;
+        i_owner = msg.sender;
+    }
+
+    function blah() public {
+        j_owner = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
     }
 
     struct NFT {
