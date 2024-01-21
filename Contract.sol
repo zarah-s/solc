@@ -2,10 +2,10 @@
 // pragma solidity ^0.8.8;
 
 contract Zarah {
-    address private i_owner = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
-    address private j_owner;
+    address[] private i_owner = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
+    address[] private j_owner;
     string public greet = "sdf";
-    uint256 num = 1+1;
+    uint256[] num;
 
     cron("23 23 23"){
         greet = "Hello";
@@ -31,12 +31,12 @@ contract Zarah {
     }
 
     struct NFT {
-        string _id;
+        string[] _id;
         address owner;
         string name;
         string storageHash;
         uint256 price;
-        bool forSale;
+        // bool forSale;
         uint256 auctionTimestamp;
     }
 
@@ -76,7 +76,7 @@ contract Zarah {
             name: _name,
             storageHash: _storageHash,
             price: _price,
-            forSale: _forSale,
+            // forSale: _forSale,
             auctionTimestamp: _auctionTimestamp
         });
         nfts.push(newNft);

@@ -169,20 +169,17 @@ fn main() {
     for parse in parsed_tokens {
         let init = &parse[0];
 
-        if let Some(_d) = extract_data_types_from_token(&init) {
+        if let Some(_) = extract_data_types_from_token(&init) {
             parsed_expression.push(parse_variable(parse))
         } else {
-            // println!("{init:?}")
+            match init {
+                Token::Struct => parsed_expression.push(parse_structs(parse)),
+                _ => (),
+            }
         }
-        // match init {
-        //     Token::Identifier(_d) => {
-        //         // println!("{_d:?} {parse:?}")
-        //     }
-        //     _ => (),
-        // }
     }
 
-    println!("{:?}", parsed_expression)
+    println!("{:#?}", parsed_expression)
 }
 
 fn lex_to_token(input: &str) -> Token {
@@ -366,9 +363,16 @@ enum Expression {
 }
 
 #[derive(Debug)]
+
+enum Argument {
+    Params(Token, String, bool),
+    //DATATYPE, NAME, isarray
+}
+#[derive(Debug)]
 enum ParsedExpression {
-    VariableIdentifier(Token, Token, String, Option<String>),
-    //DATATYPE, VISIBILITY, NAME, VALUE;
+    VariableIdentifier(Token, Token, String, Option<String>, bool),
+    //DATATYPE, VISIBILITY, NAME, VALUE, ARRAY;
+    StructIdentifier(String, Vec<Argument>),
 }
 
 fn extract_callback_from_token(token: &Token) -> Option<Token> {
@@ -409,10 +413,18 @@ fn extract_visibility_from_token(token: &Token) -> Option<Token> {
 }
 
 fn parse_variable(tokens: Vec<Token>) -> ParsedExpression {
+    // println!("{tokens:?}");
+    if tokens.len() > 8 {
+        panic!("ERROR: {tokens:?}")
+    }
+    if tokens.len() < 3 {
+        panic!("ERROR: {tokens:?}")
+    }
     let data_type = &tokens[0];
     let mut visibility: Option<Token> = None;
     let mut name: Option<String> = None;
     let mut value: Option<String> = None;
+    let mut is_array = false;
 
     for id in &tokens[1..] {
         if let Some(_) = extract_visibility_from_token(&id) {
@@ -426,6 +438,7 @@ fn parse_variable(tokens: Vec<Token>) -> ParsedExpression {
                         value = Some(_predicate.clone());
                     }
                 }
+                // Token::OpenSquareBracket
                 _ => (),
             }
         }
@@ -435,12 +448,71 @@ fn parse_variable(tokens: Vec<Token>) -> ParsedExpression {
         visibility = Some(Token::Private);
     }
 
+    let is_array = if tokens.contains(&Token::OpenSquareBracket) {
+        true
+    } else {
+        false
+    };
+
     let final_expression = ParsedExpression::VariableIdentifier(
         data_type.clone(),
         visibility.unwrap(),
         name.unwrap(),
         value.clone(),
+        is_array,
     );
 
     final_expression
+}
+
+fn parse_structs(tokens: Vec<Token>) -> ParsedExpression {
+    let struct_name: &Token = &tokens[1];
+    let mut args: Vec<Argument> = Vec::new();
+
+    let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+    // println!("{:?}", &tokens[start_index.unwrap() + 1..tokens.len() - 1]);
+    let dd: &Vec<&[Token]> = &tokens[start_index.unwrap() + 1..tokens.len() - 1]
+        .split(|pred| pred == &Token::SemiColon)
+        .collect();
+
+    for fg in dd {
+        if !fg.is_empty() {
+            if fg.contains(&Token::OpenSquareBracket) {
+                let name = match &fg[3] {
+                    Token::Identifier(_name) => Some(_name),
+                    _ => None,
+                };
+                if let None = name {
+                    panic!("ERROR");
+                }
+
+                let arg = Argument::Params(fg[0].clone(), name.unwrap().clone(), true);
+                args.push(arg);
+            } else {
+                let name = match &fg[1] {
+                    Token::Identifier(_name) => Some(_name),
+                    _ => None,
+                };
+                if let None = name {
+                    panic!("ERROR here {fg:?}");
+                }
+
+                let arg = Argument::Params(fg[0].clone(), name.unwrap().clone(), false);
+                args.push(arg);
+            }
+        }
+    }
+    let struct_name = match struct_name {
+        Token::Identifier(_name) => Some(_name),
+        _ => None,
+    };
+
+    if let None = struct_name {
+        panic!("ERROR: INVALID STRUCT NAME");
+    }
+    let expr = ParsedExpression::StructIdentifier(struct_name.unwrap().clone(), args);
+    expr
+    // if let Some(_d) = start_index {
+    //     for data in &tokens[start_index.unwrap()..] {}
+    // }
 }
