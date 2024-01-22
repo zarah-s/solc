@@ -26,7 +26,7 @@ contract Zarah {
         i_owner = msg.sender;
     }
 
-    function blah() public {
+    function blah() private gasless {
         j_owner = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
     }
 
@@ -83,24 +83,24 @@ contract Zarah {
     }
 
     function getNFTs(
-        uint256 page,
+        uint256[] page,
         uint256 size
     ) public view returns (NFT[] memory) {
         uint256 totalItems = nfts.length;
         uint256 startIndex = (page - 1) * size;
         uint256 endIndex = startIndex + size;
-        if (endIndex > totalItems) {
-            endIndex = totalItems;
-        }
-        if (startIndex > totalItems) {
-            return new NFT[](0);
-        }
+        // if (endIndex > totalItems) {
+        //     endIndex = totalItems;
+        // }
+        // if (startIndex > totalItems) {
+        //     return new NFT[](0);
+        // }
 
         NFT[] memory paginatedItems = new NFT[](endIndex - startIndex);
 
-        for (uint256 i = startIndex; i < endIndex; i++) {
-            paginatedItems[i - startIndex] = nfts[i];
-        }
+        // for (uint256 i = startIndex; i < endIndex; i++) {
+        //     paginatedItems[i - startIndex] = nfts[i];
+        // }
 
         return paginatedItems;
     }

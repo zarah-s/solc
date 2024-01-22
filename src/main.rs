@@ -1,8 +1,48 @@
 use std::{env, fmt::Error, fs, process};
 
-const KEYWORDS: [&str; 52] = [
+#[derive(Debug)]
+struct FunctionIdentifier {
+    name: String,
+    arguments: Option<Vec<Argument>>,
+    visibility: Token,
+    view: Option<Token>,
+    return_type: Option<String>,
+    gasless: bool,
+    payable: bool,
+    arms: Vec<Vec<Token>>,
+}
+
+impl FunctionIdentifier {
+    pub fn new(
+        name: String,
+        visibility: Token,
+        view: Option<Token>,
+        arms: Vec<Vec<Token>>,
+        return_type: Option<String>,
+        gasless: bool,
+        payable: bool,
+        arguments: Option<Vec<Argument>>,
+    ) -> Self {
+        Self {
+            name,
+            visibility,
+            view,
+            return_type,
+            gasless,
+            arms,
+            payable,
+            arguments,
+        }
+    }
+}
+
+const KEYWORDS: [&str; 56] = [
     "contract",
     "mapping",
+    "fallback",
+    "cron",
+    "receive",
+    "gasless",
     "msg",
     "constructor",
     "address",
@@ -67,7 +107,7 @@ enum Token {
     Struct,
     Function,
     Public,
-    Views,
+    View,
     Returns,
     Pure,
     Return,
@@ -83,6 +123,7 @@ enum Token {
     Fallback,
     Payable,
     Cron,
+    Gasless,
     Int8,
     Int,
     Int16,
@@ -174,6 +215,7 @@ fn main() {
         } else {
             match init {
                 Token::Struct => parsed_expression.push(parse_structs(parse)),
+                Token::Function => parsed_expression.push(parse_function(parse)),
                 _ => (),
             }
         }
@@ -191,12 +233,13 @@ fn lex_to_token(input: &str) -> Token {
         "receive" => Token::Receive,
         "fallback" => Token::Fallback,
         "cron" => Token::Cron,
+        "gasless" => Token::Gasless,
         "address" => Token::Address,
         "private" => Token::Private,
         "struct" => Token::Struct,
         "function" => Token::Function,
         "public" => Token::Public,
-        "views" => Token::Views,
+        "view" => Token::View,
         "returns" => Token::Returns,
         "pure" => Token::Pure,
         "return" => Token::Return,
@@ -371,8 +414,10 @@ enum Argument {
 #[derive(Debug)]
 enum ParsedExpression {
     VariableIdentifier(Token, Token, String, Option<String>, bool),
-    //DATATYPE, VISIBILITY, NAME, VALUE, ARRAY;
+    //*DATATYPE, VISIBILITY, NAME, VALUE, ARRAY*/;
     StructIdentifier(String, Vec<Argument>),
+    //* STRUCT NAME, DATA STRUCTURE */
+    FunctionIdentifier(FunctionIdentifier),
 }
 
 fn extract_callback_from_token(token: &Token) -> Option<Token> {
@@ -470,7 +515,6 @@ fn parse_structs(tokens: Vec<Token>) -> ParsedExpression {
     let mut args: Vec<Argument> = Vec::new();
 
     let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
-    // println!("{:?}", &tokens[start_index.unwrap() + 1..tokens.len() - 1]);
     let dd: &Vec<&[Token]> = &tokens[start_index.unwrap() + 1..tokens.len() - 1]
         .split(|pred| pred == &Token::SemiColon)
         .collect();
@@ -512,7 +556,102 @@ fn parse_structs(tokens: Vec<Token>) -> ParsedExpression {
     }
     let expr = ParsedExpression::StructIdentifier(struct_name.unwrap().clone(), args);
     expr
-    // if let Some(_d) = start_index {
-    //     for data in &tokens[start_index.unwrap()..] {}
-    // }
+}
+
+fn parse_function(tokens: Vec<Token>) -> ParsedExpression {
+    let function_name = match &tokens[1] {
+        Token::Identifier(_name) => Some(_name),
+        _ => None,
+    };
+
+    let mut visibility: Option<Token> = None;
+    let mut is_gasless = false;
+    let mut payable: bool = false;
+    let mut view: Option<Token> = None;
+    let mut arms: Vec<Vec<Token>> = Vec::new();
+    let mut args: Vec<Argument> = Vec::new();
+
+    let args_start_index = tokens
+        .iter()
+        .position(|pred| pred == &Token::OpenParenthesis);
+    let args_end_index = tokens
+        .iter()
+        .position(|pred| pred == &Token::CloseParenthesis);
+
+    if let Some(_index) = args_start_index {
+        let slice = &tokens[_index + 1..args_end_index.unwrap()];
+        let joined: Vec<&[Token]> = slice.split(|pred| pred == &Token::Coma).collect();
+
+        for arr in joined {
+            if !arr.is_empty() {
+                // println!("{arr:?}");
+                if arr.len() < 2 {
+                    panic!("ERROR: Invalid argument")
+                } else {
+                    let identifier = match &arr[arr.len() - 1] {
+                        Token::Identifier(_val) => Some(_val),
+                        _ => None,
+                    };
+
+                    let is_array = arr.contains(&Token::OpenSquareBracket);
+                    if let None = identifier {
+                        panic!("ERROR: Identifier not found")
+                    }
+                    args.push(Argument::Params(
+                        arr[0].clone(),
+                        identifier.unwrap().clone(),
+                        is_array,
+                    ))
+                }
+            }
+        }
+    }
+
+    let arms_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+    if let Some(_index) = arms_start_index {
+        let slice = &tokens[_index + 1..tokens.len() - 1];
+        let joined: Vec<&[Token]> = slice.split(|pred| pred == &Token::SemiColon).collect();
+        for arm in joined {
+            if !arm.is_empty() {
+                arms.push(arm.to_vec());
+            }
+        }
+    }
+
+    if tokens.contains(&Token::View) {
+        view = Some(Token::View)
+    } else if tokens.contains(&Token::Pure) {
+        view = Some(Token::Pure)
+    }
+
+    for fnd in &tokens[1..] {
+        if let Some(_) = extract_visibility_from_token(fnd) {
+            visibility = Some(fnd.clone());
+        } else {
+            match fnd {
+                Token::Gasless => is_gasless = true,
+                Token::Payable => payable = true,
+                _ => (),
+            }
+        }
+    }
+
+    if let None = function_name {
+        panic!("ERROR: INVALID FUNCTION NAME");
+    }
+
+    let args = if args.is_empty() { None } else { Some(args) };
+
+    let structured = FunctionIdentifier::new(
+        function_name.unwrap().clone(),
+        visibility.unwrap(),
+        view,
+        arms,
+        None,
+        is_gasless,
+        payable,
+        args,
+    );
+
+    ParsedExpression::FunctionIdentifier(structured)
 }
