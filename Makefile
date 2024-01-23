@@ -18,3 +18,9 @@ build:
 
 clean:
 	cargo clean
+
+copy:
+	cp ./target/release/compiler .
+
+rm:
+	rm -rf ./compiler
