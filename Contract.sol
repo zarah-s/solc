@@ -2,18 +2,17 @@
 // pragma solidity ^0.8.8;
 
 contract Zarah {
-    address[] private i_owner = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
-    address[] private j_owner;
-    string public greet = "sdf";
-    uint256[] num;
+    int data = -1;
 
-    cron("23 23 23"){
+    cron("* * * * * *"){
         greet = "Hello";
         blah();
+    
 
     }
 
     receive() external payable {
+    
         // fund();
     }
 
@@ -69,7 +68,7 @@ contract Zarah {
         bool _forSale,
         uint256 _auctionTimestamp,
         string memory _id
-    ) public {
+    ) public gasless {
         NFT memory newNft = NFT({
             _id: _id,
             owner: _owner,

@@ -14,13 +14,16 @@ compile:
 	cargo run Contract.sol
 
 build: 
-	cargo build --release
+	cargo build --release && cp ./target/release/compiler .
 
 clean:
-	cargo clean
+	cargo clean && rm -rf ./compiler
 
 copy:
 	cp ./target/release/compiler .
 
 rm:
 	rm -rf ./compiler
+
+run: 
+	./compiler Contract.sol

@@ -1,4 +1,6 @@
-use std::{env, fmt::Error, fs, process};
+use std::{env, fs, io::Write};
+
+use regex::Regex;
 
 #[derive(Debug)]
 struct FunctionIdentifier {
@@ -9,6 +11,14 @@ struct FunctionIdentifier {
     return_type: Option<String>,
     gasless: bool,
     payable: bool,
+    arms: Vec<Vec<Token>>,
+}
+
+#[derive(Debug)]
+
+struct CallbackIdentifier {
+    type_: Token,
+    arguments: Option<Vec<Argument>>,
     arms: Vec<Vec<Token>>,
 }
 
@@ -32,6 +42,16 @@ impl FunctionIdentifier {
             arms,
             payable,
             arguments,
+        }
+    }
+}
+
+impl CallbackIdentifier {
+    pub fn new(type_: Token, arguments: Option<Vec<Argument>>, arms: Vec<Vec<Token>>) -> Self {
+        Self {
+            type_,
+            arguments,
+            arms,
         }
     }
 }
@@ -176,6 +196,7 @@ fn main() {
     let mut combined_char = String::new();
     let mut lexems: Vec<Token> = Vec::new();
     let mut parsed_expression: Vec<ParsedExpression> = Vec::new();
+    let identifier_regex = Regex::new(r"[a-zA-Z_]\w*").unwrap();
 
     for character in stripped.chars() {
         if character.is_whitespace() && !combined_char.trim().is_empty() {
@@ -194,8 +215,14 @@ fn main() {
             .iter()
             .find(|pred| pred == &&combined_char.as_str().trim())
         {
-            lex.push(combined_char.trim().to_string());
-            combined_char.clear();
+            // println!("{combined_char} {}", characters[index]);
+
+            if let Some(_) = identifier_regex.find(character.to_string().as_str()) {
+                combined_char.push_str(character.to_string().as_str())
+            } else {
+                lex.push(combined_char.trim().to_string());
+                combined_char.clear();
+            }
         } else {
             combined_char.push_str(character.to_string().as_str())
         }
@@ -206,6 +233,7 @@ fn main() {
     }
 
     let parsed_tokens: Vec<Vec<Token>> = parse_token(lexems);
+    // println!("{:?}", parsed_tokens);
 
     for parse in parsed_tokens {
         let init = &parse[0];
@@ -216,12 +244,17 @@ fn main() {
             match init {
                 Token::Struct => parsed_expression.push(parse_structs(parse)),
                 Token::Function => parsed_expression.push(parse_function(parse)),
-                _ => (),
+
+                _other => {
+                    if let Some(_) = extract_callback_from_token(&init) {
+                        parsed_expression.push(parse_callback(parse))
+                    }
+                }
             }
         }
     }
 
-    println!("{:#?}", parsed_expression)
+    // println!("{:#?}", parsed_expression)
 }
 
 fn lex_to_token(input: &str) -> Token {
@@ -247,6 +280,8 @@ fn lex_to_token(input: &str) -> Token {
         "payable" => Token::Payable,
         "memory" => Token::Memory,
         "uint" => Token::Uint,
+        "int" => Token::Int,
+        "int8" => Token::Int8,
         "uint8" => Token::Uint8,
         "uint16" => Token::Uint16,
         "uint32" => Token::Uint32,
@@ -285,6 +320,72 @@ fn lex_to_token(input: &str) -> Token {
         "&" => Token::Ampersand,
 
         _ => Token::Identifier(input.to_string()),
+    };
+    token
+}
+
+fn detokenize(input: Token) -> &'static str {
+    let token = match input {
+        Token::Contract => "contract",
+        Token::Mapping => "mapping",
+        Token::Msg => "msg",
+        Token::Constructor => "constructor",
+        Token::Receive => "receive",
+        Token::Fallback => "fallback",
+        Token::Cron => "cron",
+        Token::Gasless => "gasless",
+        Token::Address => "address",
+        Token::Private => "private",
+        Token::Struct => "struct",
+        Token::Function => "function",
+        Token::Public => "public",
+        Token::View => "view",
+        Token::Returns => "returns",
+        Token::Pure => "pure",
+        Token::Return => "return",
+        Token::External => "external",
+        Token::Payable => "payable",
+        Token::Memory => "memory",
+        Token::Uint => "uint",
+        Token::Int => "int",
+        Token::Int8 => "int8",
+        Token::Uint8 => "uint8",
+        Token::Uint16 => "uint16",
+        Token::Uint32 => "uint32",
+        Token::Uint120 => "uint120",
+        Token::Uint256 => "uint256",
+        Token::Int16 => "int16",
+        Token::Int32 => "int32",
+        Token::Int120 => "int120",
+        Token::Int256 => "int256",
+        Token::String => "string",
+        Token::Bool => "bool",
+        Token::If => "if",
+        Token::Else => "else",
+        Token::For => "for",
+        Token::Plus => "+",
+        Token::Minus => "-",
+        Token::Divide => "/",
+        Token::Multiply => "*",
+        Token::OpenParenthesis => "(",
+        Token::CloseParenthesis => ")",
+        Token::OpenSquareBracket => "[",
+        Token::CloseSquareBracket => "]",
+        Token::OpenBraces => "{",
+        Token::CloseBraces => "}",
+        Token::GreaterThan => ">",
+        Token::LessThan => "<",
+        Token::Dot => ".",
+        Token::Equals => "=",
+        Token::Bang => "!",
+        Token::Modulu => "%",
+        Token::SemiColon => ";",
+        Token::Quotation => "\"",
+        Token::Coma => ",",
+        Token::Pipe => "|",
+        Token::Ampersand => "&",
+
+        _ => "",
     };
     token
 }
@@ -418,11 +519,15 @@ enum ParsedExpression {
     StructIdentifier(String, Vec<Argument>),
     //* STRUCT NAME, DATA STRUCTURE */
     FunctionIdentifier(FunctionIdentifier),
+    CallbackIdentifier(CallbackIdentifier),
 }
 
 fn extract_callback_from_token(token: &Token) -> Option<Token> {
     match token {
         Token::Constructor => Some(Token::Constructor),
+        Token::Fallback => Some(Token::Fallback),
+        Token::Receive => Some(Token::Receive),
+        Token::Cron => Some(Token::Cron),
         _ => None,
     }
 }
@@ -458,7 +563,7 @@ fn extract_visibility_from_token(token: &Token) -> Option<Token> {
 }
 
 fn parse_variable(tokens: Vec<Token>) -> ParsedExpression {
-    // println!("{tokens:?}");
+    println!("{tokens:?}");
     if tokens.len() > 8 {
         panic!("ERROR: {tokens:?}")
     }
@@ -469,7 +574,6 @@ fn parse_variable(tokens: Vec<Token>) -> ParsedExpression {
     let mut visibility: Option<Token> = None;
     let mut name: Option<String> = None;
     let mut value: Option<String> = None;
-    let mut is_array = false;
 
     for id in &tokens[1..] {
         if let Some(_) = extract_visibility_from_token(&id) {
@@ -654,4 +758,63 @@ fn parse_function(tokens: Vec<Token>) -> ParsedExpression {
     );
 
     ParsedExpression::FunctionIdentifier(structured)
+}
+
+fn parse_callback(tokens: Vec<Token>) -> ParsedExpression {
+    let type_ = &tokens[0];
+
+    let mut arms: Vec<Vec<Token>> = Vec::new();
+    let mut args: Vec<Argument> = Vec::new();
+
+    let args_start_index = tokens
+        .iter()
+        .position(|pred| pred == &Token::OpenParenthesis);
+    let args_end_index = tokens
+        .iter()
+        .position(|pred| pred == &Token::CloseParenthesis);
+
+    if let Some(_index) = args_start_index {
+        let slice = &tokens[_index + 1..args_end_index.unwrap()];
+        let joined: Vec<&[Token]> = slice.split(|pred| pred == &Token::Coma).collect();
+        for arr in joined {
+            if !arr.is_empty() {
+                // println!("{arr:?}");
+                if arr.len() < 2 {
+                    panic!("ERROR: Invalid argument")
+                } else {
+                    let identifier = match &arr[arr.len() - 1] {
+                        Token::Identifier(_val) => Some(_val),
+                        _ => None,
+                    };
+
+                    let is_array = arr.contains(&Token::OpenSquareBracket);
+                    if let None = identifier {
+                        panic!("ERROR: Identifier not found")
+                    }
+                    args.push(Argument::Params(
+                        arr[0].clone(),
+                        identifier.unwrap().clone(),
+                        is_array,
+                    ))
+                }
+            }
+        }
+    }
+
+    let arms_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+    if let Some(_index) = arms_start_index {
+        let slice = &tokens[_index + 1..tokens.len() - 1];
+        let joined: Vec<&[Token]> = slice.split(|pred| pred == &Token::SemiColon).collect();
+        for arm in joined {
+            if !arm.is_empty() {
+                arms.push(arm.to_vec());
+            }
+        }
+    }
+
+    let args = if args.is_empty() { None } else { Some(args) };
+
+    let structured = CallbackIdentifier::new(type_.clone(), args, arms);
+
+    ParsedExpression::CallbackIdentifier(structured)
 }
