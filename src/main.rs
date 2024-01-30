@@ -1,4 +1,4 @@
-use std::{env, fs, io::Write};
+use std::{env, fs, process};
 
 use regex::Regex;
 
@@ -56,70 +56,12 @@ impl CallbackIdentifier {
     }
 }
 
-const KEYWORDS: [&str; 56] = [
-    "contract",
-    "mapping",
-    "fallback",
-    "cron",
-    "receive",
-    "gasless",
-    "msg",
-    "constructor",
-    "address",
-    "private",
-    "struct",
-    "function",
-    "public",
-    "views",
-    "returns",
-    "pure",
-    "return",
-    "external",
-    "memory",
-    "uint8",
-    "uint16",
-    "uint32",
-    "uint120",
-    "uint256",
-    "int8",
-    "int16",
-    "int32",
-    "int120",
-    "int256",
-    "string",
-    "bool",
-    "if",
-    "else",
-    "for",
-    "+",
-    "-",
-    "/",
-    "*",
-    "(",
-    ")",
-    "[",
-    "]",
-    "{",
-    "}",
-    ">",
-    "<",
-    ".",
-    "=",
-    "!",
-    "%",
-    ";",
-    "\"",
-    "'",
-    ",",
-    "|",
-    "&",
-];
-
 #[derive(Debug, Clone, PartialEq)]
 enum Token {
     Identifier(String),
     Contract,
     Mapping,
+    Calldata,
     Msg,
     Constructor,
     Address,
@@ -138,6 +80,7 @@ enum Token {
     Uint16,
     Uint32,
     Uint120,
+    Upgradable,
     Uint256,
     Receive,
     Fallback,
@@ -176,51 +119,191 @@ enum Token {
     Coma,
     Pipe,
     Ampersand,
+    Immutable,
+    Constant,
+    Enum,
+    Mutable,
 }
+
+#[derive(Debug)]
+enum TreeExpression {
+    VariableIdentifier(Token, Token, Token, String, Option<Vec<Token>>, bool),
+    //*DATATYPE, VISIBILITY, NAME, VALUE, ARRAY*/;
+    StructIdentifier(String, Vec<Argument>),
+    //* STRUCT NAME, DATA STRUCTURE */
+    FunctionIdentifier(FunctionIdentifier),
+    CallbackIdentifier(CallbackIdentifier),
+}
+
+#[derive(Debug, Clone)]
+enum Expression {
+    Contract,
+    Callback,
+    Struct,
+    Function,
+    Mapping,
+    None,
+}
+
+#[derive(Debug)]
+
+enum Argument {
+    Params(Token, String, bool),
+    //DATATYPE, NAME, isarray
+}
+
 fn main() {
+    /// DEFINE KEYWORDS
+    const KEYWORDS: [&str; 62] = [
+        "contract",
+        "mapping",
+        "fallback",
+        "calldata",
+        "cron",
+        "receive",
+        "gasless",
+        "tx",
+        "msg",
+        "block",
+        "constructor",
+        "address",
+        "private",
+        "struct",
+        "function",
+        "public",
+        "views",
+        "returns",
+        "pure",
+        "return",
+        "external",
+        "memory",
+        "uint8",
+        "uint16",
+        "uint32",
+        "uint120",
+        "uint256",
+        "int8",
+        "int16",
+        "int32",
+        "int120",
+        "int256",
+        "string",
+        "bool",
+        "if",
+        "else",
+        "for",
+        "upgrdable",
+        "constant",
+        "immutable",
+        "+",
+        "-",
+        "/",
+        "*",
+        "(",
+        ")",
+        "[",
+        "]",
+        "{",
+        "}",
+        ">",
+        "<",
+        ".",
+        "=",
+        "!",
+        "%",
+        ";",
+        "\"",
+        "'",
+        ",",
+        "|",
+        "&",
+    ];
+
+    /* GET ENVIRONMENT ARGUMENTS */
     let args: Vec<String> = env::args().collect();
 
+    /* CHECK FOR VALID ARGUMENTS */
     if args.len() < 2 {
-        panic!("File required")
+        print_error("Mising file path... Run cargo run <file-path>")
     }
 
+    /* VALIDATE FILE FORMAT */
+    if args[1].split(".").last().unwrap() != "sol" {
+        print_error("Unsupported file... Expected \".sol\" file");
+    }
+
+    /* READ FILE TO STRING */
     let file_contents = fs::read_to_string(&args[1]).unwrap_or_else(|err| {
-        panic!("ERROR: Error reading file. {}, \"{}\"", err, args[1]);
+        print_error(&format!("Could not read file. {err}"));
+        process::exit(1);
     });
 
-    let stripped: String = file_contents
+    /* STRIP COMMENTS AND WHITE SPACES FROM FILE STRINGS */
+    let stripped_comments: Vec<&str> = file_contents
         .lines()
-        .filter(|pred| !pred.trim().starts_with("//"))
+        .filter(|pred| !pred.trim().starts_with("//") && !pred.trim().is_empty())
         .collect();
-    let mut lex: Vec<String> = Vec::new();
+
+    /* STRIPED INLINE COMMENTS */
+    let mut stripped_inline_comments: Vec<String> = Vec::new();
+
+    /* STRIP INLINE COMMENTS */
+    for stripped_comment in stripped_comments.iter() {
+        let index = stripped_comment.find("//");
+        if let Some(index_value) = index {
+            stripped_inline_comments.push(stripped_comment[..index_value].trim().to_string())
+        } else {
+            stripped_inline_comments.push(stripped_comment.trim().to_string())
+        }
+    }
+
+    /* JOIN STRIPPED INLINE COMMENTS */
+    let mut joined_stripped_string = stripped_inline_comments.join("");
+
+    /* STRIP DOC STRINGS */
+    while joined_stripped_string.contains("/*") || joined_stripped_string.contains("*/") {
+        let str_start_index = joined_stripped_string.find("/*");
+        let str_end_index = joined_stripped_string.find("*/");
+
+        if let Some(index_) = str_start_index {
+            if let Some(_index) = str_end_index {
+                let left: String = joined_stripped_string[..index_].to_string();
+                let right: String = joined_stripped_string[_index + 2..].to_string();
+
+                joined_stripped_string = left + &right;
+            }
+        }
+    }
+
+    /* COMBINED RELATED CHARACTERS */
     let mut combined_char = String::new();
-    let mut lexems: Vec<Token> = Vec::new();
-    let mut parsed_expression: Vec<ParsedExpression> = Vec::new();
+    /* LEX STRING */
+    let mut lex_string: Vec<String> = Vec::new();
+    /* CHARACTERS REGEX IDENTIFIER */
     let identifier_regex = Regex::new(r"[a-zA-Z_]\w*").unwrap();
 
-    for character in stripped.chars() {
+    /* GROUP RELATED CHARACTERS LIKE B O O L TO BOOL */
+    for character in joined_stripped_string.chars() {
         if character.is_whitespace() && !combined_char.trim().is_empty() {
-            lex.push(combined_char.trim().to_string());
+            lex_string.push(combined_char.trim().to_string());
             combined_char.clear();
         } else if let Some(_) = KEYWORDS
             .iter()
             .find(|pred| pred == &&character.to_string().as_str())
         {
             if !combined_char.trim().is_empty() {
-                lex.push(combined_char.trim().to_string());
+                lex_string.push(combined_char.trim().to_string());
                 combined_char.clear();
             }
-            lex.push(character.to_string());
+            lex_string.push(character.to_string());
         } else if let Some(_) = KEYWORDS
             .iter()
             .find(|pred| pred == &&combined_char.as_str().trim())
         {
-            // println!("{combined_char} {}", characters[index]);
-
             if let Some(_) = identifier_regex.find(character.to_string().as_str()) {
                 combined_char.push_str(character.to_string().as_str())
             } else {
-                lex.push(combined_char.trim().to_string());
+                lex_string.push(combined_char.trim().to_string());
                 combined_char.clear();
             }
         } else {
@@ -228,13 +311,13 @@ fn main() {
         }
     }
 
-    for lexed in lex {
-        lexems.push(lex_to_token(&lexed));
+    let mut lexems: Vec<Token> = Vec::new();
+    let mut parsed_expression: Vec<TreeExpression> = Vec::new();
+    for lexed in lex_string {
+        lexems.push(lex_string_to_token(&lexed));
     }
 
-    let parsed_tokens: Vec<Vec<Token>> = parse_token(lexems);
-    // println!("{:?}", parsed_tokens);
-
+    let parsed_tokens: Vec<Vec<Token>> = parse_tokens_into_collections(lexems);
     for parse in parsed_tokens {
         let init = &parse[0];
 
@@ -254,13 +337,24 @@ fn main() {
         }
     }
 
-    // println!("{:#?}", parsed_expression)
+    println!("{:#?}", parsed_expression)
 }
 
-fn lex_to_token(input: &str) -> Token {
+fn print_error(msg: &str) {
+    println!("Error: {}", msg);
+    process::exit(1);
+}
+
+/* PARSE LEX STRING TO TOKENS */
+fn lex_string_to_token(input: &str) -> Token {
     let token = match input {
         "contract" => Token::Contract,
         "mapping" => Token::Mapping,
+        "upgradable" => Token::Upgradable,
+        "immutable" => Token::Immutable,
+        "constant" => Token::Constant,
+        "enum" => Token::Enum,
+        "calldata" => Token::Calldata,
         "msg" => Token::Msg,
         "constructor" => Token::Constructor,
         "receive" => Token::Receive,
@@ -296,6 +390,7 @@ fn lex_to_token(input: &str) -> Token {
         "if" => Token::If,
         "else" => Token::Else,
         "for" => Token::For,
+        "mutable" => Token::Mutable,
         "+" => Token::Plus,
         "-" => Token::Minus,
         "/" => Token::Divide,
@@ -324,82 +419,91 @@ fn lex_to_token(input: &str) -> Token {
     token
 }
 
-fn detokenize(input: Token) -> &'static str {
+fn detokenize(input: Token) -> String {
     let token = match input {
-        Token::Contract => "contract",
-        Token::Mapping => "mapping",
-        Token::Msg => "msg",
-        Token::Constructor => "constructor",
-        Token::Receive => "receive",
-        Token::Fallback => "fallback",
-        Token::Cron => "cron",
-        Token::Gasless => "gasless",
-        Token::Address => "address",
-        Token::Private => "private",
-        Token::Struct => "struct",
-        Token::Function => "function",
-        Token::Public => "public",
-        Token::View => "view",
-        Token::Returns => "returns",
-        Token::Pure => "pure",
-        Token::Return => "return",
-        Token::External => "external",
-        Token::Payable => "payable",
-        Token::Memory => "memory",
-        Token::Uint => "uint",
-        Token::Int => "int",
-        Token::Int8 => "int8",
-        Token::Uint8 => "uint8",
-        Token::Uint16 => "uint16",
-        Token::Uint32 => "uint32",
-        Token::Uint120 => "uint120",
-        Token::Uint256 => "uint256",
-        Token::Int16 => "int16",
-        Token::Int32 => "int32",
-        Token::Int120 => "int120",
-        Token::Int256 => "int256",
-        Token::String => "string",
-        Token::Bool => "bool",
-        Token::If => "if",
-        Token::Else => "else",
-        Token::For => "for",
-        Token::Plus => "+",
-        Token::Minus => "-",
-        Token::Divide => "/",
-        Token::Multiply => "*",
-        Token::OpenParenthesis => "(",
-        Token::CloseParenthesis => ")",
-        Token::OpenSquareBracket => "[",
-        Token::CloseSquareBracket => "]",
-        Token::OpenBraces => "{",
-        Token::CloseBraces => "}",
-        Token::GreaterThan => ">",
-        Token::LessThan => "<",
-        Token::Dot => ".",
-        Token::Equals => "=",
-        Token::Bang => "!",
-        Token::Modulu => "%",
-        Token::SemiColon => ";",
-        Token::Quotation => "\"",
-        Token::Coma => ",",
-        Token::Pipe => "|",
-        Token::Ampersand => "&",
+        Token::Contract => "contract".to_string(),
+        Token::Mapping => "mapping".to_string(),
+        Token::Mutable => "mutable".to_string(),
+        Token::Upgradable => "upgradable".to_string(),
+        Token::Immutable => "immutable".to_string(),
+        Token::Constant => "constant".to_string(),
+        Token::Enum => "enum".to_string(),
+        Token::Calldata => "calldata".to_string(),
+        Token::Msg => "msg".to_string(),
+        Token::Constructor => "constructor".to_string(),
+        Token::Receive => "receive".to_string(),
+        Token::Fallback => "fallback".to_string(),
+        Token::Cron => "cron".to_string(),
+        Token::Gasless => "gasless".to_string(),
+        Token::Address => "address".to_string(),
+        Token::Private => "private".to_string(),
+        Token::Struct => "struct".to_string(),
+        Token::Function => "function".to_string(),
+        Token::Public => "public".to_string(),
+        Token::View => "view".to_string(),
+        Token::Returns => "returns".to_string(),
+        Token::Pure => "pure".to_string(),
+        Token::Return => "return".to_string(),
+        Token::External => "external".to_string(),
+        Token::Payable => "payable".to_string(),
+        Token::Memory => "memory".to_string(),
+        Token::Uint => "uint".to_string(),
+        Token::Int => "int".to_string(),
+        Token::Int8 => "int8".to_string(),
+        Token::Uint8 => "uint8".to_string(),
+        Token::Uint16 => "uint16".to_string(),
+        Token::Uint32 => "uint32".to_string(),
+        Token::Uint120 => "uint120".to_string(),
+        Token::Uint256 => "uint256".to_string(),
+        Token::Int16 => "int16".to_string(),
+        Token::Int32 => "int32".to_string(),
+        Token::Int120 => "int120".to_string(),
+        Token::Int256 => "int256".to_string(),
+        Token::String => "string".to_string(),
+        Token::Bool => "bool".to_string(),
+        Token::If => "if".to_string(),
+        Token::Else => "else".to_string(),
+        Token::For => "for".to_string(),
+        Token::Plus => "+".to_string(),
+        Token::Minus => "-".to_string(),
+        Token::Divide => "/".to_string(),
+        Token::Multiply => "*".to_string(),
+        Token::OpenParenthesis => "(".to_string(),
+        Token::CloseParenthesis => ")".to_string(),
+        Token::OpenSquareBracket => "[".to_string(),
+        Token::CloseSquareBracket => "]".to_string(),
+        Token::OpenBraces => "{".to_string(),
+        Token::CloseBraces => "}".to_string(),
+        Token::GreaterThan => ">".to_string(),
+        Token::LessThan => "<".to_string(),
+        Token::Dot => ".".to_string(),
+        Token::Equals => "=".to_string(),
+        Token::Bang => "!".to_string(),
+        Token::Modulu => "%".to_string(),
+        Token::SemiColon => ";".to_string(),
+        Token::Quotation => "\"".to_string(),
+        Token::Coma => ",".to_string(),
+        Token::Pipe => "|".to_string(),
+        Token::Ampersand => "&".to_string(),
 
-        _ => "",
+        Token::Identifier(val_) => val_.to_string(),
     };
     token
 }
 
-fn parse_token(tokens: Vec<Token>) -> Vec<Vec<Token>> {
+/* PARSE TOKENS TO RELATIVE COLLECTIONS */
+fn parse_tokens_into_collections(tokens: Vec<Token>) -> Vec<Vec<Token>> {
     let mut current_expression = Expression::None;
     let mut expression: Vec<Token> = Vec::new();
     let mut expression_parent: Vec<Vec<Token>> = Vec::new();
     let mut opened_braces = 0;
 
     for token in tokens {
-        if let Expression::Contract = current_expression {}
         match token {
-            Token::Contract => current_expression = Expression::Contract,
+            Token::Contract => {
+                current_expression = Expression::Contract;
+                expression.push(token.clone());
+            }
             Token::Constructor => {
                 current_expression = Expression::Callback;
                 expression.push(token.clone());
@@ -446,11 +550,16 @@ fn parse_token(tokens: Vec<Token>) -> Vec<Vec<Token>> {
                 }
             }
             Token::OpenBraces => {
-                opened_braces += 1;
-                if let Expression::Contract = current_expression {
+                if opened_braces == 0 {
+                    expression_parent.push(expression.clone());
+                    expression.clear();
                 } else {
-                    expression.push(token);
+                    if let Expression::Contract = current_expression {
+                    } else {
+                        expression.push(token);
+                    }
                 }
+                opened_braces += 1;
             }
             Token::CloseBraces => {
                 if let Expression::Function = current_expression {
@@ -470,9 +579,6 @@ fn parse_token(tokens: Vec<Token>) -> Vec<Vec<Token>> {
                     current_expression = Expression::Contract;
                 }
 
-                // if let Expression::Struct = current_expression {
-                // }
-
                 if opened_braces - 1 == 1 {
                     current_expression = Expression::Contract;
                 } else if opened_braces - 1 == 0 {
@@ -482,44 +588,10 @@ fn parse_token(tokens: Vec<Token>) -> Vec<Vec<Token>> {
                 opened_braces -= 1
             }
 
-            _ => {
-                // if let Some(_) = extract_data_types_from_token(&token) {
-                if opened_braces > 0 {
-                    expression.push(token)
-                }
-                // }
-            }
+            _ => expression.push(token),
         }
     }
-    // println!("{expression_parent:?}");
     expression_parent
-}
-
-#[derive(Debug, Clone)]
-enum Expression {
-    Contract,
-    Callback,
-    Struct,
-    Function,
-    Variable,
-    Mapping,
-    None,
-}
-
-#[derive(Debug)]
-
-enum Argument {
-    Params(Token, String, bool),
-    //DATATYPE, NAME, isarray
-}
-#[derive(Debug)]
-enum ParsedExpression {
-    VariableIdentifier(Token, Token, String, Option<String>, bool),
-    //*DATATYPE, VISIBILITY, NAME, VALUE, ARRAY*/;
-    StructIdentifier(String, Vec<Argument>),
-    //* STRUCT NAME, DATA STRUCTURE */
-    FunctionIdentifier(FunctionIdentifier),
-    CallbackIdentifier(CallbackIdentifier),
 }
 
 fn extract_callback_from_token(token: &Token) -> Option<Token> {
@@ -528,6 +600,15 @@ fn extract_callback_from_token(token: &Token) -> Option<Token> {
         Token::Fallback => Some(Token::Fallback),
         Token::Receive => Some(Token::Receive),
         Token::Cron => Some(Token::Cron),
+        _ => None,
+    }
+}
+
+fn extract_Mutability_from_token(token: &Token) -> Option<Token> {
+    match token {
+        Token::Constant => Some(Token::Constant),
+        Token::Immutable => Some(Token::Immutable),
+
         _ => None,
     }
 }
@@ -562,29 +643,35 @@ fn extract_visibility_from_token(token: &Token) -> Option<Token> {
     }
 }
 
-fn parse_variable(tokens: Vec<Token>) -> ParsedExpression {
-    println!("{tokens:?}");
-    if tokens.len() > 8 {
-        panic!("ERROR: {tokens:?}")
-    }
+fn parse_variable(tokens: Vec<Token>) -> TreeExpression {
+    // if tokens.len() > 8 {
+    //     panic!("ERROR: {tokens:?}")
+    // }
     if tokens.len() < 3 {
         panic!("ERROR: {tokens:?}")
     }
     let data_type = &tokens[0];
     let mut visibility: Option<Token> = None;
+    let mut mutability: Option<Token> = Some(Token::Mutable);
     let mut name: Option<String> = None;
-    let mut value: Option<String> = None;
+    let mut value: Option<Vec<Token>> = None;
 
+    let start_index = tokens.iter().position(|pred| pred == &Token::Equals);
+    // println!("{:?}", &tokens[start_index.unwrap() + 1..tokens.len() - 1]);
+    if let Some(_) = start_index {
+        value = Some(tokens[start_index.unwrap() + 1..tokens.len() - 1].to_vec());
+    }
     for id in &tokens[1..] {
         if let Some(_) = extract_visibility_from_token(&id) {
             visibility = extract_visibility_from_token(&id);
         } else {
+            if let Some(_) = extract_Mutability_from_token(&id) {
+                mutability = extract_Mutability_from_token(&id);
+            }
             match id {
                 Token::Identifier(_predicate) => {
                     if let None = name {
                         name = Some(_predicate.clone())
-                    } else {
-                        value = Some(_predicate.clone());
                     }
                 }
                 // Token::OpenSquareBracket
@@ -603,9 +690,10 @@ fn parse_variable(tokens: Vec<Token>) -> ParsedExpression {
         false
     };
 
-    let final_expression = ParsedExpression::VariableIdentifier(
+    let final_expression = TreeExpression::VariableIdentifier(
         data_type.clone(),
         visibility.unwrap(),
+        mutability.unwrap(),
         name.unwrap(),
         value.clone(),
         is_array,
@@ -614,7 +702,7 @@ fn parse_variable(tokens: Vec<Token>) -> ParsedExpression {
     final_expression
 }
 
-fn parse_structs(tokens: Vec<Token>) -> ParsedExpression {
+fn parse_structs(tokens: Vec<Token>) -> TreeExpression {
     let struct_name: &Token = &tokens[1];
     let mut args: Vec<Argument> = Vec::new();
 
@@ -658,11 +746,11 @@ fn parse_structs(tokens: Vec<Token>) -> ParsedExpression {
     if let None = struct_name {
         panic!("ERROR: INVALID STRUCT NAME");
     }
-    let expr = ParsedExpression::StructIdentifier(struct_name.unwrap().clone(), args);
+    let expr = TreeExpression::StructIdentifier(struct_name.unwrap().clone(), args);
     expr
 }
 
-fn parse_function(tokens: Vec<Token>) -> ParsedExpression {
+fn parse_function(tokens: Vec<Token>) -> TreeExpression {
     let function_name = match &tokens[1] {
         Token::Identifier(_name) => Some(_name),
         _ => None,
@@ -757,10 +845,10 @@ fn parse_function(tokens: Vec<Token>) -> ParsedExpression {
         args,
     );
 
-    ParsedExpression::FunctionIdentifier(structured)
+    TreeExpression::FunctionIdentifier(structured)
 }
 
-fn parse_callback(tokens: Vec<Token>) -> ParsedExpression {
+fn parse_callback(tokens: Vec<Token>) -> TreeExpression {
     let type_ = &tokens[0];
 
     let mut arms: Vec<Vec<Token>> = Vec::new();
@@ -816,5 +904,5 @@ fn parse_callback(tokens: Vec<Token>) -> ParsedExpression {
 
     let structured = CallbackIdentifier::new(type_.clone(), args, arms);
 
-    ParsedExpression::CallbackIdentifier(structured)
+    TreeExpression::CallbackIdentifier(structured)
 }
