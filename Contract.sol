@@ -1,25 +1,48 @@
 // SPDX-License-Identifier: MIT
-// pragma solidity ^0.8.20;
+// pragma solidity ^0.8.8;
 
-contract Counter {
-    uint[] public count = [1 + 1, 2];
-    string oi = ("str");
+contract Todos {
+    struct Todo {
+        string text;
+        bool completed;
+    }
+    // An array of 'Todo' structs
+    Todo[] public todos;
 
-    fallback() external {}
+    function create(string calldata _text) public {
+        // 3 ways to initialize a struct
+        // - calling it like a function
+        todos.push(Todo(_text, false));
 
-    // Function to get the current count
-    function get() public view returns (uint) {
-        return count;
+        // key value mapping
+        todos.push(Todo({text: _text, completed: false}));
+
+        // initialize an empty struct and then update it
+        Todo memory todo;
+        todo.text = _text;
+        // todo.completed initialized to false
+
+        todos.push(todo);
     }
 
-    // Function to increment count by 1
-    function inc() public {
-        count += 1;
+    // Solidity automatically created a getter for 'todos' so
+    // you don't actually need this function.
+    function get(
+        uint _index
+    ) public view returns (string memory text, bool completed) {
+        Todo storage todo = todos[_index];
+        return (todo.text, todo.completed);
     }
 
-    // Function to decrement count by 1
-    function dec() public {
-        // This function will fail if count = 0
-        count -= 1;
+    // update text
+    function updateText(uint _index, string calldata _text) public {
+        Todo storage todo = todos[_index];
+        todo.text = _text;
+    }
+
+    // update completed
+    function toggleCompleted(uint _index) public {
+        Todo storage todo = todos[_index];
+        todo.completed = !todo.completed;
     }
 }
