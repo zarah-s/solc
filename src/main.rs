@@ -8,7 +8,7 @@ struct FunctionIdentifier {
     arguments: Option<Vec<Argument>>,
     visibility: Token,
     view: Option<Token>,
-    return_type: Option<String>,
+    return_type: Option<Vec<Token>>,
     gasless: bool,
     payable: bool,
     arms: Vec<Vec<Token>>,
@@ -28,7 +28,7 @@ impl FunctionIdentifier {
         visibility: Token,
         view: Option<Token>,
         arms: Vec<Vec<Token>>,
-        return_type: Option<String>,
+        return_type: Option<Vec<Token>>,
         gasless: bool,
         payable: bool,
         arguments: Option<Vec<Argument>>,
@@ -760,6 +760,7 @@ fn parse_function(tokens: Vec<Token>) -> TreeExpression {
     let mut is_gasless = false;
     let mut payable: bool = false;
     let mut view: Option<Token> = None;
+    let mut return_type: Option<Vec<Token>> = None;
     let mut arms: Vec<Vec<Token>> = Vec::new();
     let mut args: Vec<Argument> = Vec::new();
 
@@ -816,6 +817,19 @@ fn parse_function(tokens: Vec<Token>) -> TreeExpression {
         view = Some(Token::Pure)
     }
 
+    if tokens.contains(&Token::Returns) {
+        let returns_position = tokens.iter().position(|pred| pred == &Token::Returns);
+        let from_returns_arr = &tokens[returns_position.unwrap()..];
+        let to_close_paren = from_returns_arr
+            .iter()
+            .position(|pred| pred == &Token::CloseParenthesis);
+        if let Some(index_) = to_close_paren {
+            return_type = Some(from_returns_arr[2..index_].to_vec());
+            // println!("{:?}", &from_returns_arr[1..index_ + 1]);
+        }
+        // println!("{:?}", from_returns_arr);
+    }
+
     for fnd in &tokens[1..] {
         if let Some(_) = extract_visibility_from_token(fnd) {
             visibility = Some(fnd.clone());
@@ -839,7 +853,7 @@ fn parse_function(tokens: Vec<Token>) -> TreeExpression {
         visibility.unwrap(),
         view,
         arms,
-        None,
+        return_type,
         is_gasless,
         payable,
         args,
