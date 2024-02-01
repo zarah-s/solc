@@ -271,6 +271,15 @@ fn extract_custom_data_types(data: &Vec<LineDescriptions>) -> Vec<StructIdentifi
         if let Some(_) = start_index {
             let left_padding = stringified_data[start_index.unwrap()..].to_string();
             let end_index = &left_padding.find("}");
+            if let None = end_index {
+                print_error(&format!(
+                    "Unprocessible entity on line {:?}",
+                    LineDescriptions::to_struct(left_padding.clone())
+                        .last()
+                        .unwrap()
+                        .line
+                ))
+            }
             let position_from_close_brace = &left_padding[end_index.unwrap()..].find("%%");
 
             let right_padding = left_padding
@@ -301,6 +310,21 @@ fn validate_struct(data: &Vec<LineDescriptions>) -> StructIdentifier {
 
             if validate_identifier_regex(splited_str[1], sst.line) {
                 identifier = Some(splited_str[1]);
+            }
+
+            let check_inline_format: Vec<&str> = sst.text.split("{").collect();
+            if check_inline_format.len() > 0 && !check_inline_format[1].is_empty() {
+                let inline_types: Vec<&str> = check_inline_format[1].split(";").collect();
+                println!("{:?}", inline_types);
+                for inline in inline_types {
+                    if inline != "}" && !inline.is_empty() {
+                        if let Some(return_value) =
+                            validate_struct_type(&format!("{inline};"), sst.line)
+                        {
+                            types.push(return_value);
+                        }
+                    }
+                }
             }
         } else {
             if sst.text != "}" {
@@ -338,7 +362,7 @@ fn validate_struct_type(text: &str, line: i32) -> Option<StructTypes> {
                 if validate_identifier_regex(splited_terminate[0], line) {
                     return Some(StructTypes::Type(
                         splited[0].to_string(),
-                        splited[1].to_string(),
+                        splited_terminate[0].to_string(),
                     ));
                 }
                 None
@@ -352,17 +376,28 @@ fn validate_struct_type(text: &str, line: i32) -> Option<StructTypes> {
 /* *************************** VARIABLE ******************************************/
 
 fn extract_global_variables(data: &Vec<LineDescriptions>) {
-    // println!("{:?}", data);
-
     let mut opened_braces = 0;
 
     for sst in data {
         if sst.text.contains("{") {
-            opened_braces += 1;
+            for character in sst.text.chars() {
+                if character == '{' {
+                    opened_braces += 1;
+                }
+            }
         }
 
         if sst.text.contains("}") {
-            opened_braces -= 1;
+            for character in sst.text.chars() {
+                if character == '}' {
+                    opened_braces -= 1;
+                }
+            }
+        }
+
+        if opened_braces == 1 {
+            // prin
+            println!("{:?}", sst)
         }
     }
 

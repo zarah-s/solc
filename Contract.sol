@@ -6,6 +6,7 @@ contract Todos {
         string text;
         bool completed;
     }
+    mapping(address => uint) name;
 
     // An array of 'Todo' structs
     Todo[] public todos;
