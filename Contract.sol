@@ -6,6 +6,7 @@ contract Todos {
         string text;
         bool completed;
     }
+
     // An array of 'Todo' structs
     Todo[] public todos;
 
@@ -34,6 +35,11 @@ contract Todos {
         return (todo.text, todo.completed);
     }
 
+    struct Calm {
+        string text;
+        bool completed;
+    }
+
     // update text
     function updateText(uint _index, string calldata _text) public {
         Todo storage todo = todos[_index];
@@ -44,5 +50,10 @@ contract Todos {
     function toggleCompleted(uint _index) public {
         Todo storage todo = todos[_index];
         todo.completed = !todo.completed;
+    }
+
+    struct NFT {
+        string[] text;
+        bool[] completed;
     }
 }
