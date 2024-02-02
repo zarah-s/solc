@@ -2,7 +2,8 @@
 // pragma solidity ^0.8.8;
 
 contract Todos {
-    uint leeter = 1;
+    int public leeter = -1;
+
     struct Todo {
         string text;
         bool completed;
@@ -21,9 +22,11 @@ contract Todos {
 
     // An array of 'Todo' structs
     Todo[] public todos;
+    string greet = "Hello";
 
     function create(string calldata _text) public {
         // 3 ways to initialize a struct
+        string memory greet = "Hello";
         // - calling it like a function
         todos.push(Todo(_text, false));
 
@@ -68,4 +71,10 @@ contract Todos {
         string[] text;
         bool[] completed;
     }
+    int public leeter = -1;
+    int public leeter = -1;
+    int public leeter = -1;
+    int public leeter = -1;
+
+    bool[] arr;
 }
