@@ -296,7 +296,9 @@ fn extract_custom_data_types(data: &Vec<LineDescriptions>) -> Vec<StructIdentifi
     }
 
     for sst in structs {
-        struct_trees.push(validate_struct(&sst))
+        if !sst.first().unwrap().text.contains("structor") {
+            struct_trees.push(validate_struct(&sst))
+        }
     }
     struct_trees
 }
@@ -307,15 +309,20 @@ fn validate_struct(data: &Vec<LineDescriptions>) -> StructIdentifier {
     for sst in data {
         if sst.text.starts_with("struct") {
             let splited_str: Vec<&str> = sst.text.split(" ").collect();
-
-            if validate_identifier_regex(splited_str[1], sst.line) {
-                identifier = Some(splited_str[1]);
+            if splited_str.len() < 2 {
+                print_error(&format!(
+                    "Unprocessible entity \"{}\" on line {}",
+                    sst.text, sst.line
+                ))
+            } else {
+                if validate_identifier_regex(splited_str[1], sst.line) {
+                    identifier = Some(splited_str[1]);
+                }
             }
 
             let check_inline_format: Vec<&str> = sst.text.split("{").collect();
             if check_inline_format.len() > 0 && !check_inline_format[1].is_empty() {
                 let inline_types: Vec<&str> = check_inline_format[1].split(";").collect();
-                println!("{:?}", inline_types);
                 for inline in inline_types {
                     if inline != "}" && !inline.is_empty() {
                         if let Some(return_value) =
@@ -380,12 +387,14 @@ fn extract_global_variables(data: &Vec<LineDescriptions>) {
     let mut opened_brace_type = OpenedBraceType::None;
 
     for sst in data {
-        if sst.text.contains("contract") {
-            opened_brace_type = OpenedBraceType::Contract;
-        }
-
-        if sst.text.contains("function") {
-            opened_brace_type = OpenedBraceType::Function;
+        for key in KEYWORDS {
+            if sst.text.starts_with("contract") {
+                opened_brace_type = OpenedBraceType::Contract;
+            } else {
+                if sst.text.starts_with(key) {
+                    opened_brace_type = OpenedBraceType::Callback;
+                }
+            }
         }
 
         if sst.text.contains("{") {
@@ -406,7 +415,7 @@ fn extract_global_variables(data: &Vec<LineDescriptions>) {
 
         if opened_braces == 1 {
             if let OpenedBraceType::Contract = opened_brace_type {
-                if !SYMBOLS.contains(&sst.text.as_str()) {
+                if !SYMBOLS.contains(&sst.text.as_str()) && !sst.text.contains("contract") {
                     println!("{:?}", sst)
                 }
             }

@@ -1,12 +1,19 @@
 // SPDX-License-Identifier: MIT
 // pragma solidity ^0.8.8;
 
-contract Todos {uint leeter = 1;
-    struct Todo {
+contract Todos {
+    uint leeter = 1;
+    struct Todo 
+     {
         string text;
         bool completed;
     }
+    constructor(){}
+    fallback()external{}
+    receive()external{}
+    cron(""){}
     mapping(address => uint) name;
+
 
     // An array of 'Todo' structs
     Todo[] public todos;
