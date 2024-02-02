@@ -321,14 +321,21 @@ fn validate_struct(data: &Vec<LineDescriptions>) -> StructIdentifier {
             }
 
             let check_inline_format: Vec<&str> = sst.text.split("{").collect();
-            if check_inline_format.len() > 0 && !check_inline_format[1].is_empty() {
-                let inline_types: Vec<&str> = check_inline_format[1].split(";").collect();
-                for inline in inline_types {
-                    if inline != "}" && !inline.is_empty() {
-                        if let Some(return_value) =
-                            validate_struct_type(&format!("{inline};"), sst.line)
-                        {
-                            types.push(return_value);
+            if check_inline_format.len() < 2 {
+                print_error(&format!(
+                    "Unprocessible entity {} on line {}",
+                    sst.text, sst.line
+                ))
+            } else {
+                if check_inline_format.len() > 0 && !check_inline_format[1].is_empty() {
+                    let inline_types: Vec<&str> = check_inline_format[1].split(";").collect();
+                    for inline in inline_types {
+                        if inline != "}" && !inline.is_empty() {
+                            if let Some(return_value) =
+                                validate_struct_type(&format!("{inline};"), sst.line)
+                            {
+                                types.push(return_value);
+                            }
                         }
                     }
                 }
