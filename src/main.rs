@@ -81,14 +81,14 @@ struct StructIdentifier {
     types: Vec<StructTypes>,
 }
 
-// #[derive(Debug)]
-// enum OpenedBraceType {
-//     None,
-//     Struct,
-//     Callback,
-//     Function,
-//     Contract,
-// }
+#[derive(Debug)]
+enum OpenedBraceType {
+    None,
+    Struct,
+    Callback,
+    Function,
+    Contract,
+}
 
 impl StructIdentifier {
     pub fn new(identifier: String, types: Vec<StructTypes>) -> Self {
@@ -377,8 +377,17 @@ fn validate_struct_type(text: &str, line: i32) -> Option<StructTypes> {
 
 fn extract_global_variables(data: &Vec<LineDescriptions>) {
     let mut opened_braces = 0;
+    let mut opened_brace_type = OpenedBraceType::None;
 
     for sst in data {
+        if sst.text.contains("contract") {
+            opened_brace_type = OpenedBraceType::Contract;
+        }
+
+        if sst.text.contains("function") {
+            opened_brace_type = OpenedBraceType::Function;
+        }
+
         if sst.text.contains("{") {
             for character in sst.text.chars() {
                 if character == '{' {
@@ -396,8 +405,11 @@ fn extract_global_variables(data: &Vec<LineDescriptions>) {
         }
 
         if opened_braces == 1 {
-            // prin
-            println!("{:?}", sst)
+            if let OpenedBraceType::Contract = opened_brace_type {
+                if !SYMBOLS.contains(&sst.text.as_str()) {
+                    println!("{:?}", sst)
+                }
+            }
         }
     }
 
