@@ -2,18 +2,20 @@
 // pragma solidity ^0.8.8;
 
 contract Todos {
-    int public leeter = -1;
+    int public constant leeter = -1;
 
     struct Todo {
         string text;
         bool completed;
     }
 
-    constructor() {
+    constructor(uint leeter) {
         uint leeter = 1;
     }
 
-    fallback() external {}
+    fallback() external {
+        uint leeter = 1;
+    }
 
     receive() external payable {}
 
@@ -22,6 +24,7 @@ contract Todos {
 
     // An array of 'Todo' structs
     Todo[] public todos;
+    Todo public yo = Todo({text: "Hello", completed: false});
     string greet = "Hello";
 
     function create(string calldata _text) public {
@@ -70,6 +73,7 @@ contract Todos {
     struct NFT {
         string[] text;
         bool[] completed;
+        Todo[] todo;
     }
     int public leeter = -1;
     int public leeter = -1;

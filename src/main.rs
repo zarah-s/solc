@@ -1,4 +1,4 @@
-use std::{env, fs, process};
+use std::{env, fs, process, string};
 
 use regex::Regex;
 
@@ -81,6 +81,34 @@ struct StructIdentifier {
     types: Vec<StructTypes>,
 }
 
+#[derive(Debug, Clone)]
+
+struct VariableIdentifier {
+    data_type: String,
+    visibility: String,
+    mutability: String,
+    name: String,
+    value: Option<String>,
+}
+
+impl VariableIdentifier {
+    pub fn new(
+        data_type: String,
+        visibility: String,
+        mutability: String,
+        name: String,
+        value: Option<String>,
+    ) -> Self {
+        Self {
+            data_type,
+            visibility,
+            mutability,
+            name,
+            value,
+        }
+    }
+}
+
 #[derive(Debug)]
 enum OpenedBraceType {
     None,
@@ -100,14 +128,6 @@ impl StructIdentifier {
 struct LineDescriptions {
     text: String,
     line: i32,
-}
-
-struct Expressions {
-    structs: Vec<StructIdentifier>,
-}
-
-impl Expressions {
-    pub fn new_structs(structs: Vec<StructIdentifier>) {}
 }
 
 impl LineDescriptions {
@@ -219,8 +239,9 @@ fn main() {
         LineDescriptions::to_struct(joined_stripped_string);
 
     let structs_tree = extract_custom_data_types(&structured_stripped_compilable_contents);
-    extract_global_variables(&structured_stripped_compilable_contents);
-    // println!("{:#?}", structs_tree)
+    let global_variables = extract_global_variables(&structured_stripped_compilable_contents);
+    extract_functions(&structured_stripped_compilable_contents);
+    // println!("{:#?} {:#?}", structs_tree, global_variables)
 }
 
 fn print_error(msg: &str) {
@@ -365,31 +386,32 @@ fn validate_struct_type(text: &str, line: i32) -> Option<StructTypes> {
             print_error(&format!("Expecting \"{}\" on line {}", ";", line));
             None
         } else {
-            if !DATA_TYPES.contains(&splited[0]) {
-                print_error(&format!(
-                    "Unidentified identifier \"{}\" on line {}",
-                    splited[0], line
+            // if !DATA_TYPES.contains(&splited[0]) {
+            //     print_error(&format!(
+            //         "Unidentified identifier \"{}\" on line {}",
+            //         splited[0], line
+            //     ));
+            //     None
+            // } else {
+            let splited_terminate: Vec<&str> = splited[1].split(";").collect();
+            if validate_identifier_regex(splited_terminate[0], line) {
+                return Some(StructTypes::Type(
+                    splited[0].to_string(),
+                    splited_terminate[0].to_string(),
                 ));
-                None
-            } else {
-                let splited_terminate: Vec<&str> = splited[1].split(";").collect();
-                if validate_identifier_regex(splited_terminate[0], line) {
-                    return Some(StructTypes::Type(
-                        splited[0].to_string(),
-                        splited_terminate[0].to_string(),
-                    ));
-                }
-                None
             }
+            None
+            // }
         }
     }
 }
 
 /* *************************** STRUCT END ******************************************/
 
-/* *************************** VARIABLE ******************************************/
+/* *************************** VARIABLE START ******************************************/
 
-fn extract_global_variables(data: &Vec<LineDescriptions>) {
+fn extract_global_variables(data: &Vec<LineDescriptions>) -> Vec<VariableIdentifier> {
+    let mut global_variables = Vec::new();
     let mut opened_braces = 0;
     let mut opened_brace_type = OpenedBraceType::None;
     let mut variables: Vec<LineDescriptions> = Vec::new();
@@ -412,9 +434,6 @@ fn extract_global_variables(data: &Vec<LineDescriptions>) {
             for llm in sst.text.chars() {
                 if llm == '{' {
                     opened_braces += 1;
-                    // if opened_braces == 1 {
-                    //     opened_brace_type = OpenedBraceType::Contract;
-                    // }
                 }
             }
         }
@@ -456,5 +475,123 @@ fn extract_global_variables(data: &Vec<LineDescriptions>) {
         }
     }
 
-    println!("{:#?}", variables)
+    for variable in variables {
+        global_variables.push(validate_variable(variable));
+    }
+
+    global_variables
+}
+
+fn validate_variable(text: LineDescriptions) -> VariableIdentifier {
+    let spl: Vec<&str> = text.text.split(" ").collect();
+
+    let data_type = spl[0];
+    let mut visibility = "private";
+    let mut mutability = "mutable";
+    let mut value: Option<String> = None;
+    let splited: Vec<&str> = text.text.split("=").collect();
+    let left_padding: Vec<&str> = splited[0].split(" ").collect();
+    let name = left_padding
+        .iter()
+        .filter(|pred| !pred.is_empty())
+        .last()
+        .unwrap();
+    if splited.len() > 1 {
+        value = Some(splited[1].trim().to_string())
+    }
+
+    if let Some(_visibility) = Regex::new(r"\b(public|private|external)\b")
+        .unwrap()
+        .find(splited[0])
+    {
+        visibility = _visibility.as_str();
+    }
+
+    if let Some(_mutability) = Regex::new(r"\b(constant|immutable)\b")
+        .unwrap()
+        .find(splited[0])
+    {
+        mutability = _mutability.as_str();
+    }
+
+    let structured = VariableIdentifier::new(
+        data_type.to_string(),
+        visibility.to_string(),
+        mutability.to_string(),
+        name.to_string(),
+        value,
+    );
+    structured
+    // println!("{:#?}", structured)
+}
+
+/* *************************** VARIABLE START ******************************************/
+
+/* *************************** FUNCTION START ******************************************/
+
+fn extract_functions(data: &Vec<LineDescriptions>) {
+    let mut opened_braces = 0;
+    let mut opened_braces_type = OpenedBraceType::None;
+    let mut processed_data: Vec<Vec<LineDescriptions>> = Vec::new();
+    let mut combined = Vec::new();
+    for line in data {
+        let raw = line.text.clone();
+
+        if raw.contains("{") {
+            for character in raw.chars() {
+                if character == '{' {
+                    opened_braces += 1;
+                }
+            }
+        }
+
+        if raw.contains("}") {
+            for character in raw.chars() {
+                if character == '}' {
+                    opened_braces -= 1;
+                }
+            }
+        }
+
+        if raw.starts_with("function") {
+            opened_braces_type = OpenedBraceType::Function;
+        }
+
+        if let OpenedBraceType::Function = opened_braces_type {
+            if opened_braces == 1 {
+                opened_braces_type = OpenedBraceType::Contract;
+                combined.push(line.clone());
+
+                processed_data.push(combined.clone());
+                combined.clear();
+            } else {
+                combined.push(line.clone())
+            }
+        }
+    }
+
+    for processed in processed_data {
+        extract_function_arm(processed);
+    }
+    // println!("{processed_data:#?}");
+}
+
+fn extract_function_arm(data: Vec<LineDescriptions>) {
+    let mut opened_braces = 0;
+    let mut stringified = String::new();
+
+    for raw in data {
+        stringified.push_str(&raw.to_string());
+        // println!("{}", raw.to_string())
+    }
+
+    let start_index = stringified.find("{");
+    if let Some(_) = start_index {
+        println!(
+            "{:#?}\n\n\n",
+            LineDescriptions::to_struct(
+                stringified[start_index.unwrap()..stringified.len()].to_string()
+            )
+        );
+    }
 }
