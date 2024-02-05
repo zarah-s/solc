@@ -29,4 +29,4 @@ run:
 	./compiler Contract.sol
 
 push:
-	git add . && git commit -m $(msg) && git push
+	git add . && git commit -m $(msg) && git push && echo pushed to remote repository with $(msg) message
