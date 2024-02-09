@@ -76,6 +76,14 @@ enum StructTypes {
 }
 
 #[derive(Debug, Clone)]
+
+enum VariableType {
+    Variable,
+    Struct,
+    Contract,
+}
+
+#[derive(Debug, Clone)]
 struct StructIdentifier {
     identifier: String,
     types: Vec<StructTypes>,
@@ -85,6 +93,7 @@ struct StructIdentifier {
 
 struct VariableIdentifier {
     data_type: String,
+    type_: VariableType,
     visibility: String,
     mutability: String,
     name: String,
@@ -95,6 +104,7 @@ impl VariableIdentifier {
     pub fn new(
         data_type: String,
         visibility: String,
+        type_: VariableType,
         mutability: String,
         name: String,
         value: Option<String>,
@@ -102,6 +112,7 @@ impl VariableIdentifier {
         Self {
             data_type,
             visibility,
+            type_,
             mutability,
             name,
             value,
@@ -247,9 +258,17 @@ fn main() {
         LineDescriptions::to_struct(joined_stripped_string);
 
     let structs_tree = extract_custom_data_types(&structured_stripped_compilable_contents);
-    let global_variables = extract_global_variables(&structured_stripped_compilable_contents);
-    extract_functions(&structured_stripped_compilable_contents);
-    // println!("{:#?} {:#?}", structs_tree, global_variables)
+    let custom_data_types_identifiers: Vec<&str> = structs_tree
+        .iter()
+        .map(|pred| pred.identifier.as_str())
+        .collect();
+
+    let global_variables = extract_global_variables(
+        &structured_stripped_compilable_contents,
+        &custom_data_types_identifiers,
+    );
+    // extract_functions(&structured_stripped_compilable_contents);
+    println!("{:#?} {:#?}", structs_tree, global_variables)
 }
 
 fn print_error(msg: &str) {
@@ -418,7 +437,10 @@ fn validate_struct_type(text: &str, line: i32) -> Option<StructTypes> {
 
 /* *************************** VARIABLE START ******************************************/
 
-fn extract_global_variables(data: &Vec<LineDescriptions>) -> Vec<VariableIdentifier> {
+fn extract_global_variables(
+    data: &Vec<LineDescriptions>,
+    custom_data_types: &Vec<&str>,
+) -> Vec<VariableIdentifier> {
     let mut global_variables = Vec::new();
     let mut opened_braces = 0;
     let mut opened_brace_type = OpenedBraceType::None;
@@ -484,13 +506,13 @@ fn extract_global_variables(data: &Vec<LineDescriptions>) -> Vec<VariableIdentif
     }
 
     for variable in variables {
-        global_variables.push(validate_variable(variable));
+        global_variables.push(validate_variable(variable, custom_data_types));
     }
 
     global_variables
 }
 
-fn validate_variable(text: LineDescriptions) -> VariableIdentifier {
+fn validate_variable(text: LineDescriptions, custom_data_types: &Vec<&str>) -> VariableIdentifier {
     let spl: Vec<&str> = text.text.split(" ").collect();
 
     let data_type = spl[0];
@@ -521,10 +543,44 @@ fn validate_variable(text: LineDescriptions) -> VariableIdentifier {
     {
         mutability = _mutability.as_str();
     }
+    let mut validated_type = false;
+    let mut variable_type: Option<VariableType> = None;
+    for sst in [DATA_TYPES.to_vec(), custom_data_types.to_vec()].concat() {
+        if data_type.ends_with("]") {
+            if sst.starts_with(&data_type[..data_type.len() - 2]) {
+                validated_type = true;
+            }
+        } else {
+            if sst.starts_with(data_type) {
+                validated_type = true;
+            }
+        }
+    }
+
+    if !validated_type {
+        print_error(&format!(
+            "Invalid data type \"{}\" on line  {}",
+            data_type, text.line
+        ));
+    } else {
+        if let Some(_) = DATA_TYPES.iter().find(|pred| pred == &&data_type) {
+            variable_type = Some(VariableType::Variable);
+        } else {
+            variable_type = Some(VariableType::Struct);
+        }
+    }
+
+    if let None = variable_type {
+        print_error(&format!(
+            "Invalid data type \"{}\" on line  {}",
+            data_type, text.line
+        ));
+    }
 
     let structured = VariableIdentifier::new(
         data_type.to_string(),
         visibility.to_string(),
+        variable_type.unwrap(),
         mutability.to_string(),
         name.to_string(),
         value,
@@ -611,32 +667,55 @@ fn extract_function_arm(data: Vec<LineDescriptions>) {
         // println!("{:#?}", &structured[1..structured.len() - 1]);
 
         let sliced_structured = &structured[1..structured.len() - 1];
-
-        for (index, strr) in sliced_structured.iter().enumerate() {
-            // println!("{:?}", strr)
-
-            if strr.text.contains("{") {
-                for character in strr.text.chars() {
+        for mut i in 1..=sliced_structured.len() - 1 {
+            let element = &sliced_structured[i];
+            if element.text.contains("{") {
+                for character in element.text.chars() {
                     if character == '{' {
                         opened_braces += 1;
                     }
                 }
             }
 
-            if strr.text.contains("}") {
-                for character in strr.text.chars() {
+            if element.text.contains("}") {
+                for character in element.text.chars() {
                     if character == '}' {
                         opened_braces -= 1;
                     }
                 }
             }
 
-            if strr.text.starts_with("if(") || strr.text.starts_with("if (") {
-                // print_error("Error here")
-                println!("{:?}", strr)
+            if element.text.starts_with("if(") || element.text.starts_with("if (") {
+                println!("{} {element:?} ", i)
             } else {
+                println!("nope {} {element:?} ", i)
             }
         }
+        // for (index, strr) in sliced_structured.iter().enumerate() {
+        //     // println!("{:?}", strr)
+
+        //     if strr.text.contains("{") {
+        //         for character in strr.text.chars() {
+        //             if character == '{' {
+        //                 opened_braces += 1;
+        //             }
+        //         }
+        //     }
+
+        //     if strr.text.contains("}") {
+        //         for character in strr.text.chars() {
+        //             if character == '}' {
+        //                 opened_braces -= 1;
+        //             }
+        //         }
+        //     }
+
+        //     if strr.text.starts_with("if(") || strr.text.starts_with("if (") {
+        //         // print_error("Error here")
+        //         println!("{:?}", strr)
+        //     } else {
+        //     }
+        // }
         // let mut stringified = String::new();
 
         // for struct_to_str in structured {

@@ -2,7 +2,7 @@
 // pragma solidity ^0.8.8;
 
 contract Todos {
-    int public constant leeter = -1;
+    int[] public constant leeter = 1;
 
     struct Todo {
         string text;
