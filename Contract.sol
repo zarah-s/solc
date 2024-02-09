@@ -7,6 +7,7 @@ contract Todos {
     struct Todo {
         string text;
         bool completed;
+        //mapping(uing=> string) name;
     }
 
     constructor(uint leeter) {
@@ -27,22 +28,22 @@ contract Todos {
     Todo public yo = Todo({text: "Hello", completed: false});
     string greet = "Hello";
 
-    function create(string calldata _text) public {
-        // 3 ways to initialize a struct
-        string memory greet = "Hello";
-        // - calling it like a function
-        todos.push(Todo(_text, false));
+    // function create(string calldata _text) public {
+    //     // 3 ways to initialize a struct
+    //     string memory greet = "Hello";
+    //     // - calling it like a function
+    //     todos.push(Todo(_text, false));
 
-        // key value mapping
-        todos.push(Todo({text: _text, completed: false}));
+    //     // key value mapping
+    //     todos.push(Todo({text: _text, completed: false}));
 
-        // initialize an empty struct and then update it
-        Todo memory todo;
-        todo.text = _text;
-        // todo.completed initialized to false
+    //     // initialize an empty struct and then update it
+    //     Todo memory todo;
+    //     todo.text = _text;
+    //     // todo.completed initialized to false
 
-        todos.push(todo);
-    }
+    //     todos.push(todo);
+    // }
 
     // Solidity automatically created a getter for 'todos' so
     // you don't actually need this function.
@@ -50,12 +51,30 @@ contract Todos {
         uint _index
     ) public view returns (string memory text, bool completed) {
         Todo storage todo = todos[_index];
+        if (true) {
+            return (todo.text, todo.completed);
+        } else if (false) {
+            if (1 == 1) {
+                return (todo.text, todo.completed);
+            } else {
+                // return;
+            }
+            // do something;
+        }
+
+        if (true) {
+            return (todo.text, todo.completed);
+        } else if (false) {
+            // do something;
+        }
         return (todo.text, todo.completed);
     }
 
     struct Calm {
+        /* hey */
         string text;
-        bool completed;
+        bool completed; // this is a comment
+        Todo[] todos;
     }
 
     // update text

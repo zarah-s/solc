@@ -193,17 +193,25 @@ fn main() {
 
     /* STRIP INLINE COMMENTS */
     for stripped_comment in stripped_comments.iter() {
-        let index = stripped_comment.text.find("//");
-        if let Some(index_value) = index {
+        let comment_index = stripped_comment.text.find("//");
+        let doc_str_index = stripped_comment.text.find("/*");
+        if let Some(index_value) = comment_index {
             stripped_inline_comments.push(LineDescriptions {
                 text: stripped_comment.text[..index_value].trim().to_string(),
                 ..**stripped_comment
             })
         } else {
-            stripped_inline_comments.push(LineDescriptions {
-                text: stripped_comment.text.trim().to_string(),
-                ..**stripped_comment
-            })
+            if let Some(index_value) = doc_str_index {
+                stripped_inline_comments.push(LineDescriptions {
+                    text: stripped_comment.text[..index_value].trim().to_string(),
+                    ..**stripped_comment
+                })
+            } else {
+                stripped_inline_comments.push(LineDescriptions {
+                    text: stripped_comment.text.trim().to_string(),
+                    ..**stripped_comment
+                })
+            }
         }
     }
 
@@ -549,6 +557,15 @@ fn extract_functions(data: &Vec<LineDescriptions>) {
             for character in raw.chars() {
                 if character == '}' {
                     opened_braces -= 1;
+                    if opened_braces == 1 {
+                        if let OpenedBraceType::Function = opened_braces_type {
+                            opened_braces_type = OpenedBraceType::Contract;
+                            combined.push(line.clone());
+
+                            processed_data.push(combined.clone());
+                            combined.clear();
+                        }
+                    }
                 }
             }
         }
@@ -558,15 +575,7 @@ fn extract_functions(data: &Vec<LineDescriptions>) {
         }
 
         if let OpenedBraceType::Function = opened_braces_type {
-            if opened_braces == 1 {
-                opened_braces_type = OpenedBraceType::Contract;
-                combined.push(line.clone());
-
-                processed_data.push(combined.clone());
-                combined.clear();
-            } else {
-                combined.push(line.clone())
-            }
+            combined.push(line.clone())
         }
     }
 
@@ -577,9 +586,10 @@ fn extract_functions(data: &Vec<LineDescriptions>) {
 }
 
 fn extract_function_arm(data: Vec<LineDescriptions>) {
+    let function_block: Vec<FunctionIdentifier> = Vec::new();
     let mut opened_braces = 0;
     let mut stringified = String::new();
-
+    let opened_brace_type = OpenedBraceType::None;
     for raw in data {
         stringified.push_str(&raw.to_string());
         // println!("{}", raw.to_string())
@@ -587,11 +597,117 @@ fn extract_function_arm(data: Vec<LineDescriptions>) {
 
     let start_index = stringified.find("{");
     if let Some(_) = start_index {
-        println!(
-            "{:#?}\n\n\n",
-            LineDescriptions::to_struct(
-                stringified[start_index.unwrap()..stringified.len()].to_string()
-            )
+        // println!(
+        //     "{:#?}\n\n\n",
+        //     LineDescriptions::to_struct(
+        //         stringified[start_index.unwrap()..stringified.len()].to_string()
+        //     )
+        // );
+
+        let structured = LineDescriptions::to_struct(
+            stringified[start_index.unwrap()..stringified.len()].to_string(),
         );
+
+        // println!("{:#?}", &structured[1..structured.len() - 1]);
+
+        let sliced_structured = &structured[1..structured.len() - 1];
+
+        for (index, strr) in sliced_structured.iter().enumerate() {
+            // println!("{:?}", strr)
+
+            if strr.text.contains("{") {
+                for character in strr.text.chars() {
+                    if character == '{' {
+                        opened_braces += 1;
+                    }
+                }
+            }
+
+            if strr.text.contains("}") {
+                for character in strr.text.chars() {
+                    if character == '}' {
+                        opened_braces -= 1;
+                    }
+                }
+            }
+
+            if strr.text.starts_with("if(") || strr.text.starts_with("if (") {
+                // print_error("Error here")
+                println!("{:?}", strr)
+            } else {
+            }
+        }
+        // let mut stringified = String::new();
+
+        // for struct_to_str in structured {
+        //     stringified.push_str(&struct_to_str.text);
+        // }
+
+        // process_conditional(stringified)
+    }
+}
+
+fn process_conditional(data: String) {
+    let start_index = data.find("if");
+    if let Some(_start_index) = start_index {
+        // println!("{}, {_start_index}", data);
+        let mut opened_braces = 0;
+        let mut stop_index: Option<usize> = None;
+        for (index, character) in data[_start_index..].chars().enumerate() {
+            if character == '{' {
+                opened_braces += 1;
+            }
+
+            if character == '}' {
+                opened_braces -= 1;
+                if opened_braces == 0 {
+                    if let Some(_next) = data[_start_index + index..].find("else") {
+                    } else {
+                        stop_index = Some(index);
+                        // println!("{index}  here");
+                        break;
+                    }
+                }
+            }
+        }
+
+        let conditional_statements =
+            &data.as_str()[_start_index..stop_index.unwrap() + _start_index + 1];
+        Conditionals::new(conditional_statements);
+        // println!(
+        //     "{:?}",
+        //     &data.as_str()[_start_index..stop_index.unwrap() + _start_index + 1]
+        // );
+    }
+}
+
+#[derive(Debug, Clone)]
+enum FunctionIdentifier {
+    Other(Vec<String>),
+    // Variable(VariableIdentifier),
+    Condition(Conditionals),
+}
+
+#[derive(Debug, Clone)]
+struct Token;
+#[derive(Debug, Clone)]
+
+struct ElIf {
+    condition: Vec<Token>,
+    arm: Vec<FunctionIdentifier>,
+}
+
+#[derive(Debug, Clone)]
+
+struct Conditionals {
+    condition: Vec<Token>,
+    arm: Vec<FunctionIdentifier>,
+    elif: Option<Vec<ElIf>>,
+    el: Option<Vec<FunctionIdentifier>>,
+}
+
+impl Conditionals {
+    pub fn new(input: &str) {
+        println!("{input}")
     }
 }
