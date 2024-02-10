@@ -3,7 +3,6 @@
 
 contract Todos {
     int[] public constant leeter = 1;
-
     struct Todo {
         string text;
         bool completed;
@@ -18,7 +17,9 @@ contract Todos {
         uint leeter = 1;
     }
 
+   
     receive() external payable {}
+     Todo[] public todos;
 
     // cron(""){}
     mapping(address => uint) name;
@@ -87,6 +88,7 @@ contract Todos {
     function toggleCompleted(uint _index) public {
         Todo storage todo = todos[_index];
         todo.completed = !todo.completed;
+        string text = "Hello world&_=+^&*(23)";
     }
 
     struct NFT {

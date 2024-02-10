@@ -2,6 +2,72 @@ use std::{env, fs, process, string};
 
 use regex::Regex;
 
+#[derive(Debug, Clone, PartialEq)]
+enum Token {
+    Identifier(String),
+    Contract,
+    Override,
+    Virtual,
+    New,
+    Mapping,
+    Msg,
+    Constructor,
+    Address,
+    Private,
+    Struct,
+    Function,
+    Public,
+    View,
+    Returns,
+    Pure,
+    Return,
+    External,
+    Memory,
+    Uint,
+    Uint8,
+    Uint16,
+    Uint32,
+    Uint120,
+    Uint256,
+    Receive,
+    Fallback,
+    Payable,
+    Cron,
+    Gasless,
+    Int8,
+    Int,
+    Int16,
+    Int32,
+    Int120,
+    Int256,
+    String,
+    Bool,
+    If,
+    Else,
+    For,
+    Plus,
+    Minus,
+    Divide,
+    Multiply,
+    OpenParenthesis,
+    CloseParenthesis,
+    OpenSquareBracket,
+    CloseSquareBracket,
+    OpenBraces,
+    CloseBraces,
+    GreaterThan,
+    LessThan,
+    Dot,
+    Equals,
+    Bang,
+    Modulu,
+    SemiColon,
+    Quotation,
+    Coma,
+    Pipe,
+    Ampersand,
+}
+
 const DATA_TYPES: [&str; 28] = [
     "uint8",
     "uint8[]",
@@ -161,6 +227,61 @@ impl LineDescriptions {
 
         return_value
     }
+
+    fn to_token(input: &str) -> Vec<Token> {
+        let mut lex: Vec<String> = Vec::new();
+        let mut combined_char = String::new();
+        let mut lexems: Vec<Token> = Vec::new();
+        let mut opened_quotations = 0;
+        let identifier_regex = Regex::new(r"[a-zA-Z_]\w*").unwrap();
+        for character in input.chars() {
+            if character == '"' || character == '\'' {
+                if opened_quotations == 0 {
+                    opened_quotations += 1;
+                } else {
+                    opened_quotations = 0
+                }
+            }
+            if character.is_whitespace() && !combined_char.trim().is_empty() {
+                if opened_quotations > 0 {
+                    combined_char.push_str(character.to_string().as_str())
+                } else {
+                    lex.push(combined_char.trim().to_string());
+                    combined_char.clear();
+                }
+            } else if let Some(_) = SYMBOLS
+                .iter()
+                .find(|pred| pred == &&character.to_string().as_str())
+            {
+                if !combined_char.trim().is_empty() {
+                    if opened_quotations > 0 {
+                        combined_char.push_str(character.to_string().as_str())
+                    } else {
+                        lex.push(combined_char.trim().to_string());
+                        combined_char.clear();
+                    }
+                }
+                lex.push(character.to_string());
+            } else if let Some(_) = [KEYWORDS.to_vec(), DATA_TYPES.to_vec(), SYMBOLS.to_vec()]
+                .concat()
+                .iter()
+                .find(|pred| pred == &&combined_char.as_str().trim())
+            {
+                if let Some(_) = identifier_regex.find(character.to_string().as_str()) {
+                    combined_char.push_str(character.to_string().as_str())
+                } else {
+                    lex.push(combined_char.trim().to_string());
+                    combined_char.clear();
+                }
+            } else {
+                combined_char.push_str(character.to_string().as_str())
+            }
+        }
+        for lexed in lex {
+            lexems.push(lex_to_token(&lexed));
+        }
+        lexems
+    }
 }
 
 fn main() {
@@ -267,8 +388,8 @@ fn main() {
         &structured_stripped_compilable_contents,
         &custom_data_types_identifiers,
     );
-    // extract_functions(&structured_stripped_compilable_contents);
-    println!("{:#?} {:#?}", structs_tree, global_variables)
+    extract_functions(&structured_stripped_compilable_contents);
+    // println!("{:#?} {:#?}", structs_tree, global_variables)
 }
 
 fn print_error(msg: &str) {
@@ -635,10 +756,26 @@ fn extract_functions(data: &Vec<LineDescriptions>) {
         }
     }
 
+    let mut stringified = Vec::new();
+
+    let mut single_structure: Vec<LineDescriptions> = Vec::new();
     for processed in processed_data {
-        extract_function_arm(processed);
+        let mut combined = String::new();
+        // single_structure.push(processed);
+        for prr in processed {
+            combined.push_str(&prr.text);
+        }
+
+        stringified.push(combined.clone());
+        combined.clear();
     }
-    // println!("{processed_data:#?}");
+
+    for single_stringified in stringified {
+        println!(
+            "{:#?}\n\n\n\n",
+            LineDescriptions::to_token(single_stringified.as_str())
+        );
+    }
 }
 
 fn extract_function_arm(data: Vec<LineDescriptions>) {
@@ -768,8 +905,6 @@ enum FunctionIdentifier {
 }
 
 #[derive(Debug, Clone)]
-struct Token;
-#[derive(Debug, Clone)]
 
 struct ElIf {
     condition: Vec<Token>,
@@ -789,4 +924,143 @@ impl Conditionals {
     pub fn new(input: &str) {
         println!("{input}")
     }
+}
+
+fn lex_to_token(input: &str) -> Token {
+    let token = match input {
+        "contract" => Token::Contract,
+        "mapping" => Token::Mapping,
+        "msg" => Token::Msg,
+        "constructor" => Token::Constructor,
+        "receive" => Token::Receive,
+        "fallback" => Token::Fallback,
+        "cron" => Token::Cron,
+        "gasless" => Token::Gasless,
+        "address" => Token::Address,
+        "private" => Token::Private,
+        "struct" => Token::Struct,
+        "function" => Token::Function,
+        "public" => Token::Public,
+        "view" => Token::View,
+        "returns" => Token::Returns,
+        "pure" => Token::Pure,
+        "override" => Token::Override,
+        "new" => Token::New,
+        "virtual" => Token::Virtual,
+        "return" => Token::Return,
+        "external" => Token::External,
+        "payable" => Token::Payable,
+        "memory" => Token::Memory,
+        "uint" => Token::Uint,
+        "int" => Token::Int,
+        "int8" => Token::Int8,
+        "uint8" => Token::Uint8,
+        "uint16" => Token::Uint16,
+        "uint32" => Token::Uint32,
+        "uint120" => Token::Uint120,
+        "uint256" => Token::Uint256,
+        "int16" => Token::Int16,
+        "int32" => Token::Int32,
+        "int120" => Token::Int120,
+        "int256" => Token::Int256,
+        "string" => Token::String,
+        "bool" => Token::Bool,
+        "if" => Token::If,
+        "else" => Token::Else,
+        "for" => Token::For,
+        "+" => Token::Plus,
+        "-" => Token::Minus,
+        "/" => Token::Divide,
+        "*" => Token::Multiply,
+        "(" => Token::OpenParenthesis,
+        ")" => Token::CloseParenthesis,
+        "[" => Token::OpenSquareBracket,
+        "]" => Token::CloseSquareBracket,
+        "{" => Token::OpenBraces,
+        "}" => Token::CloseBraces,
+        ">" => Token::GreaterThan,
+        "<" => Token::LessThan,
+        "." => Token::Dot,
+        "=" => Token::Equals,
+        "!" => Token::Bang,
+        "%" => Token::Modulu,
+        ";" => Token::SemiColon,
+        "'" => Token::Quotation,
+        "\"" => Token::Quotation,
+        "," => Token::Coma,
+        "|" => Token::Pipe,
+        "&" => Token::Ampersand,
+
+        _ => Token::Identifier(input.to_string()),
+    };
+    token
+}
+
+fn detokenize(input: Token) -> &'static str {
+    let token = match input {
+        Token::Contract => "contract",
+        Token::Mapping => "mapping",
+        Token::Msg => "msg",
+        Token::Constructor => "constructor",
+        Token::Receive => "receive",
+        Token::Fallback => "fallback",
+        Token::Cron => "cron",
+        Token::Virtual => "virtual",
+        Token::New => "new",
+        Token::Override => "override",
+        Token::Gasless => "gasless",
+        Token::Address => "address",
+        Token::Private => "private",
+        Token::Struct => "struct",
+        Token::Function => "function",
+        Token::Public => "public",
+        Token::View => "view",
+        Token::Returns => "returns",
+        Token::Pure => "pure",
+        Token::Return => "return",
+        Token::External => "external",
+        Token::Payable => "payable",
+        Token::Memory => "memory",
+        Token::Uint => "uint",
+        Token::Int => "int",
+        Token::Int8 => "int8",
+        Token::Uint8 => "uint8",
+        Token::Uint16 => "uint16",
+        Token::Uint32 => "uint32",
+        Token::Uint120 => "uint120",
+        Token::Uint256 => "uint256",
+        Token::Int16 => "int16",
+        Token::Int32 => "int32",
+        Token::Int120 => "int120",
+        Token::Int256 => "int256",
+        Token::String => "string",
+        Token::Bool => "bool",
+        Token::If => "if",
+        Token::Else => "else",
+        Token::For => "for",
+        Token::Plus => "+",
+        Token::Minus => "-",
+        Token::Divide => "/",
+        Token::Multiply => "*",
+        Token::OpenParenthesis => "(",
+        Token::CloseParenthesis => ")",
+        Token::OpenSquareBracket => "[",
+        Token::CloseSquareBracket => "]",
+        Token::OpenBraces => "{",
+        Token::CloseBraces => "}",
+        Token::GreaterThan => ">",
+        Token::LessThan => "<",
+        Token::Dot => ".",
+        Token::Equals => "=",
+        Token::Bang => "!",
+        Token::Modulu => "%",
+        Token::SemiColon => ";",
+        Token::Quotation => "\"",
+        Token::Coma => ",",
+        Token::Pipe => "|",
+        Token::Ampersand => "&",
+
+        _ => "",
+    };
+    token
 }
