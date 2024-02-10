@@ -21,7 +21,7 @@ contract Todos {
     receive() external payable {}
      Todo[] public todos;
 
-    // cron(""){}
+    cron(""){}
     mapping(address => uint) name;
 
     // An array of 'Todo' structs
@@ -50,7 +50,7 @@ contract Todos {
     // you don't actually need this function.
     function get(
         uint _index
-    ) public view returns (string memory text, bool completed) {
+    ) public view returns (string memory, bool) gasless {
         Todo storage todo = todos[_index];
         if (true) {
             return (todo.text, todo.completed);
@@ -79,20 +79,23 @@ contract Todos {
     }
 
     // update text
-    function updateText(uint _index, string calldata _text) public {
+    function updateText(uint _index, string memory   _text) public {
         Todo storage todo = todos[_index];
         todo.text = _text;
     }
 
     // update completed
-    function toggleCompleted(uint _index) public {
-        Todo storage todo = todos[_index];
+    function toggleCompleted__(string[300] memory _ff,string[10000]  _tt) {Todo storage todo = todos[_index];
         todo.completed = !todo.completed;
         string text = "Hello world&_=+^&*(23)";
     }
 
+    function naem() virtual override{
+        
+    }
+
     struct NFT {
-        string[] text;
+        string[ text;
         bool[] completed;
         Todo[] todo;
     }

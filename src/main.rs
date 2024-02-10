@@ -1,4 +1,4 @@
-use std::{env, fs, process, string};
+use std::{env, fs, process};
 
 use regex::Regex;
 
@@ -7,7 +7,10 @@ enum Token {
     Identifier(String),
     Contract,
     Override,
+    Internal,
+    External,
     Virtual,
+    Calldata,
     New,
     Mapping,
     Msg,
@@ -21,7 +24,6 @@ enum Token {
     Returns,
     Pure,
     Return,
-    External,
     Memory,
     Uint,
     Uint8,
@@ -99,7 +101,7 @@ const DATA_TYPES: [&str; 28] = [
     "address[]",
 ];
 
-const KEYWORDS: [&str; 28] = [
+const KEYWORDS: [&str; 29] = [
     "contract",
     "mapping",
     "fallback",
@@ -121,6 +123,7 @@ const KEYWORDS: [&str; 28] = [
     "pure",
     "return",
     "external",
+    "internal",
     "memory",
     "if",
     "else",
@@ -139,6 +142,17 @@ const SYMBOLS: [&str; 22] = [
 
 enum StructTypes {
     Type(String, String),
+}
+
+// enum Argument<'a> {
+//     Arg(&'a str, &'a str),
+// }
+
+#[derive(Debug)]
+struct Argument {
+    type_: String,
+    name_: String,
+    location: Option<Token>,
 }
 
 #[derive(Debug, Clone)]
@@ -226,6 +240,10 @@ impl LineDescriptions {
         }
 
         return_value
+    }
+
+    fn from_token_to_string(token: &Token) -> String {
+        return detokenize(&token);
     }
 
     fn to_token(input: &str) -> Vec<Token> {
@@ -402,14 +420,14 @@ fn validate_identifier_regex(identifer: &str, line: i32) -> bool {
 
     if identifer.is_empty() {
         print_error(&format!(
-            "Expecting struct identifier \"{}\" on line {}",
+            "Expecting identifier \"{}\" on line {}",
             identifer, line
         ));
         false
     } else {
         if let Some(_) = Regex::new(r"[\W]").unwrap().find(identifer) {
             print_error(&format!(
-                "Invalid struct Identifier \"{}\" on line {}",
+                "Invalid Identifier \"{}\" on line {}",
                 identifer, line
             ));
             false
@@ -418,7 +436,7 @@ fn validate_identifier_regex(identifer: &str, line: i32) -> bool {
                 true
             } else {
                 print_error(&format!(
-                    "Invalid struct Identifier \"{}\" on line {}",
+                    "Invalid Identifier \"{}\" on line {}",
                     identifer, line
                 ));
                 false
@@ -605,6 +623,7 @@ fn extract_global_variables(
                 if !sst.text.contains("fallback")
                     && !sst.text.contains("receive")
                     && !sst.text.contains("cron")
+                    && !sst.text.contains("function")
                     && !sst.text.contains("mapping")
                 {
                     if !SYMBOLS.contains(&sst.text.as_str()) {
@@ -758,7 +777,6 @@ fn extract_functions(data: &Vec<LineDescriptions>) {
 
     let mut stringified = Vec::new();
 
-    let mut single_structure: Vec<LineDescriptions> = Vec::new();
     for processed in processed_data {
         let mut combined = String::new();
         // single_structure.push(processed);
@@ -771,129 +789,397 @@ fn extract_functions(data: &Vec<LineDescriptions>) {
     }
 
     for single_stringified in stringified {
-        println!(
-            "{:#?}\n\n\n\n",
-            LineDescriptions::to_token(single_stringified.as_str())
-        );
-    }
-}
-
-fn extract_function_arm(data: Vec<LineDescriptions>) {
-    let function_block: Vec<FunctionIdentifier> = Vec::new();
-    let mut opened_braces = 0;
-    let mut stringified = String::new();
-    let opened_brace_type = OpenedBraceType::None;
-    for raw in data {
-        stringified.push_str(&raw.to_string());
-        // println!("{}", raw.to_string())
-    }
-
-    let start_index = stringified.find("{");
-    if let Some(_) = start_index {
-        // println!(
-        //     "{:#?}\n\n\n",
-        //     LineDescriptions::to_struct(
-        //         stringified[start_index.unwrap()..stringified.len()].to_string()
-        //     )
-        // );
-
-        let structured = LineDescriptions::to_struct(
-            stringified[start_index.unwrap()..stringified.len()].to_string(),
-        );
-
-        // println!("{:#?}", &structured[1..structured.len() - 1]);
-
-        let sliced_structured = &structured[1..structured.len() - 1];
-        for mut i in 1..=sliced_structured.len() - 1 {
-            let element = &sliced_structured[i];
-            if element.text.contains("{") {
-                for character in element.text.chars() {
-                    if character == '{' {
-                        opened_braces += 1;
-                    }
-                }
-            }
-
-            if element.text.contains("}") {
-                for character in element.text.chars() {
-                    if character == '}' {
-                        opened_braces -= 1;
-                    }
-                }
-            }
-
-            if element.text.starts_with("if(") || element.text.starts_with("if (") {
-                println!("{} {element:?} ", i)
-            } else {
-                println!("nope {} {element:?} ", i)
-            }
+        let tokens = LineDescriptions::to_token(single_stringified.as_str());
+        if let Token::OpenParenthesis = &tokens[2] {
+        } else {
+            print_error(&format!(
+                "Unprocessible function name \"{}\"",
+                [
+                    LineDescriptions::from_token_to_string(&tokens[1]),
+                    LineDescriptions::from_token_to_string(&tokens[2])
+                ]
+                .join("")
+            ))
         }
-        // for (index, strr) in sliced_structured.iter().enumerate() {
-        //     // println!("{:?}", strr)
-
-        //     if strr.text.contains("{") {
-        //         for character in strr.text.chars() {
-        //             if character == '{' {
-        //                 opened_braces += 1;
-        //             }
-        //         }
-        //     }
-
-        //     if strr.text.contains("}") {
-        //         for character in strr.text.chars() {
-        //             if character == '}' {
-        //                 opened_braces -= 1;
-        //             }
-        //         }
-        //     }
-
-        //     if strr.text.starts_with("if(") || strr.text.starts_with("if (") {
-        //         // print_error("Error here")
-        //         println!("{:?}", strr)
-        //     } else {
-        //     }
-        // }
-        // let mut stringified = String::new();
-
-        // for struct_to_str in structured {
-        //     stringified.push_str(&struct_to_str.text);
-        // }
-
-        // process_conditional(stringified)
-    }
-}
-
-fn process_conditional(data: String) {
-    let start_index = data.find("if");
-    if let Some(_start_index) = start_index {
-        // println!("{}, {_start_index}", data);
-        let mut opened_braces = 0;
-        let mut stop_index: Option<usize> = None;
-        for (index, character) in data[_start_index..].chars().enumerate() {
-            if character == '{' {
-                opened_braces += 1;
+        let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+        let function_definition = &tokens[..start_index.unwrap()];
+        let function_name = match &tokens[1] {
+            Token::Identifier(_val) => {
+                let validated = validate_identifier_regex(_val, 0);
+                if validated {
+                    _val
+                } else {
+                    process::exit(1)
+                }
             }
+            _ => {
+                print_error(&format!(
+                    "Unsupported function name \"{}\"",
+                    LineDescriptions::from_token_to_string(&tokens[1])
+                ));
+                process::exit(1);
+            }
+        };
+        let mut function_arguments: Vec<Argument> = Vec::new();
+        let mut function_override: bool = false;
+        let mut function_virtual: bool = false;
+        let mut function_visibility = Token::Internal;
+        let mut function_returns: Option<Vec<String>> = None;
+        let start_params = function_definition
+            .iter()
+            .position(|pred| pred == &Token::OpenParenthesis);
+        let end_params = function_definition
+            .iter()
+            .position(|pred| pred == &Token::CloseParenthesis);
 
-            if character == '}' {
-                opened_braces -= 1;
-                if opened_braces == 0 {
-                    if let Some(_next) = data[_start_index + index..].find("else") {
+        let params_block = &function_definition[start_params.unwrap_or_else(|| {
+            print_error("Shitty syntax");
+            0
+        }) + 1..end_params.unwrap_or_else(|| {
+            print_error("Shitty syntax");
+            0
+        })];
+
+        let splited_params_block: Vec<&[Token]> =
+            params_block.split(|pred| pred == &Token::Coma).collect();
+
+        for splited_param in splited_params_block {
+            let mut type_: Option<String> = None;
+            let mut name_: Option<String> = None;
+            let mut location_: Option<Token> = None;
+
+            if !splited_param.is_empty() {
+                if splited_param.contains(&Token::OpenSquareBracket) {
+                    // println!("====>> {:?}", splited_param);
+                    let check_for_fixed_length = splited_param
+                        .iter()
+                        .position(|pred| pred == &Token::OpenSquareBracket);
+                    if let None = splited_param
+                        .iter()
+                        .position(|pred| pred == &Token::CloseSquareBracket)
+                    {
+                        print_error(&format!("Unpressible entity {:?}", splited_param))
                     } else {
-                        stop_index = Some(index);
-                        // println!("{index}  here");
-                        break;
+                        let close_index = splited_param
+                            .iter()
+                            .position(|pred| pred == &Token::CloseSquareBracket);
+                        // println!("{}", close_index.unwrap() - check_for_fixed_length.unwrap());
+                        if close_index.unwrap() - check_for_fixed_length.unwrap() == 1 {
+                            if splited_param.len() == 4 {
+                                if DATA_TYPES.contains(
+                                    &LineDescriptions::from_token_to_string(&splited_param[0])
+                                        .as_str(),
+                                ) {
+                                    type_ = Some(format!(
+                                        "{}[]",
+                                        LineDescriptions::from_token_to_string(&splited_param[0])
+                                    ));
+                                } else {
+                                    print_error(&format!(
+                                        "Unprocessible entity \"{}\"",
+                                        &LineDescriptions::from_token_to_string(&splited_param[0])
+                                    ))
+                                }
+
+                                if validate_identifier_regex(
+                                    LineDescriptions::from_token_to_string(&splited_param[3])
+                                        .as_str(),
+                                    0,
+                                ) {
+                                    name_ = Some(LineDescriptions::from_token_to_string(
+                                        &splited_param[3],
+                                    ));
+                                }
+                            } else if splited_param.len() == 5 {
+                                if DATA_TYPES.contains(
+                                    &LineDescriptions::from_token_to_string(&splited_param[0])
+                                        .as_str(),
+                                ) {
+                                    type_ = Some(format!(
+                                        "{}[]",
+                                        LineDescriptions::from_token_to_string(&splited_param[0],)
+                                    ));
+                                } else {
+                                    print_error(&format!(
+                                        "Unprocessible entity \"{}\"",
+                                        &LineDescriptions::from_token_to_string(&splited_param[0])
+                                    ))
+                                }
+
+                                if [Token::Memory, Token::Calldata].contains(&splited_param[3]) {
+                                    location_ = Some(splited_param[3].clone())
+                                } else {
+                                    let stringified_function_identifier: Vec<String> =
+                                        function_definition
+                                            .iter()
+                                            .map(|pred| {
+                                                LineDescriptions::from_token_to_string(pred)
+                                            })
+                                            .collect();
+                                    print_error(&format!(
+                                        "Unprocessible entity \"{}\" for {:?}",
+                                        &LineDescriptions::from_token_to_string(&splited_param[3]),
+                                        stringified_function_identifier.join(" ")
+                                    ))
+                                }
+
+                                if validate_identifier_regex(
+                                    LineDescriptions::from_token_to_string(&splited_param[4])
+                                        .as_str(),
+                                    0,
+                                ) {
+                                    name_ = Some(LineDescriptions::from_token_to_string(
+                                        &splited_param[4],
+                                    ));
+                                }
+                            } else {
+                                let stringified_function_identifier: Vec<String> =
+                                    function_definition
+                                        .iter()
+                                        .map(|pred| LineDescriptions::from_token_to_string(pred))
+                                        .collect();
+
+                                let stringified_params: Vec<String> = splited_param
+                                    .iter()
+                                    .map(|pred| LineDescriptions::from_token_to_string(pred))
+                                    .collect();
+
+                                print_error(&format!(
+                                    "Length exceeded ({:?}) for {:?}...",
+                                    stringified_params.join(" "),
+                                    [stringified_function_identifier].concat().join(" ")
+                                ))
+                            }
+                        } else {
+                            let size = match &splited_param[2] {
+                                Token::Identifier(_val) => _val,
+                                _ => {
+                                    print_error("Invalid array  size");
+                                    process::exit(1);
+                                }
+                            };
+
+                            if !Regex::new(r"^\d+$").unwrap().is_match(size) {
+                                print_error(&format!("Cannot process size \"{}\"", size));
+                            }
+                            if splited_param.len() == 5 {
+                                if DATA_TYPES.contains(
+                                    &LineDescriptions::from_token_to_string(&splited_param[0])
+                                        .as_str(),
+                                ) {
+                                    type_ = Some(format!(
+                                        "{}[{}]",
+                                        LineDescriptions::from_token_to_string(&splited_param[0]),
+                                        size
+                                    ));
+                                } else {
+                                    print_error(&format!(
+                                        "Unprocessible entity \"{}\"",
+                                        &LineDescriptions::from_token_to_string(&splited_param[0])
+                                    ))
+                                }
+
+                                if validate_identifier_regex(
+                                    LineDescriptions::from_token_to_string(&splited_param[4])
+                                        .as_str(),
+                                    0,
+                                ) {
+                                    name_ = Some(LineDescriptions::from_token_to_string(
+                                        &splited_param[4],
+                                    ));
+                                }
+                            } else if splited_param.len() == 6 {
+                                if DATA_TYPES.contains(
+                                    &LineDescriptions::from_token_to_string(&splited_param[0])
+                                        .as_str(),
+                                ) {
+                                    type_ = Some(format!(
+                                        "{}[{}]",
+                                        LineDescriptions::from_token_to_string(&splited_param[0],),
+                                        size
+                                    ));
+                                } else {
+                                    print_error(&format!(
+                                        "Unprocessible entity \"{}\"",
+                                        &LineDescriptions::from_token_to_string(&splited_param[0])
+                                    ))
+                                }
+
+                                if [Token::Memory, Token::Calldata].contains(&splited_param[4]) {
+                                    location_ = Some(splited_param[4].clone())
+                                } else {
+                                    let stringified_function_identifier: Vec<String> =
+                                        function_definition
+                                            .iter()
+                                            .map(|pred| {
+                                                LineDescriptions::from_token_to_string(pred)
+                                            })
+                                            .collect();
+                                    print_error(&format!(
+                                        "Unprocessible entity \"{}\" for {:?}",
+                                        &LineDescriptions::from_token_to_string(&splited_param[4]),
+                                        stringified_function_identifier.join(" ")
+                                    ))
+                                }
+
+                                if validate_identifier_regex(
+                                    LineDescriptions::from_token_to_string(&splited_param[5])
+                                        .as_str(),
+                                    0,
+                                ) {
+                                    name_ = Some(LineDescriptions::from_token_to_string(
+                                        &splited_param[5],
+                                    ));
+                                }
+                            } else {
+                                let stringified_function_identifier: Vec<String> =
+                                    function_definition
+                                        .iter()
+                                        .map(|pred| LineDescriptions::from_token_to_string(pred))
+                                        .collect();
+
+                                let stringified_params: Vec<String> = splited_param
+                                    .iter()
+                                    .map(|pred| LineDescriptions::from_token_to_string(pred))
+                                    .collect();
+
+                                print_error(&format!(
+                                    "Length exceeded ({:?}) for {:?}...",
+                                    stringified_params.join(" "),
+                                    [stringified_function_identifier].concat().join(" ")
+                                ))
+                            }
+                        }
+                    }
+                } else {
+                    if splited_param.len() == 2 {
+                        if DATA_TYPES.contains(
+                            &LineDescriptions::from_token_to_string(&splited_param[0]).as_str(),
+                        ) {
+                            type_ = Some(LineDescriptions::from_token_to_string(&splited_param[0]));
+                        } else {
+                            print_error(&format!(
+                                "Unprocessible entity \"{}\"",
+                                &LineDescriptions::from_token_to_string(&splited_param[0])
+                            ))
+                        }
+
+                        if validate_identifier_regex(
+                            LineDescriptions::from_token_to_string(&splited_param[1]).as_str(),
+                            0,
+                        ) {
+                            name_ = Some(LineDescriptions::from_token_to_string(&splited_param[1]));
+                        }
+                    } else if splited_param.len() == 3 {
+                        if DATA_TYPES.contains(
+                            &LineDescriptions::from_token_to_string(&splited_param[0]).as_str(),
+                        ) {
+                            type_ = Some(LineDescriptions::from_token_to_string(&splited_param[0]));
+                        } else {
+                            print_error(&format!(
+                                "Unprocessible entity \"{}\"",
+                                &LineDescriptions::from_token_to_string(&splited_param[0])
+                            ))
+                        }
+
+                        if [Token::Memory, Token::Calldata].contains(&splited_param[1]) {
+                            location_ = Some(splited_param[1].clone())
+                        } else {
+                            let stringified_function_identifier: Vec<String> = function_definition
+                                .iter()
+                                .map(|pred| LineDescriptions::from_token_to_string(pred))
+                                .collect();
+                            print_error(&format!(
+                                "Unprocessible entity \"{}\" for {:?}",
+                                &LineDescriptions::from_token_to_string(&splited_param[1]),
+                                stringified_function_identifier.join(" ")
+                            ))
+                        }
+
+                        if validate_identifier_regex(
+                            LineDescriptions::from_token_to_string(&splited_param[2]).as_str(),
+                            0,
+                        ) {
+                            name_ = Some(LineDescriptions::from_token_to_string(&splited_param[2]));
+                        }
+                    } else {
+                        let stringified_function_identifier: Vec<String> = function_definition
+                            .iter()
+                            .map(|pred| LineDescriptions::from_token_to_string(pred))
+                            .collect();
+
+                        let stringified_params: Vec<String> = splited_param
+                            .iter()
+                            .map(|pred| LineDescriptions::from_token_to_string(pred))
+                            .collect();
+
+                        print_error(&format!(
+                            "Length exceeded ({:?}) for {:?}...",
+                            stringified_params.join(" "),
+                            [stringified_function_identifier].concat().join(" ")
+                        ))
                     }
                 }
+                let structured_argument = Argument {
+                    location: location_,
+                    name_: name_.unwrap(),
+                    type_: type_.unwrap(),
+                };
+
+                function_arguments.push(structured_argument);
             }
         }
 
-        let conditional_statements =
-            &data.as_str()[_start_index..stop_index.unwrap() + _start_index + 1];
-        Conditionals::new(conditional_statements);
-        // println!(
-        //     "{:?}",
-        //     &data.as_str()[_start_index..stop_index.unwrap() + _start_index + 1]
-        // );
+        for visibility in [
+            Token::Internal,
+            Token::External,
+            Token::Public,
+            Token::Private,
+        ] {
+            if function_definition.contains(&visibility) {
+                function_visibility = visibility;
+            }
+        }
+
+        let returns_start_index = function_definition
+            .iter()
+            .position(|pred| pred == &Token::Returns);
+
+        if let Some(_returns_start_index) = returns_start_index {
+            let returns_definition = &function_definition[_returns_start_index..];
+            let end_index = returns_definition
+                .iter()
+                .position(|pred| pred == &Token::CloseParenthesis);
+            if let None = end_index {
+                let msg: Vec<String> = returns_definition
+                    .iter()
+                    .map(|pred| LineDescriptions::from_token_to_string(pred))
+                    .collect();
+                let stringified_function_identifier: Vec<String> = function_definition
+                    .iter()
+                    .map(|pred| LineDescriptions::from_token_to_string(pred))
+                    .collect();
+                print_error(&format!(
+                    "Unprocessible entity {:?} on {}",
+                    msg.join(" "),
+                    stringified_function_identifier.join(" ")
+                ))
+            }
+            println!("{:?}", &function_definition[_returns_start_index..])
+        }
+
+        if function_definition.contains(&Token::Override) {
+            function_override = true;
+        }
+
+        if function_definition.contains(&Token::Virtual) {
+            function_virtual = true;
+        }
+
+        println!(
+            "{:?} \n {:#?}\n {:#?}\n {function_override}\n {function_virtual} \n\n\n\n",
+            function_name, function_visibility, function_arguments
+        );
     }
 }
 
@@ -933,6 +1219,9 @@ fn lex_to_token(input: &str) -> Token {
         "msg" => Token::Msg,
         "constructor" => Token::Constructor,
         "receive" => Token::Receive,
+        "internal" => Token::Internal,
+        "external" => Token::External,
+        "calldata" => Token::Calldata,
         "fallback" => Token::Fallback,
         "cron" => Token::Cron,
         "gasless" => Token::Gasless,
@@ -948,7 +1237,6 @@ fn lex_to_token(input: &str) -> Token {
         "new" => Token::New,
         "virtual" => Token::Virtual,
         "return" => Token::Return,
-        "external" => Token::External,
         "payable" => Token::Payable,
         "memory" => Token::Memory,
         "uint" => Token::Uint,
@@ -996,71 +1284,72 @@ fn lex_to_token(input: &str) -> Token {
     token
 }
 
-fn detokenize(input: Token) -> &'static str {
-    let token = match input {
-        Token::Contract => "contract",
-        Token::Mapping => "mapping",
-        Token::Msg => "msg",
-        Token::Constructor => "constructor",
-        Token::Receive => "receive",
-        Token::Fallback => "fallback",
-        Token::Cron => "cron",
-        Token::Virtual => "virtual",
-        Token::New => "new",
-        Token::Override => "override",
-        Token::Gasless => "gasless",
-        Token::Address => "address",
-        Token::Private => "private",
-        Token::Struct => "struct",
-        Token::Function => "function",
-        Token::Public => "public",
-        Token::View => "view",
-        Token::Returns => "returns",
-        Token::Pure => "pure",
-        Token::Return => "return",
-        Token::External => "external",
-        Token::Payable => "payable",
-        Token::Memory => "memory",
-        Token::Uint => "uint",
-        Token::Int => "int",
-        Token::Int8 => "int8",
-        Token::Uint8 => "uint8",
-        Token::Uint16 => "uint16",
-        Token::Uint32 => "uint32",
-        Token::Uint120 => "uint120",
-        Token::Uint256 => "uint256",
-        Token::Int16 => "int16",
-        Token::Int32 => "int32",
-        Token::Int120 => "int120",
-        Token::Int256 => "int256",
-        Token::String => "string",
-        Token::Bool => "bool",
-        Token::If => "if",
-        Token::Else => "else",
-        Token::For => "for",
-        Token::Plus => "+",
-        Token::Minus => "-",
-        Token::Divide => "/",
-        Token::Multiply => "*",
-        Token::OpenParenthesis => "(",
-        Token::CloseParenthesis => ")",
-        Token::OpenSquareBracket => "[",
-        Token::CloseSquareBracket => "]",
-        Token::OpenBraces => "{",
-        Token::CloseBraces => "}",
-        Token::GreaterThan => ">",
-        Token::LessThan => "<",
-        Token::Dot => ".",
-        Token::Equals => "=",
-        Token::Bang => "!",
-        Token::Modulu => "%",
-        Token::SemiColon => ";",
-        Token::Quotation => "\"",
-        Token::Coma => ",",
-        Token::Pipe => "|",
-        Token::Ampersand => "&",
-
-        _ => "",
+fn detokenize(input: &Token) -> String {
+    let token: String = match input {
+        Token::Contract => "contract".to_string(),
+        Token::Mapping => "mapping".to_string(),
+        Token::Msg => "msg".to_string(),
+        Token::Constructor => "constructor".to_string(),
+        Token::Calldata => "calldata".to_string(),
+        Token::Receive => "receive".to_string(),
+        Token::Fallback => "fallback".to_string(),
+        Token::Cron => "cron".to_string(),
+        Token::Virtual => "virtual".to_string(),
+        Token::New => "new".to_string(),
+        Token::Override => "override".to_string(),
+        Token::Gasless => "gasless".to_string(),
+        Token::Address => "address".to_string(),
+        Token::Private => "private".to_string(),
+        Token::Struct => "struct".to_string(),
+        Token::Function => "function".to_string(),
+        Token::Public => "public".to_string(),
+        Token::View => "view".to_string(),
+        Token::Returns => "returns".to_string(),
+        Token::Pure => "pure".to_string(),
+        Token::Return => "return".to_string(),
+        Token::External => "external".to_string(),
+        Token::Internal => "internal".to_string(),
+        Token::Payable => "payable".to_string(),
+        Token::Memory => "memory".to_string(),
+        Token::Uint => "uint".to_string(),
+        Token::Int => "int".to_string(),
+        Token::Int8 => "int8".to_string(),
+        Token::Uint8 => "uint8".to_string(),
+        Token::Uint16 => "uint16".to_string(),
+        Token::Uint32 => "uint32".to_string(),
+        Token::Uint120 => "uint120".to_string(),
+        Token::Uint256 => "uint256".to_string(),
+        Token::Int16 => "int16".to_string(),
+        Token::Int32 => "int32".to_string(),
+        Token::Int120 => "int120".to_string(),
+        Token::Int256 => "int256".to_string(),
+        Token::String => "string".to_string(),
+        Token::Bool => "bool".to_string(),
+        Token::If => "if".to_string(),
+        Token::Else => "else".to_string(),
+        Token::For => "for".to_string(),
+        Token::Plus => "+".to_string(),
+        Token::Minus => "-".to_string(),
+        Token::Divide => "/".to_string(),
+        Token::Multiply => "*".to_string(),
+        Token::OpenParenthesis => "(".to_string(),
+        Token::CloseParenthesis => ")".to_string(),
+        Token::OpenSquareBracket => "[".to_string(),
+        Token::CloseSquareBracket => "]".to_string(),
+        Token::OpenBraces => "{".to_string(),
+        Token::CloseBraces => "}".to_string(),
+        Token::GreaterThan => ">".to_string(),
+        Token::LessThan => "<".to_string(),
+        Token::Dot => ".".to_string(),
+        Token::Equals => "=".to_string(),
+        Token::Bang => "!".to_string(),
+        Token::Modulu => "%".to_string(),
+        Token::SemiColon => ";".to_string(),
+        Token::Quotation => "\"".to_string(),
+        Token::Coma => ",".to_string(),
+        Token::Pipe => "|".to_string(),
+        Token::Ampersand => "&".to_string(),
+        Token::Identifier(_val) => _val.to_owned(),
     };
     token
 }
