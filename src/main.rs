@@ -153,6 +153,16 @@ struct Argument {
     type_: String,
     name_: String,
     location: Option<Token>,
+    size: Option<String>,
+    is_array: bool,
+}
+
+#[derive(Debug)]
+struct ReturnType {
+    type_: String,
+    location: Option<Token>,
+    size: Option<String>,
+    is_array: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -252,7 +262,7 @@ impl LineDescriptions {
         let mut lexems: Vec<Token> = Vec::new();
         let mut opened_quotations = 0;
         let identifier_regex = Regex::new(r"[a-zA-Z_]\w*").unwrap();
-        for character in input.chars() {
+        for (index, character) in input.chars().enumerate() {
             if character == '"' || character == '\'' {
                 if opened_quotations == 0 {
                     opened_quotations += 1;
@@ -285,11 +295,28 @@ impl LineDescriptions {
                 .iter()
                 .find(|pred| pred == &&combined_char.as_str().trim())
             {
-                if let Some(_) = identifier_regex.find(character.to_string().as_str()) {
-                    combined_char.push_str(character.to_string().as_str())
+                if let Some(_next) = input.chars().nth(index + 1) {
+                    let mut joined = String::from(combined_char.clone());
+                    joined.push(character);
+                    joined.push(_next);
+
+                    if [KEYWORDS.to_vec(), DATA_TYPES.to_vec(), SYMBOLS.to_vec()]
+                        .concat()
+                        .concat()
+                        .contains(&joined.as_str().trim())
+                    {
+                        combined_char.push_str(character.to_string().as_str())
+                    } else {
+                        lex.push(combined_char.trim().to_string());
+                        combined_char.clear();
+                    }
                 } else {
-                    lex.push(combined_char.trim().to_string());
-                    combined_char.clear();
+                    if let Some(_) = identifier_regex.find(character.to_string().as_str()) {
+                        combined_char.push_str(character.to_string().as_str())
+                    } else {
+                        lex.push(combined_char.trim().to_string());
+                        combined_char.clear();
+                    }
                 }
             } else {
                 combined_char.push_str(character.to_string().as_str())
@@ -406,7 +433,10 @@ fn main() {
         &structured_stripped_compilable_contents,
         &custom_data_types_identifiers,
     );
-    extract_functions(&structured_stripped_compilable_contents);
+    extract_functions(
+        &structured_stripped_compilable_contents,
+        &custom_data_types_identifiers,
+    );
     // println!("{:#?} {:#?}", structs_tree, global_variables)
 }
 
@@ -733,7 +763,7 @@ fn validate_variable(text: LineDescriptions, custom_data_types: &Vec<&str>) -> V
 
 /* *************************** FUNCTION START ******************************************/
 
-fn extract_functions(data: &Vec<LineDescriptions>) {
+fn extract_functions(data: &Vec<LineDescriptions>, custom_data_types: &Vec<&str>) {
     let mut opened_braces = 0;
     let mut opened_braces_type = OpenedBraceType::None;
     let mut processed_data: Vec<Vec<LineDescriptions>> = Vec::new();
@@ -790,6 +820,7 @@ fn extract_functions(data: &Vec<LineDescriptions>) {
 
     for single_stringified in stringified {
         let tokens = LineDescriptions::to_token(single_stringified.as_str());
+        // println!("{:#?}", tokens);
         if let Token::OpenParenthesis = &tokens[2] {
         } else {
             print_error(&format!(
@@ -801,8 +832,9 @@ fn extract_functions(data: &Vec<LineDescriptions>) {
                 .join("")
             ))
         }
+
         let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
-        let function_definition = &tokens[..start_index.unwrap()];
+        let function_definition: &[Token] = &tokens[..start_index.unwrap()];
         let function_name = match &tokens[1] {
             Token::Identifier(_val) => {
                 let validated = validate_identifier_regex(_val, 0);
@@ -820,11 +852,10 @@ fn extract_functions(data: &Vec<LineDescriptions>) {
                 process::exit(1);
             }
         };
-        let mut function_arguments: Vec<Argument> = Vec::new();
         let mut function_override: bool = false;
         let mut function_virtual: bool = false;
         let mut function_visibility = Token::Internal;
-        let mut function_returns: Option<Vec<String>> = None;
+        let mut function_returns: Option<Vec<ReturnType>> = None;
         let start_params = function_definition
             .iter()
             .position(|pred| pred == &Token::OpenParenthesis);
@@ -842,294 +873,7 @@ fn extract_functions(data: &Vec<LineDescriptions>) {
 
         let splited_params_block: Vec<&[Token]> =
             params_block.split(|pred| pred == &Token::Coma).collect();
-
-        for splited_param in splited_params_block {
-            let mut type_: Option<String> = None;
-            let mut name_: Option<String> = None;
-            let mut location_: Option<Token> = None;
-
-            if !splited_param.is_empty() {
-                if splited_param.contains(&Token::OpenSquareBracket) {
-                    // println!("====>> {:?}", splited_param);
-                    let check_for_fixed_length = splited_param
-                        .iter()
-                        .position(|pred| pred == &Token::OpenSquareBracket);
-                    if let None = splited_param
-                        .iter()
-                        .position(|pred| pred == &Token::CloseSquareBracket)
-                    {
-                        print_error(&format!("Unpressible entity {:?}", splited_param))
-                    } else {
-                        let close_index = splited_param
-                            .iter()
-                            .position(|pred| pred == &Token::CloseSquareBracket);
-                        // println!("{}", close_index.unwrap() - check_for_fixed_length.unwrap());
-                        if close_index.unwrap() - check_for_fixed_length.unwrap() == 1 {
-                            if splited_param.len() == 4 {
-                                if DATA_TYPES.contains(
-                                    &LineDescriptions::from_token_to_string(&splited_param[0])
-                                        .as_str(),
-                                ) {
-                                    type_ = Some(format!(
-                                        "{}[]",
-                                        LineDescriptions::from_token_to_string(&splited_param[0])
-                                    ));
-                                } else {
-                                    print_error(&format!(
-                                        "Unprocessible entity \"{}\"",
-                                        &LineDescriptions::from_token_to_string(&splited_param[0])
-                                    ))
-                                }
-
-                                if validate_identifier_regex(
-                                    LineDescriptions::from_token_to_string(&splited_param[3])
-                                        .as_str(),
-                                    0,
-                                ) {
-                                    name_ = Some(LineDescriptions::from_token_to_string(
-                                        &splited_param[3],
-                                    ));
-                                }
-                            } else if splited_param.len() == 5 {
-                                if DATA_TYPES.contains(
-                                    &LineDescriptions::from_token_to_string(&splited_param[0])
-                                        .as_str(),
-                                ) {
-                                    type_ = Some(format!(
-                                        "{}[]",
-                                        LineDescriptions::from_token_to_string(&splited_param[0],)
-                                    ));
-                                } else {
-                                    print_error(&format!(
-                                        "Unprocessible entity \"{}\"",
-                                        &LineDescriptions::from_token_to_string(&splited_param[0])
-                                    ))
-                                }
-
-                                if [Token::Memory, Token::Calldata].contains(&splited_param[3]) {
-                                    location_ = Some(splited_param[3].clone())
-                                } else {
-                                    let stringified_function_identifier: Vec<String> =
-                                        function_definition
-                                            .iter()
-                                            .map(|pred| {
-                                                LineDescriptions::from_token_to_string(pred)
-                                            })
-                                            .collect();
-                                    print_error(&format!(
-                                        "Unprocessible entity \"{}\" for {:?}",
-                                        &LineDescriptions::from_token_to_string(&splited_param[3]),
-                                        stringified_function_identifier.join(" ")
-                                    ))
-                                }
-
-                                if validate_identifier_regex(
-                                    LineDescriptions::from_token_to_string(&splited_param[4])
-                                        .as_str(),
-                                    0,
-                                ) {
-                                    name_ = Some(LineDescriptions::from_token_to_string(
-                                        &splited_param[4],
-                                    ));
-                                }
-                            } else {
-                                let stringified_function_identifier: Vec<String> =
-                                    function_definition
-                                        .iter()
-                                        .map(|pred| LineDescriptions::from_token_to_string(pred))
-                                        .collect();
-
-                                let stringified_params: Vec<String> = splited_param
-                                    .iter()
-                                    .map(|pred| LineDescriptions::from_token_to_string(pred))
-                                    .collect();
-
-                                print_error(&format!(
-                                    "Length exceeded ({:?}) for {:?}...",
-                                    stringified_params.join(" "),
-                                    [stringified_function_identifier].concat().join(" ")
-                                ))
-                            }
-                        } else {
-                            let size = match &splited_param[2] {
-                                Token::Identifier(_val) => _val,
-                                _ => {
-                                    print_error("Invalid array  size");
-                                    process::exit(1);
-                                }
-                            };
-
-                            if !Regex::new(r"^\d+$").unwrap().is_match(size) {
-                                print_error(&format!("Cannot process size \"{}\"", size));
-                            }
-                            if splited_param.len() == 5 {
-                                if DATA_TYPES.contains(
-                                    &LineDescriptions::from_token_to_string(&splited_param[0])
-                                        .as_str(),
-                                ) {
-                                    type_ = Some(format!(
-                                        "{}[{}]",
-                                        LineDescriptions::from_token_to_string(&splited_param[0]),
-                                        size
-                                    ));
-                                } else {
-                                    print_error(&format!(
-                                        "Unprocessible entity \"{}\"",
-                                        &LineDescriptions::from_token_to_string(&splited_param[0])
-                                    ))
-                                }
-
-                                if validate_identifier_regex(
-                                    LineDescriptions::from_token_to_string(&splited_param[4])
-                                        .as_str(),
-                                    0,
-                                ) {
-                                    name_ = Some(LineDescriptions::from_token_to_string(
-                                        &splited_param[4],
-                                    ));
-                                }
-                            } else if splited_param.len() == 6 {
-                                if DATA_TYPES.contains(
-                                    &LineDescriptions::from_token_to_string(&splited_param[0])
-                                        .as_str(),
-                                ) {
-                                    type_ = Some(format!(
-                                        "{}[{}]",
-                                        LineDescriptions::from_token_to_string(&splited_param[0],),
-                                        size
-                                    ));
-                                } else {
-                                    print_error(&format!(
-                                        "Unprocessible entity \"{}\"",
-                                        &LineDescriptions::from_token_to_string(&splited_param[0])
-                                    ))
-                                }
-
-                                if [Token::Memory, Token::Calldata].contains(&splited_param[4]) {
-                                    location_ = Some(splited_param[4].clone())
-                                } else {
-                                    let stringified_function_identifier: Vec<String> =
-                                        function_definition
-                                            .iter()
-                                            .map(|pred| {
-                                                LineDescriptions::from_token_to_string(pred)
-                                            })
-                                            .collect();
-                                    print_error(&format!(
-                                        "Unprocessible entity \"{}\" for {:?}",
-                                        &LineDescriptions::from_token_to_string(&splited_param[4]),
-                                        stringified_function_identifier.join(" ")
-                                    ))
-                                }
-
-                                if validate_identifier_regex(
-                                    LineDescriptions::from_token_to_string(&splited_param[5])
-                                        .as_str(),
-                                    0,
-                                ) {
-                                    name_ = Some(LineDescriptions::from_token_to_string(
-                                        &splited_param[5],
-                                    ));
-                                }
-                            } else {
-                                let stringified_function_identifier: Vec<String> =
-                                    function_definition
-                                        .iter()
-                                        .map(|pred| LineDescriptions::from_token_to_string(pred))
-                                        .collect();
-
-                                let stringified_params: Vec<String> = splited_param
-                                    .iter()
-                                    .map(|pred| LineDescriptions::from_token_to_string(pred))
-                                    .collect();
-
-                                print_error(&format!(
-                                    "Length exceeded ({:?}) for {:?}...",
-                                    stringified_params.join(" "),
-                                    [stringified_function_identifier].concat().join(" ")
-                                ))
-                            }
-                        }
-                    }
-                } else {
-                    if splited_param.len() == 2 {
-                        if DATA_TYPES.contains(
-                            &LineDescriptions::from_token_to_string(&splited_param[0]).as_str(),
-                        ) {
-                            type_ = Some(LineDescriptions::from_token_to_string(&splited_param[0]));
-                        } else {
-                            print_error(&format!(
-                                "Unprocessible entity \"{}\"",
-                                &LineDescriptions::from_token_to_string(&splited_param[0])
-                            ))
-                        }
-
-                        if validate_identifier_regex(
-                            LineDescriptions::from_token_to_string(&splited_param[1]).as_str(),
-                            0,
-                        ) {
-                            name_ = Some(LineDescriptions::from_token_to_string(&splited_param[1]));
-                        }
-                    } else if splited_param.len() == 3 {
-                        if DATA_TYPES.contains(
-                            &LineDescriptions::from_token_to_string(&splited_param[0]).as_str(),
-                        ) {
-                            type_ = Some(LineDescriptions::from_token_to_string(&splited_param[0]));
-                        } else {
-                            print_error(&format!(
-                                "Unprocessible entity \"{}\"",
-                                &LineDescriptions::from_token_to_string(&splited_param[0])
-                            ))
-                        }
-
-                        if [Token::Memory, Token::Calldata].contains(&splited_param[1]) {
-                            location_ = Some(splited_param[1].clone())
-                        } else {
-                            let stringified_function_identifier: Vec<String> = function_definition
-                                .iter()
-                                .map(|pred| LineDescriptions::from_token_to_string(pred))
-                                .collect();
-                            print_error(&format!(
-                                "Unprocessible entity \"{}\" for {:?}",
-                                &LineDescriptions::from_token_to_string(&splited_param[1]),
-                                stringified_function_identifier.join(" ")
-                            ))
-                        }
-
-                        if validate_identifier_regex(
-                            LineDescriptions::from_token_to_string(&splited_param[2]).as_str(),
-                            0,
-                        ) {
-                            name_ = Some(LineDescriptions::from_token_to_string(&splited_param[2]));
-                        }
-                    } else {
-                        let stringified_function_identifier: Vec<String> = function_definition
-                            .iter()
-                            .map(|pred| LineDescriptions::from_token_to_string(pred))
-                            .collect();
-
-                        let stringified_params: Vec<String> = splited_param
-                            .iter()
-                            .map(|pred| LineDescriptions::from_token_to_string(pred))
-                            .collect();
-
-                        print_error(&format!(
-                            "Length exceeded ({:?}) for {:?}...",
-                            stringified_params.join(" "),
-                            [stringified_function_identifier].concat().join(" ")
-                        ))
-                    }
-                }
-                let structured_argument = Argument {
-                    location: location_,
-                    name_: name_.unwrap(),
-                    type_: type_.unwrap(),
-                };
-
-                function_arguments.push(structured_argument);
-            }
-        }
-
+        let function_arguments = extract_function_params(splited_params_block, function_definition);
         for visibility in [
             Token::Internal,
             Token::External,
@@ -1159,14 +903,25 @@ fn extract_functions(data: &Vec<LineDescriptions>) {
                     .iter()
                     .map(|pred| LineDescriptions::from_token_to_string(pred))
                     .collect();
+
                 print_error(&format!(
                     "Unprocessible entity {:?} on {}",
                     msg.join(" "),
                     stringified_function_identifier.join(" ")
                 ))
             }
-            println!("{:?}", &function_definition[_returns_start_index..])
+
+            let splited_returns_block: Vec<&[Token]> = function_definition
+                [_returns_start_index + 2..end_index.unwrap() + _returns_start_index]
+                .split(|pred| pred == &Token::Coma)
+                .collect();
+            function_returns = Some(extract_return_types(
+                splited_returns_block,
+                function_definition,
+                custom_data_types,
+            ));
         }
+        // println!("{:?}===========>>", function_definition);
 
         if function_definition.contains(&Token::Override) {
             function_override = true;
@@ -1176,11 +931,308 @@ fn extract_functions(data: &Vec<LineDescriptions>) {
             function_virtual = true;
         }
 
+        // println!("{:#?}", single_stringified)
+
         println!(
-            "{:?} \n {:#?}\n {:#?}\n {function_override}\n {function_virtual} \n\n\n\n",
-            function_name, function_visibility, function_arguments
+            "{:?} \n {:#?}\n {:#?}\n {function_override}\n {function_virtual}\n {:#?} \n\n\n\n",
+            function_name, function_visibility, function_arguments, function_returns
         );
     }
+}
+
+fn extract_function_params(
+    splited_params_block: Vec<&[Token]>,
+    function_definition: &[Token],
+) -> Vec<Argument> {
+    let mut function_arguments: Vec<Argument> = Vec::new();
+
+    for splited_param in splited_params_block {
+        if !splited_param.is_empty() {
+            let mut type_: Option<String> = None;
+            let mut name_: Option<String> = None;
+            let mut location_: Option<Token> = None;
+            let mut is_array = false;
+            let mut size: Option<String> = None;
+            let mut is_primitive = false;
+            let vec_: Vec<String> = function_definition
+                .iter()
+                .map(|pred| LineDescriptions::from_token_to_string(pred))
+                .collect();
+            if !splited_param.is_empty() {
+                if splited_param.len() < 2 {
+                    print_error(&format!("Invalid function argument {}", vec_.join(" ")))
+                }
+
+                if DATA_TYPES
+                    .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
+                {
+                    if let Token::String = splited_param[0] {
+                        is_primitive = true;
+                    }
+                    type_ = Some(format!(
+                        "{}",
+                        LineDescriptions::from_token_to_string(&splited_param[0],)
+                    ));
+                } else {
+                    print_error(&format!(
+                        "Unprocessible entity \"{}\"",
+                        &LineDescriptions::from_token_to_string(&splited_param[0])
+                    ))
+                }
+
+                if let Token::OpenSquareBracket = &splited_param[1] {
+                    is_array = true;
+                    is_primitive = true;
+                    let close_index = splited_param
+                        .iter()
+                        .position(|pred| pred == &Token::CloseSquareBracket);
+
+                    if let None = close_index {
+                        print_error(&format!(
+                            "Syntax error... Expecting a close bracket for {}",
+                            vec_.join(" ")
+                        ))
+                    } else {
+                        if close_index.unwrap() - 1 != 1 {
+                            if splited_param.len() != 6 {
+                                print_error(&format!("Syntax error {}... Missing \"memory\" or \"calldata\" or argument identifier", vec_.join(" "),))
+                            }
+                            if let None = extract_data_location_from_token(&splited_param[4]) {
+                                print_error(&format!(
+                                    "Expecting \"memory\" or \"calldata\". {} ",
+                                    vec_.join(" "),
+                                ))
+                            } else {
+                                location_ = extract_data_location_from_token(&splited_param[4]);
+                            }
+                            match &splited_param[2] {
+                                Token::Identifier(_val) => {
+                                    if let Some(_dd) = Regex::new(r"^\d+$").unwrap().find(_val) {
+                                        if _val == "0" {
+                                            print_error(&format!("Invalid array size {}", _val))
+                                        }
+                                        size = Some(_val.to_owned());
+                                    } else {
+                                        print_error(&format!("Invalid array size {}", _val))
+                                    }
+                                }
+                                _ => print_error(&format!(
+                                    "Unprocessible entity.. Expecting a size of uint but found {}",
+                                    LineDescriptions::from_token_to_string(&splited_param[2])
+                                )),
+                            }
+
+                            match &splited_param[5] {
+                                Token::Identifier(_val) => name_ = Some(_val.to_owned()),
+
+                                _ => print_error(&format!(
+                                    "Unprocessible entity.. Expecting identifier but found {}",
+                                    LineDescriptions::from_token_to_string(&splited_param[5])
+                                )),
+                            }
+                        } else {
+                            if splited_param.len() != 5 {
+                                print_error(&format!("Syntax error {}... Missing \"memory\" or \"calldata\" or argument identifier", vec_.join(" "),))
+                            }
+                            if let None = extract_data_location_from_token(&splited_param[3]) {
+                                print_error(&format!(
+                                    "Expecting \"memory\" or \"calldata\". {} ",
+                                    vec_.join(" "),
+                                ))
+                            } else {
+                                location_ = extract_data_location_from_token(&splited_param[3]);
+                            }
+
+                            match &splited_param[4] {
+                                Token::Identifier(_val) => name_ = Some(_val.to_owned()),
+
+                                _ => print_error(&format!(
+                                    "Unprocessible entity.. Expecting identifier but found {}",
+                                    LineDescriptions::from_token_to_string(&splited_param[4])
+                                )),
+                            }
+                        }
+                    }
+                } else if let Some(_location) = extract_data_location_from_token(&splited_param[1])
+                {
+                    if !is_primitive {
+                        print_error(&format!(
+                            "Syntax error... cannot declare \"{}\" on a  non-primive type. {} ",
+                            LineDescriptions::from_token_to_string(&_location),
+                            vec_.join(" "),
+                        ))
+                    } else {
+                        location_ = Some(_location);
+                        if let Token::Identifier(_identifier) = &splited_param[2] {
+                            if validate_identifier_regex(&_identifier, 0) {
+                                name_ = Some(_identifier.to_owned());
+                            }
+                        } else {
+                            print_error(&format!("Invalid function argument {}", vec_.join(" ")))
+                        }
+                    }
+                } else if let Token::Identifier(_identifier) = &splited_param[1] {
+                    if validate_identifier_regex(&_identifier, 0) {
+                        name_ = Some(_identifier.to_owned());
+                    }
+                } else {
+                    print_error(&format!("Invalid function argument {}", vec_.join(" ")))
+                }
+            }
+
+            if let None = name_ {
+                print_error(&format!(
+                    "Syntax error... missing argument identifier {:?} ",
+                    vec_.join(" "),
+                ))
+            }
+
+            let structured = Argument {
+                location: location_,
+                name_: name_.unwrap(),
+                type_: type_.unwrap(),
+                is_array,
+                size,
+            };
+
+            function_arguments.push(structured);
+        }
+    }
+
+    function_arguments
+}
+
+fn extract_return_types(
+    splited_params_block: Vec<&[Token]>,
+    function_definition: &[Token],
+    custom_data_types: &Vec<&str>,
+) -> Vec<ReturnType> {
+    let mut function_arguments: Vec<ReturnType> = Vec::new();
+
+    for splited_param in splited_params_block {
+        if !splited_param.is_empty() {
+            let mut type_: Option<String> = None;
+            let mut location_: Option<Token> = None;
+            let mut is_array = false;
+            let mut size: Option<String> = None;
+            let mut is_primitive = false;
+
+            let vec_: Vec<String> = function_definition
+                .iter()
+                .map(|pred| LineDescriptions::from_token_to_string(pred))
+                .collect();
+
+            if DATA_TYPES
+                .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
+            {
+                if let Token::String = splited_param[0] {
+                    is_primitive = true;
+                }
+                type_ = Some(format!(
+                    "{}",
+                    LineDescriptions::from_token_to_string(&splited_param[0],)
+                ));
+            } else {
+                if custom_data_types
+                    .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
+                {
+                    is_primitive = true;
+                    type_ = Some(format!(
+                        "{}",
+                        LineDescriptions::from_token_to_string(&splited_param[0],)
+                    ));
+                } else {
+                    print_error(&format!(
+                        "Unprocessible entity \"{}\"",
+                        &LineDescriptions::from_token_to_string(&splited_param[0])
+                    ))
+                }
+            }
+
+            if splited_param.len() > 1 {
+                if let Token::OpenSquareBracket = &splited_param[1] {
+                    is_array = true;
+                    is_primitive = true;
+                    let close_index = splited_param
+                        .iter()
+                        .position(|pred| pred == &Token::CloseSquareBracket);
+
+                    if let None = close_index {
+                        print_error(&format!(
+                            "Syntax error... Expecting a close bracket for {}",
+                            vec_.join(" ")
+                        ))
+                    } else {
+                        if close_index.unwrap() - 1 != 1 {
+                            if splited_param.len() != 5 {
+                                print_error(&format!("Syntax error {}... Missing \"memory\" or \"calldata\" or argument identifier", vec_.join(" "),))
+                            }
+                            if let None = extract_data_location_from_token(&splited_param[4]) {
+                                print_error(&format!(
+                                    "Expecting \"memory\" or \"calldata\". {} ",
+                                    vec_.join(" "),
+                                ))
+                            } else {
+                                location_ = extract_data_location_from_token(&splited_param[4]);
+                            }
+                            match &splited_param[2] {
+                                Token::Identifier(_val) => {
+                                    if let Some(_dd) = Regex::new(r"^\d+$").unwrap().find(_val) {
+                                        if _val == "0" {
+                                            print_error(&format!("Invalid array size {}", _val))
+                                        }
+                                        size = Some(_val.to_owned());
+                                    } else {
+                                        print_error(&format!("Invalid array size {}", _val))
+                                    }
+                                }
+                                _ => print_error(&format!(
+                                    "Unprocessible entity.. Expecting a size of uint but found {}",
+                                    LineDescriptions::from_token_to_string(&splited_param[2])
+                                )),
+                            }
+                        } else {
+                            if splited_param.len() != 4 {
+                                print_error(&format!("Syntax error {}... Missing \"memory\" or \"calldata\" or argument identifier", vec_.join(" "),))
+                            }
+                            if let None = extract_data_location_from_token(&splited_param[3]) {
+                                print_error(&format!(
+                                    "Expecting \"memory\" or \"calldata\". {} ",
+                                    vec_.join(" "),
+                                ))
+                            } else {
+                                location_ = extract_data_location_from_token(&splited_param[3]);
+                            }
+                        }
+                    }
+                } else if let Some(_location) = extract_data_location_from_token(&splited_param[1])
+                {
+                    if !is_primitive {
+                        print_error(&format!(
+                            "Syntax error... cannot declare \"{}\" on a  non-primive type. {} ",
+                            LineDescriptions::from_token_to_string(&_location),
+                            vec_.join(" "),
+                        ))
+                    } else {
+                        location_ = Some(_location);
+                    }
+                } else {
+                    print_error(&format!("Invalid function argument {}", vec_.join(" ")))
+                }
+            }
+
+            let structured = ReturnType {
+                location: location_,
+                type_: type_.unwrap(),
+                is_array,
+                size,
+            };
+
+            function_arguments.push(structured);
+        }
+    }
+
+    function_arguments
 }
 
 #[derive(Debug, Clone)]
@@ -1352,4 +1404,12 @@ fn detokenize(input: &Token) -> String {
         Token::Identifier(_val) => _val.to_owned(),
     };
     token
+}
+
+fn extract_data_location_from_token(token: &Token) -> Option<Token> {
+    match token {
+        Token::Memory => Some(Token::Memory),
+        Token::Calldata => Some(Token::Calldata),
+        _ => None,
+    }
 }

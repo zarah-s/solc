@@ -1,108 +1,60 @@
 // SPDX-License-Identifier: MIT
-// pragma solidity ^0.8.8;
+pragma solidity ^0.8.8;
 
-contract Todos {
-    int[] public constant leeter = 1;
+contract MyTodo {
+    Todo[] todos;
+    uint256 public deleted;
+
+    enum Status {
+        Idle,
+        Pending,
+        Done
+    }
+
     struct Todo {
-        string text;
-        bool completed;
-        //mapping(uing=> string) name;
+        uint256 id;
+        string title;
+        string description;
+        uint256 timestamp;
+        Status status;
     }
 
-    constructor(uint leeter) {
-        uint leeter = 1;
+    function createTodo(
+        string calldata _title,
+        string calldata _description
+    ) external {
+        todos.push(
+            Todo({
+                id: todos.length + 1,
+                title: _title,
+                description: _description,
+                timestamp: block.timestamp,
+                status: Status.Idle
+            })
+        );
     }
 
-    fallback() external {
-        uint leeter = 1;
+    function changeStatus(uint256 _id, uint8 _status) external {
+        Todo storage todo = todos[_id - 1];
+        todo.status = Status(_status);
     }
 
-   
-    receive() external payable {}
-     Todo[] public todos;
-
-    cron(""){}
-    mapping(address => uint) name;
-
-    // An array of 'Todo' structs
-    Todo[] public todos;
-    Todo public yo = Todo({text: "Hello", completed: false});
-    string greet = "Hello";
-
-    // function create(string calldata _text) public {
-    //     // 3 ways to initialize a struct
-    //     string memory greet = "Hello";
-    //     // - calling it like a function
-    //     todos.push(Todo(_text, false));
-
-    //     // key value mapping
-    //     todos.push(Todo({text: _text, completed: false}));
-
-    //     // initialize an empty struct and then update it
-    //     Todo memory todo;
-    //     todo.text = _text;
-    //     // todo.completed initialized to false
-
-    //     todos.push(todo);
-    // }
-
-    // Solidity automatically created a getter for 'todos' so
-    // you don't actually need this function.
-    function get(
-        uint _index
-    ) public view returns (string memory, bool) gasless {
-        Todo storage todo = todos[_index];
-        if (true) {
-            return (todo.text, todo.completed);
-        } else if (false) {
-            if (1 == 1) {
-                return (todo.text, todo.completed);
-            } else {
-                // return;
+    function getTodos() external view returns (Todo[] memory) {
+        Todo[] memory todos_ = new Todo[](todos.length - deleted);
+        uint256 _count;
+        for (uint256 i = 0; i < todos.length; i++) {
+            if (todos[i].timestamp != 0) {
+                todos_[_count] = todos[i];
+                _count++;
             }
-            // do something;
         }
-
-        if (true) {
-            return (todo.text, todo.completed);
-        } else if (false) {
-            // do something;
-        }
-        return (todo.text, todo.completed);
+        return todos_;
     }
 
-    struct Calm {
-        /* hey */
-        string text;
-        bool completed; // this is a comment
-        Todo[] todos;
+    function deleteTodo(uint256 _id) external {
+        require(_id > 0, "Invalid id");
+        require(_id - 1 < todos.length, "Invalid id");
+        delete todos[_id - 1];
+        deleted++;
     }
-
-    // update text
-    function updateText(uint _index, string memory   _text) public {
-        Todo storage todo = todos[_index];
-        todo.text = _text;
-    }
-
-    // update completed
-    function toggleCompleted__(string[300] memory _ff,string[10000]  _tt) {Todo storage todo = todos[_index];
-        todo.completed = !todo.completed;
-        string text = "Hello world&_=+^&*(23)";
-    }
-
-    function naem() virtual override{
-        
-    }
-
-    struct NFT {
-        string[ text;
-        bool[] completed;
-        Todo[] todo;
-    }
-    int public leeter = -1;
-    int public leeter = -1;
-    int public leeter = -1;
-    int public leeter = -1;
-
-    bool[] arr;
 }
