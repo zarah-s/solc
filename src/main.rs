@@ -582,22 +582,22 @@ fn validate_struct_type(text: &str, line: i32) -> Option<StructTypes> {
             print_error(&format!("Expecting \"{}\" on line {}", ";", line));
             None
         } else {
-            // if !DATA_TYPES.contains(&splited[0]) {
-            //     print_error(&format!(
-            //         "Unidentified identifier \"{}\" on line {}",
-            //         splited[0], line
-            //     ));
-            //     None
-            // } else {
-            let splited_terminate: Vec<&str> = splited[1].split(";").collect();
-            if validate_identifier_regex(splited_terminate[0], line) {
-                return Some(StructTypes::Type(
-                    splited[0].to_string(),
-                    splited_terminate[0].to_string(),
+            if !DATA_TYPES.contains(&splited[0]) {
+                print_error(&format!(
+                    "Unidentified identifier \"{}\" on line {}",
+                    splited[0], line
                 ));
+                None
+            } else {
+                let splited_terminate: Vec<&str> = splited[1].split(";").collect();
+                if validate_identifier_regex(splited_terminate[0], line) {
+                    return Some(StructTypes::Type(
+                        splited[0].to_string(),
+                        splited_terminate[0].to_string(),
+                    ));
+                }
+                None
             }
-            None
-            // }
         }
     }
 }
@@ -921,7 +921,6 @@ fn extract_functions(data: &Vec<LineDescriptions>, custom_data_types: &Vec<&str>
                 custom_data_types,
             ));
         }
-        // println!("{:?}===========>>", function_definition);
 
         if function_definition.contains(&Token::Override) {
             function_override = true;
@@ -930,8 +929,6 @@ fn extract_functions(data: &Vec<LineDescriptions>, custom_data_types: &Vec<&str>
         if function_definition.contains(&Token::Virtual) {
             function_virtual = true;
         }
-
-        // println!("{:#?}", single_stringified)
 
         println!(
             "{:?} \n {:#?}\n {:#?}\n {function_override}\n {function_virtual}\n {:#?} \n\n\n\n",
