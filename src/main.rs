@@ -140,8 +140,11 @@ const SYMBOLS: [&str; 22] = [
 
 #[derive(Debug, Clone)]
 
-enum StructTypes {
-    Type(String, String),
+struct StructTypes {
+    type_: String,
+    name_: String,
+    size: Option<String>,
+    is_array: bool,
 }
 
 // enum Argument<'a> {
@@ -295,29 +298,30 @@ impl LineDescriptions {
                 .iter()
                 .find(|pred| pred == &&combined_char.as_str().trim())
             {
-                if let Some(_next) = input.chars().nth(index + 1) {
-                    let mut joined = String::from(combined_char.clone());
-                    joined.push(character);
-                    joined.push(_next);
+                // if let Some(_next) = input.chars().nth(index + 1) {
+                //     let mut joined = String::from(combined_char.clone());
+                //     joined.push(character);
+                //     joined.push(_next);
 
-                    if [KEYWORDS.to_vec(), DATA_TYPES.to_vec(), SYMBOLS.to_vec()]
-                        .concat()
-                        .concat()
-                        .contains(&joined.as_str().trim())
-                    {
-                        combined_char.push_str(character.to_string().as_str())
-                    } else {
-                        lex.push(combined_char.trim().to_string());
-                        combined_char.clear();
-                    }
+                //     if [DATA_TYPES.to_vec()]
+                //         .concat()
+                //         .concat()
+                //         .contains(&joined.as_str().trim())
+                //     {
+                //         combined_char.push_str(character.to_string().as_str())
+                //     } else {
+                //         panic!("here {}", joined);
+                //         lex.push(combined_char.trim().to_string());
+                //         combined_char.clear();
+                //     }
+                // } else {
+                if let Some(_) = identifier_regex.find(character.to_string().as_str()) {
+                    combined_char.push_str(character.to_string().as_str())
                 } else {
-                    if let Some(_) = identifier_regex.find(character.to_string().as_str()) {
-                        combined_char.push_str(character.to_string().as_str())
-                    } else {
-                        lex.push(combined_char.trim().to_string());
-                        combined_char.clear();
-                    }
+                    lex.push(combined_char.trim().to_string());
+                    combined_char.clear();
                 }
+                // }
             } else {
                 combined_char.push_str(character.to_string().as_str())
             }
@@ -423,20 +427,20 @@ fn main() {
     let structured_stripped_compilable_contents: Vec<LineDescriptions> =
         LineDescriptions::to_struct(joined_stripped_string);
 
-    let structs_tree = extract_custom_data_types(&structured_stripped_compilable_contents);
-    let custom_data_types_identifiers: Vec<&str> = structs_tree
-        .iter()
-        .map(|pred| pred.identifier.as_str())
-        .collect();
+    extract_custom_data_types(&structured_stripped_compilable_contents);
+    // let custom_data_types_identifiers: Vec<&str> = structs_tree
+    //     .iter()
+    //     .map(|pred| pred.identifier.as_str())
+    //     .collect();
 
-    let global_variables = extract_global_variables(
-        &structured_stripped_compilable_contents,
-        &custom_data_types_identifiers,
-    );
-    extract_functions(
-        &structured_stripped_compilable_contents,
-        &custom_data_types_identifiers,
-    );
+    // let global_variables = extract_global_variables(
+    //     &structured_stripped_compilable_contents,
+    //     &custom_data_types_identifiers,
+    // );
+    // extract_functions(
+    //     &structured_stripped_compilable_contents,
+    //     &custom_data_types_identifiers,
+    // );
     // println!("{:#?} {:#?}", structs_tree, global_variables)
 }
 
@@ -475,132 +479,142 @@ fn validate_identifier_regex(identifer: &str, line: i32) -> bool {
     }
 }
 
+/* *************************** ENUM START ******************************************/
+
 /* *************************** STRUCT START ******************************************/
-fn extract_custom_data_types(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
-    let stringified_vec_data: Vec<String> = data.iter().map(|ff| ff.clone().to_string()).collect();
-    let mut stringified_data = stringified_vec_data.join("");
-    let mut stringified_structs: Vec<String> = Vec::new();
-    let mut structs: Vec<Vec<LineDescriptions>> = Vec::new();
-    let mut struct_trees: Vec<StructIdentifier> = Vec::new();
-
-    while stringified_data.contains("struct") {
-        let start_index = stringified_data.find("struct");
-        if let Some(_) = start_index {
-            let left_padding = stringified_data[start_index.unwrap()..].to_string();
-            let end_index = &left_padding.find("}");
-            if let None = end_index {
-                print_error(&format!(
-                    "Unprocessible entity on line {:?}",
-                    LineDescriptions::to_struct(left_padding.clone())
-                        .last()
-                        .unwrap()
-                        .line
-                ))
-            }
-            let position_from_close_brace = &left_padding[end_index.unwrap()..].find("%%");
-
-            let right_padding = left_padding
-                [..end_index.unwrap() + (position_from_close_brace.unwrap() + 2)]
-                .to_string();
-            stringified_structs.push(right_padding);
-            stringified_data = stringified_data[..start_index.unwrap()].to_string()
-                + &stringified_data[start_index.unwrap() + end_index.unwrap()..].to_string()
-        }
+fn extract_custom_data_types(data: &Vec<LineDescriptions>) {
+    let mut stringified = String::new();
+    let mut extracted_structs: Vec<Vec<Token>> = Vec::new();
+    let mut combined: Vec<Token> = Vec::new();
+    for line_data in data {
+        stringified.push_str(&line_data.text);
     }
+    let tokens = LineDescriptions::to_token(&stringified);
 
-    for stt in stringified_structs {
-        structs.push(LineDescriptions::to_struct(stt))
-    }
+    let mut opened_braces = 0;
+    let mut opened_brace_type = OpenedBraceType::None;
 
-    for sst in structs {
-        if !sst.first().unwrap().text.contains("structor") {
-            struct_trees.push(validate_struct(&sst))
-        }
-    }
-    struct_trees
-}
-
-fn validate_struct(data: &Vec<LineDescriptions>) -> StructIdentifier {
-    let mut identifier: Option<&str> = None;
-    let mut types: Vec<StructTypes> = Vec::new();
-    for sst in data {
-        if sst.text.starts_with("struct") {
-            let splited_str: Vec<&str> = sst.text.split(" ").collect();
-            if splited_str.len() < 2 {
-                print_error(&format!(
-                    "Unprocessible entity \"{}\" on line {}",
-                    sst.text, sst.line
-                ))
-            } else {
-                if validate_identifier_regex(splited_str[1], sst.line) {
-                    identifier = Some(splited_str[1]);
+    for token in tokens {
+        match token {
+            Token::OpenBraces => {
+                opened_braces += 1;
+                if let OpenedBraceType::Struct = opened_brace_type {
+                    combined.push(token)
                 }
             }
 
-            let check_inline_format: Vec<&str> = sst.text.split("{").collect();
-            if check_inline_format.len() < 2 {
-                print_error(&format!(
-                    "Unprocessible entity {} on line {}",
-                    sst.text, sst.line
-                ))
-            } else {
-                if check_inline_format.len() > 0 && !check_inline_format[1].is_empty() {
-                    let inline_types: Vec<&str> = check_inline_format[1].split(";").collect();
-                    for inline in inline_types {
-                        if inline != "}" && !inline.is_empty() {
-                            if let Some(return_value) =
-                                validate_struct_type(&format!("{inline};"), sst.line)
-                            {
-                                types.push(return_value);
-                            }
-                        }
+            Token::CloseBraces => {
+                if let OpenedBraceType::Struct = opened_brace_type {
+                    combined.push(token)
+                }
+                opened_braces -= 1;
+                if opened_braces == 1 {
+                    opened_brace_type = OpenedBraceType::None;
+                    if !combined.is_empty() {
+                        extracted_structs.push(combined.clone());
+                        combined.clear();
                     }
                 }
             }
-        } else {
-            if sst.text != "}" {
-                if let Some(return_value) = validate_struct_type(&sst.text, sst.line) {
-                    types.push(return_value);
+            Token::Struct => {
+                opened_brace_type = OpenedBraceType::Struct;
+                combined.push(token)
+            }
+
+            _other => {
+                if let OpenedBraceType::Struct = opened_brace_type {
+                    combined.push(_other)
                 }
             }
         }
     }
 
-    StructIdentifier::new(identifier.unwrap().to_string(), types)
-}
-
-fn validate_struct_type(text: &str, line: i32) -> Option<StructTypes> {
-    let splited: Vec<&str> = text.split(" ").collect();
-    if splited.len() != 2 {
-        print_error(&format!(
-            "Unprocessible entity \"{}\" on line {}",
-            text, line
-        ));
-        None
-    } else {
-        if !text.ends_with(";") {
-            print_error(&format!("Expecting \"{}\" on line {}", ";", line));
-            None
-        } else {
-            if !DATA_TYPES.contains(&splited[0]) {
-                print_error(&format!(
-                    "Unidentified identifier \"{}\" on line {}",
-                    splited[0], line
-                ));
-                None
-            } else {
-                let splited_terminate: Vec<&str> = splited[1].split(";").collect();
-                if validate_identifier_regex(splited_terminate[0], line) {
-                    return Some(StructTypes::Type(
-                        splited[0].to_string(),
-                        splited_terminate[0].to_string(),
-                    ));
-                }
-                None
-            }
-        }
+    for struct_inst in extracted_structs {
+        println!("{:#?}", struct_inst);
     }
 }
+
+// fn validate_struct(data: &Vec<LineDescriptions>) -> StructIdentifier {
+//     let mut identifier: Option<&str> = None;
+//     let mut types: Vec<StructTypes> = Vec::new();
+//     for sst in data {
+//         if sst.text.starts_with("struct") {
+//             let splited_str: Vec<&str> = sst.text.split(" ").collect();
+//             if splited_str.len() < 2 {
+//                 print_error(&format!(
+//                     "Unprocessible entity \"{}\" on line {}",
+//                     sst.text, sst.line
+//                 ))
+//             } else {
+//                 if validate_identifier_regex(splited_str[1], sst.line) {
+//                     identifier = Some(splited_str[1]);
+//                 }
+//             }
+
+//             let check_inline_format: Vec<&str> = sst.text.split("{").collect();
+//             if check_inline_format.len() < 2 {
+//                 print_error(&format!(
+//                     "Unprocessible entity {} on line {}",
+//                     sst.text, sst.line
+//                 ))
+//             } else {
+//                 if check_inline_format.len() > 0 && !check_inline_format[1].is_empty() {
+//                     let inline_types: Vec<&str> = check_inline_format[1].split(";").collect();
+//                     for inline in inline_types {
+//                         if inline != "}" && !inline.is_empty() {
+//                             if let Some(return_value) =
+//                                 validate_struct_type(&format!("{inline};"), sst.line)
+//                             {
+//                                 types.push(return_value);
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+//         } else {
+//             if sst.text != "}" {
+//                 if let Some(return_value) = validate_struct_type(&sst.text, sst.line) {
+//                     types.push(return_value);
+//                 }
+//             }
+//         }
+//     }
+
+//     StructIdentifier::new(identifier.unwrap().to_string(), types)
+// }
+
+// fn validate_struct_type(text: &str, line: i32) -> Option<StructTypes> {
+//     let splited: Vec<&str> = text.split(" ").collect();
+//     if splited.len() != 2 {
+//         print_error(&format!(
+//             "Unprocessible entity \"{}\" on line {}",
+//             text, line
+//         ));
+//         None
+//     } else {
+//         if !text.ends_with(";") {
+//             print_error(&format!("Expecting \"{}\" on line {}", ";", line));
+//             None
+//         } else {
+//             if !DATA_TYPES.contains(&splited[0]) {
+//                 print_error(&format!(
+//                     "Unidentified identifier \"{}\" on line {}",
+//                     splited[0], line
+//                 ));
+//                 None
+//             } else {
+//                 let splited_terminate: Vec<&str> = splited[1].split(";").collect();
+//                 if validate_identifier_regex(splited_terminate[0], line) {
+//                     return Some(StructTypes::Type(
+//                         splited[0].to_string(),
+//                         splited_terminate[0].to_string(),
+//                     ));
+//                 }
+//                 None
+//             }
+//         }
+//     }
+// }
 
 /* *************************** STRUCT END ******************************************/
 

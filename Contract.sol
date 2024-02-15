@@ -5,6 +5,11 @@ contract MyTodo {
     Todo[] todos;
     uint256 public deleted;
 
+    function structify(uint256 _id, uint8 _status) external {
+        Todo storage todo = todos[_id - 1];
+        todo.status = Status(_status);
+    }
+
     enum Status {
         Idle,
         Pending,
@@ -17,6 +22,15 @@ contract MyTodo {
         string description;
         uint256 timestamp;
         Status status;
+    }
+
+    struct Tod {
+        uint256 id;
+        string title;
+        string description;
+        uint256 timestamp;
+        Status status;
+        Todo[] todos;
     }
 
     function createTodo(
@@ -32,11 +46,6 @@ contract MyTodo {
                 status: Status.Idle
             })
         );
-    }
-
-    function changeStatus(uint256 _id, uint8 _status) external {
-        Todo storage todo = todos[_id - 1];
-        todo.status = Status(_status);
     }
 
     function getTodos() external view returns (Todo[] memory) {
