@@ -1,12 +1,12 @@
-use std::{env, fs, process};
-
 use regex::Regex;
+use std::{env, fs, process};
 
 #[derive(Debug, Clone, PartialEq)]
 enum Token {
     Identifier(String),
     Contract,
     Override,
+    Enum,
     Internal,
     External,
     Virtual,
@@ -101,7 +101,7 @@ const DATA_TYPES: [&str; 28] = [
     "address[]",
 ];
 
-const KEYWORDS: [&str; 29] = [
+const KEYWORDS: [&str; 30] = [
     "contract",
     "mapping",
     "fallback",
@@ -113,6 +113,7 @@ const KEYWORDS: [&str; 29] = [
     "msg",
     "block",
     "constructor",
+    "enum",
     "address",
     "private",
     "struct",
@@ -147,10 +148,6 @@ struct StructTypes {
     is_array: bool,
 }
 
-// enum Argument<'a> {
-//     Arg(&'a str, &'a str),
-// }
-
 #[derive(Debug)]
 struct Argument {
     type_: String,
@@ -180,6 +177,12 @@ enum VariableType {
 struct StructIdentifier {
     identifier: String,
     types: Vec<StructTypes>,
+}
+#[derive(Debug)]
+
+struct EnumIdentifier {
+    identifier: String,
+    variants: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -220,6 +223,7 @@ enum OpenedBraceType {
     Callback,
     Function,
     Contract,
+    Enum,
 }
 
 impl StructIdentifier {
@@ -426,27 +430,127 @@ fn main() {
 
     let structured_stripped_compilable_contents: Vec<LineDescriptions> =
         LineDescriptions::to_struct(joined_stripped_string);
+    let extracted_enums = extract_enum(&structured_stripped_compilable_contents);
 
-    extract_custom_data_types(&structured_stripped_compilable_contents);
-    // let custom_data_types_identifiers: Vec<&str> = structs_tree
-    //     .iter()
-    //     .map(|pred| pred.identifier.as_str())
-    //     .collect();
+    let structs_tree = extract_struct(&structured_stripped_compilable_contents);
+    let struct_identifiers: Vec<&str> = structs_tree
+        .iter()
+        .map(|pred| pred.identifier.as_str())
+        .collect();
 
-    // let global_variables = extract_global_variables(
-    //     &structured_stripped_compilable_contents,
-    //     &custom_data_types_identifiers,
-    // );
-    // extract_functions(
-    //     &structured_stripped_compilable_contents,
-    //     &custom_data_types_identifiers,
-    // );
-    // println!("{:#?} {:#?}", structs_tree, global_variables)
+    let enum_identifiers: Vec<&str> = extracted_enums
+        .iter()
+        .map(|pred| pred.identifier.as_str())
+        .collect();
+
+    let custom_data_types_identifiers: Vec<&str> = [enum_identifiers, struct_identifiers].concat();
+
+    let global_variables = extract_global_variables(
+        &structured_stripped_compilable_contents,
+        &custom_data_types_identifiers,
+    );
+    extract_functions(
+        &structured_stripped_compilable_contents,
+        &custom_data_types_identifiers,
+    );
+    println!(
+        "{:#?} \n {:#?}\n {:#?}",
+        structs_tree, global_variables, extracted_enums
+    )
 }
 
 fn print_error(msg: &str) {
     eprintln!("ERROR: {}", msg);
     process::exit(1);
+}
+
+fn custom_data_types_tokens(_type: &Token, data: &Vec<LineDescriptions>) -> Vec<Vec<Token>> {
+    let mut stringified = String::new();
+    let mut extracted_types: Vec<Vec<Token>> = Vec::new();
+    let mut combined: Vec<Token> = Vec::new();
+    for line_data in data {
+        stringified.push_str(&line_data.text);
+    }
+    let tokens = LineDescriptions::to_token(&stringified);
+
+    let mut opened_braces = 0;
+    let mut opened_brace_type = OpenedBraceType::None;
+
+    for token in tokens {
+        match token {
+            Token::OpenBraces => {
+                opened_braces += 1;
+                // if let OpenedBraceType::Struct = opened_brace_type {
+                //     combined.push(token)
+                // }
+                if let Token::Struct = _type {
+                    if let OpenedBraceType::Struct = opened_brace_type {
+                        combined.push(token)
+                    }
+                } else {
+                    if let OpenedBraceType::Enum = opened_brace_type {
+                        combined.push(token)
+                    }
+                }
+            }
+
+            Token::CloseBraces => {
+                // if let OpenedBraceType::Struct = opened_brace_type {
+                //     combined.push(token)
+                // }
+                if let Token::Struct = _type {
+                    if let OpenedBraceType::Struct = opened_brace_type {
+                        combined.push(token)
+                    }
+                } else {
+                    if let OpenedBraceType::Enum = opened_brace_type {
+                        combined.push(token)
+                    }
+                }
+                opened_braces -= 1;
+                if opened_braces == 1 {
+                    opened_brace_type = OpenedBraceType::None;
+                    if !combined.is_empty() {
+                        extracted_types.push(combined.clone());
+                        combined.clear();
+                    }
+                }
+            }
+            Token::Struct => {
+                if let Token::Struct = _type {
+                    opened_brace_type = OpenedBraceType::Struct;
+                    combined.push(token)
+                } else {
+                    // opened_brace_type = OpenedBraceType::Enum;
+                    // combined.push(token)
+                }
+            }
+
+            Token::Enum => {
+                if let Token::Struct = _type {
+                    // opened_brace_type = OpenedBraceType::Struct;
+                    // combined.push(token)
+                } else {
+                    opened_brace_type = OpenedBraceType::Enum;
+                    combined.push(token)
+                }
+            }
+
+            _other => {
+                if let Token::Struct = _type {
+                    if let OpenedBraceType::Struct = opened_brace_type {
+                        combined.push(_other)
+                    }
+                } else {
+                    if let OpenedBraceType::Enum = opened_brace_type {
+                        combined.push(_other)
+                    }
+                }
+            }
+        }
+    }
+
+    extracted_types
 }
 
 fn validate_identifier_regex(identifer: &str, line: i32) -> bool {
@@ -480,141 +584,166 @@ fn validate_identifier_regex(identifer: &str, line: i32) -> bool {
 }
 
 /* *************************** ENUM START ******************************************/
+fn extract_enum(data: &Vec<LineDescriptions>) -> Vec<EnumIdentifier> {
+    let extracted_enums = custom_data_types_tokens(&Token::Enum, data);
+    let mut enum_identifier: Vec<EnumIdentifier> = Vec::new();
 
-/* *************************** STRUCT START ******************************************/
-fn extract_custom_data_types(data: &Vec<LineDescriptions>) {
-    let mut stringified = String::new();
-    let mut extracted_structs: Vec<Vec<Token>> = Vec::new();
-    let mut combined: Vec<Token> = Vec::new();
-    for line_data in data {
-        stringified.push_str(&line_data.text);
-    }
-    let tokens = LineDescriptions::to_token(&stringified);
+    for enum_inst in extracted_enums {
+        let mut _identifier: Option<String> = None;
+        if let Token::Identifier(_id) = &enum_inst[1] {
+            _identifier = Some(_id.to_string());
+        } else {
+            print_error("Missing enum identifier!!");
+        }
 
-    let mut opened_braces = 0;
-    let mut opened_brace_type = OpenedBraceType::None;
-
-    for token in tokens {
-        match token {
-            Token::OpenBraces => {
-                opened_braces += 1;
-                if let OpenedBraceType::Struct = opened_brace_type {
-                    combined.push(token)
+        let stripped = &enum_inst[3..enum_inst.len() - 1];
+        let splited: Vec<&[Token]> = stripped.split(|pred| pred == &Token::Coma).collect();
+        let mut combined_types: Vec<String> = Vec::new();
+        for splited_param in splited.iter().filter(|pred| !pred.is_empty()) {
+            if !splited_param.is_empty() {
+                if splited_param.len() != 1 {
+                    print_error(&format!("Invalid enum variant ",))
                 }
-            }
-
-            Token::CloseBraces => {
-                if let OpenedBraceType::Struct = opened_brace_type {
-                    combined.push(token)
-                }
-                opened_braces -= 1;
-                if opened_braces == 1 {
-                    opened_brace_type = OpenedBraceType::None;
-                    if !combined.is_empty() {
-                        extracted_structs.push(combined.clone());
-                        combined.clear();
-                    }
-                }
-            }
-            Token::Struct => {
-                opened_brace_type = OpenedBraceType::Struct;
-                combined.push(token)
-            }
-
-            _other => {
-                if let OpenedBraceType::Struct = opened_brace_type {
-                    combined.push(_other)
+                if let Token::Identifier(_id) = &splited_param[0] {
+                    validate_identifier_regex(_id, 000);
+                    combined_types.push(_id.to_string());
+                } else {
+                    print_error("Invalid enum variant")
                 }
             }
         }
+
+        let structured = EnumIdentifier {
+            identifier: _identifier.unwrap(),
+            variants: combined_types,
+        };
+
+        enum_identifier.push(structured);
     }
 
-    for struct_inst in extracted_structs {
-        println!("{:#?}", struct_inst);
-    }
+    enum_identifier
 }
 
-// fn validate_struct(data: &Vec<LineDescriptions>) -> StructIdentifier {
-//     let mut identifier: Option<&str> = None;
-//     let mut types: Vec<StructTypes> = Vec::new();
-//     for sst in data {
-//         if sst.text.starts_with("struct") {
-//             let splited_str: Vec<&str> = sst.text.split(" ").collect();
-//             if splited_str.len() < 2 {
-//                 print_error(&format!(
-//                     "Unprocessible entity \"{}\" on line {}",
-//                     sst.text, sst.line
-//                 ))
-//             } else {
-//                 if validate_identifier_regex(splited_str[1], sst.line) {
-//                     identifier = Some(splited_str[1]);
-//                 }
-//             }
+/* *************************** ENUM END ******************************************/
 
-//             let check_inline_format: Vec<&str> = sst.text.split("{").collect();
-//             if check_inline_format.len() < 2 {
-//                 print_error(&format!(
-//                     "Unprocessible entity {} on line {}",
-//                     sst.text, sst.line
-//                 ))
-//             } else {
-//                 if check_inline_format.len() > 0 && !check_inline_format[1].is_empty() {
-//                     let inline_types: Vec<&str> = check_inline_format[1].split(";").collect();
-//                     for inline in inline_types {
-//                         if inline != "}" && !inline.is_empty() {
-//                             if let Some(return_value) =
-//                                 validate_struct_type(&format!("{inline};"), sst.line)
-//                             {
-//                                 types.push(return_value);
-//                             }
-//                         }
-//                     }
-//                 }
-//             }
-//         } else {
-//             if sst.text != "}" {
-//                 if let Some(return_value) = validate_struct_type(&sst.text, sst.line) {
-//                     types.push(return_value);
-//                 }
-//             }
-//         }
-//     }
+/* *************************** STRUCT START ******************************************/
+fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
+    let extracted_structs = custom_data_types_tokens(&Token::Struct, data);
+    let mut struct_identifier: Vec<StructIdentifier> = Vec::new();
 
-//     StructIdentifier::new(identifier.unwrap().to_string(), types)
-// }
+    for struct_inst in extracted_structs {
+        let mut _identifier: Option<String> = None;
+        if let Token::Identifier(_id) = &struct_inst[1] {
+            _identifier = Some(_id.to_string());
+        } else {
+            print_error("Missing struct identifier!!");
+        }
+        let stripped = &struct_inst[3..struct_inst.len() - 1];
+        let splited: Vec<&[Token]> = stripped.split(|pred| pred == &Token::SemiColon).collect();
+        let mut combined_types: Vec<StructTypes> = Vec::new();
+        // println!("{:?}", splited);
+        for splited_param in splited.iter().filter(|pred| !pred.is_empty()) {
+            let mut type_: Option<String> = None;
+            let mut name_: Option<String> = None;
+            let mut is_array = false;
+            let mut size: Option<String> = None;
+            if !splited_param.is_empty() {
+                if splited_param.len() < 2 {
+                    print_error(&format!("Invalid Struct params ",))
+                }
 
-// fn validate_struct_type(text: &str, line: i32) -> Option<StructTypes> {
-//     let splited: Vec<&str> = text.split(" ").collect();
-//     if splited.len() != 2 {
-//         print_error(&format!(
-//             "Unprocessible entity \"{}\" on line {}",
-//             text, line
-//         ));
-//         None
-//     } else {
-//         if !text.ends_with(";") {
-//             print_error(&format!("Expecting \"{}\" on line {}", ";", line));
-//             None
-//         } else {
-//             if !DATA_TYPES.contains(&splited[0]) {
-//                 print_error(&format!(
-//                     "Unidentified identifier \"{}\" on line {}",
-//                     splited[0], line
-//                 ));
-//                 None
-//             } else {
-//                 let splited_terminate: Vec<&str> = splited[1].split(";").collect();
-//                 if validate_identifier_regex(splited_terminate[0], line) {
-//                     return Some(StructTypes::Type(
-//                         splited[0].to_string(),
-//                         splited_terminate[0].to_string(),
-//                     ));
-//                 }
-//                 None
-//             }
-//         }
-//     }
-// }
+                type_ = Some(format!(
+                    "{}",
+                    LineDescriptions::from_token_to_string(&splited_param[0],)
+                ));
+
+                if let Token::OpenSquareBracket = &splited_param[1] {
+                    is_array = true;
+                    let close_index = splited_param
+                        .iter()
+                        .position(|pred| pred == &Token::CloseSquareBracket);
+
+                    if let None = close_index {
+                        print_error(&format!(
+                            "Syntax error... Expecting a close bracket for struct",
+                        ))
+                    } else {
+                        if close_index.unwrap() - 1 != 1 {
+                            if splited_param.len() != 5 {
+                                print_error(&format!("Syntax error on struct"))
+                            }
+
+                            match &splited_param[2] {
+                                Token::Identifier(_val) => {
+                                    if let Some(_dd) = Regex::new(r"^\d+$").unwrap().find(_val) {
+                                        if _val == "0" {
+                                            print_error(&format!("Invalid array size {}", _val))
+                                        }
+                                        size = Some(_val.to_owned());
+                                    } else {
+                                        print_error(&format!("Invalid array size {}", _val))
+                                    }
+                                }
+                                _ => print_error(&format!(
+                                    "Unprocessible entity.. Expecting a size of uint but found {}",
+                                    LineDescriptions::from_token_to_string(&splited_param[2])
+                                )),
+                            }
+
+                            match &splited_param[4] {
+                                Token::Identifier(_val) => name_ = Some(_val.to_owned()),
+
+                                _ => print_error(&format!(
+                                    "Unprocessible entity.. Expecting identifier but found {}",
+                                    LineDescriptions::from_token_to_string(&splited_param[4])
+                                )),
+                            }
+                        } else {
+                            if splited_param.len() != 4 {
+                                print_error(&format!("Syntax error on struct"));
+                            }
+                            // panic!("sdf");
+                            match &splited_param[3] {
+                                Token::Identifier(_val) => name_ = Some(_val.to_owned()),
+
+                                _ => print_error(&format!(
+                                    "Unprocessible entity.. Expecting identifier but found {}",
+                                    LineDescriptions::from_token_to_string(&splited_param[3])
+                                )),
+                            }
+                        }
+                    }
+                } else if let Token::Identifier(_identifier) = &splited_param[1] {
+                    if validate_identifier_regex(&_identifier, 0) {
+                        name_ = Some(_identifier.to_owned());
+                    }
+                } else {
+                    print_error(&format!("Invalid struct",))
+                }
+            }
+
+            if let None = name_ {
+                print_error(&format!("Syntax error... missing struct identifier  ",))
+            }
+
+            let structured = StructTypes {
+                is_array,
+                name_: name_.unwrap(),
+                size: size,
+                type_: type_.unwrap(),
+            };
+            combined_types.push(structured);
+        }
+
+        let struct_build = StructIdentifier {
+            identifier: _identifier.unwrap(),
+            types: combined_types,
+        };
+        struct_identifier.push(struct_build);
+    }
+
+    struct_identifier
+}
 
 /* *************************** STRUCT END ******************************************/
 
@@ -735,7 +864,7 @@ fn validate_variable(text: LineDescriptions, custom_data_types: &Vec<&str>) -> V
                 validated_type = true;
             }
         } else {
-            if sst.starts_with(data_type) {
+            if sst == data_type {
                 validated_type = true;
             }
         }
@@ -770,7 +899,6 @@ fn validate_variable(text: LineDescriptions, custom_data_types: &Vec<&str>) -> V
         value,
     );
     structured
-    // println!("{:#?}", structured)
 }
 
 /* *************************** VARIABLE START ******************************************/
@@ -887,7 +1015,8 @@ fn extract_functions(data: &Vec<LineDescriptions>, custom_data_types: &Vec<&str>
 
         let splited_params_block: Vec<&[Token]> =
             params_block.split(|pred| pred == &Token::Coma).collect();
-        let function_arguments = extract_function_params(splited_params_block, function_definition);
+        let function_arguments =
+            extract_function_params(splited_params_block, function_definition, custom_data_types);
         for visibility in [
             Token::Internal,
             Token::External,
@@ -954,6 +1083,7 @@ fn extract_functions(data: &Vec<LineDescriptions>, custom_data_types: &Vec<&str>
 fn extract_function_params(
     splited_params_block: Vec<&[Token]>,
     function_definition: &[Token],
+    custom_data_types: &Vec<&str>,
 ) -> Vec<Argument> {
     let mut function_arguments: Vec<Argument> = Vec::new();
 
@@ -976,6 +1106,9 @@ fn extract_function_params(
 
                 if DATA_TYPES
                     .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
+                    || custom_data_types.contains(
+                        &LineDescriptions::from_token_to_string(&splited_param[0]).as_str(),
+                    )
                 {
                     if let Token::String = splited_param[0] {
                         is_primitive = true;
@@ -1287,6 +1420,7 @@ fn lex_to_token(input: &str) -> Token {
         "calldata" => Token::Calldata,
         "fallback" => Token::Fallback,
         "cron" => Token::Cron,
+        "enum" => Token::Enum,
         "gasless" => Token::Gasless,
         "address" => Token::Address,
         "private" => Token::Private,
@@ -1357,6 +1491,7 @@ fn detokenize(input: &Token) -> String {
         Token::Receive => "receive".to_string(),
         Token::Fallback => "fallback".to_string(),
         Token::Cron => "cron".to_string(),
+        Token::Enum => "enum".to_string(),
         Token::Virtual => "virtual".to_string(),
         Token::New => "new".to_string(),
         Token::Override => "override".to_string(),

@@ -3,9 +3,9 @@ pragma solidity ^0.8.8;
 
 contract MyTodo {
     Todo[] todos;
-    uint256 public deleted;
+    uint public deleted;
 
-    function structify(uint256 _id, uint8 _status) external {
+    function structify(uint _id, Status _status) external {
         Todo storage todo = todos[_id - 1];
         todo.status = Status(_status);
     }
@@ -13,22 +13,27 @@ contract MyTodo {
     enum Status {
         Idle,
         Pending,
-        Done
+        Done1
+    }
+
+    enum Gender {
+        Male,
+        Female
     }
 
     struct Todo {
-        uint256 id;
+        uint id;
         string title;
         string description;
-        uint256 timestamp;
+        uint timestamp;
         Status status;
     }
 
     struct Tod {
-        uint256 id;
+        uint id;
         string title;
         string description;
-        uint256 timestamp;
+        uint timestamp;
         Status status;
         Todo[] todos;
     }
@@ -50,8 +55,8 @@ contract MyTodo {
 
     function getTodos() external view returns (Todo[] memory) {
         Todo[] memory todos_ = new Todo[](todos.length - deleted);
-        uint256 _count;
-        for (uint256 i = 0; i < todos.length; i++) {
+        uint _count;
+        for (uint i = 0; i < todos.length; i++) {
             if (todos[i].timestamp != 0) {
                 todos_[_count] = todos[i];
                 _count++;
@@ -60,7 +65,7 @@ contract MyTodo {
         return todos_;
     }
 
-    function deleteTodo(uint256 _id) external {
+    function deleteTodo(uint _id) external {
         require(_id > 0, "Invalid id");
         require(_id - 1 < todos.length, "Invalid id");
         delete todos[_id - 1];
