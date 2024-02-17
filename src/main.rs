@@ -445,7 +445,7 @@ fn main() {
 
     let custom_data_types_identifiers: Vec<&str> = [enum_identifiers, struct_identifiers].concat();
 
-    let global_variables = extract_global_variables(
+    let (global_variables, custom_errors) = extract_global_variables(
         &structured_stripped_compilable_contents,
         &custom_data_types_identifiers,
     );
@@ -454,8 +454,8 @@ fn main() {
         &custom_data_types_identifiers,
     );
     println!(
-        "{:#?} \n {:#?}\n {:#?}",
-        structs_tree, global_variables, extracted_enums
+        "{:#?} \n {:#?}\n {:#?}\n {:#?}",
+        structs_tree, global_variables, extracted_enums, custom_errors
     )
 }
 
@@ -747,13 +747,18 @@ fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
 
 /* *************************** STRUCT END ******************************************/
 
+/* *************************** CUSTOM ERROR START ******************************************/
+// fn extract_custom_errors() {}
+/* *************************** CUSTOM ERROR END ******************************************/
+
 /* *************************** VARIABLE START ******************************************/
 
 fn extract_global_variables(
     data: &Vec<LineDescriptions>,
     custom_data_types: &Vec<&str>,
-) -> Vec<VariableIdentifier> {
+) -> (Vec<VariableIdentifier>, Vec<String>) {
     let mut global_variables = Vec::new();
+    let mut custom_errors: Vec<String> = Vec::new();
     let mut opened_braces = 0;
     let mut opened_brace_type = OpenedBraceType::None;
     let mut variables: Vec<LineDescriptions> = Vec::new();
@@ -819,13 +824,21 @@ fn extract_global_variables(
     }
 
     for variable in variables {
-        global_variables.push(validate_variable(variable, custom_data_types));
+        let validated = validate_variable(variable, custom_data_types);
+        if let Some(_raw) = validated.0 {
+            global_variables.push(_raw);
+        } else {
+            custom_errors.push(validated.1.unwrap())
+        }
     }
 
-    global_variables
+    (global_variables, custom_errors)
 }
 
-fn validate_variable(text: LineDescriptions, custom_data_types: &Vec<&str>) -> VariableIdentifier {
+fn validate_variable(
+    text: LineDescriptions,
+    custom_data_types: &Vec<&str>,
+) -> (Option<VariableIdentifier>, Option<String>) {
     let spl: Vec<&str> = text.text.split(" ").collect();
 
     let data_type = spl[0];
@@ -869,12 +882,17 @@ fn validate_variable(text: LineDescriptions, custom_data_types: &Vec<&str>) -> V
             }
         }
     }
-
+    let mut is_custom_error = false;
     if !validated_type {
-        print_error(&format!(
-            "Invalid data type \"{}\" on line  {}",
-            data_type, text.line
-        ));
+        let check_custom_err: Vec<&str> = text.text.split(" ").collect();
+        if check_custom_err[0] == "error" {
+            is_custom_error = true;
+        } else {
+            print_error(&format!(
+                "Invalid data type \"{}\" on line  {}",
+                data_type, text.text
+            ));
+        }
     } else {
         if let Some(_) = DATA_TYPES.iter().find(|pred| pred == &&data_type) {
             variable_type = Some(VariableType::Variable);
@@ -883,22 +901,28 @@ fn validate_variable(text: LineDescriptions, custom_data_types: &Vec<&str>) -> V
         }
     }
 
-    if let None = variable_type {
-        print_error(&format!(
-            "Invalid data type \"{}\" on line  {}",
-            data_type, text.line
-        ));
+    if !is_custom_error {
+        if let None = variable_type {
+            print_error(&format!(
+                "Invalid data type \"{}\" on line  {}",
+                data_type, text.line
+            ));
+        }
     }
 
-    let structured = VariableIdentifier::new(
-        data_type.to_string(),
-        visibility.to_string(),
-        variable_type.unwrap(),
-        mutability.to_string(),
-        name.to_string(),
-        value,
-    );
-    structured
+    if is_custom_error {
+        return (None, Some(text.text));
+    } else {
+        let structured = VariableIdentifier::new(
+            data_type.to_string(),
+            visibility.to_string(),
+            variable_type.unwrap(),
+            mutability.to_string(),
+            name.to_string(),
+            value,
+        );
+        return (Some(structured), None);
+    }
 }
 
 /* *************************** VARIABLE START ******************************************/
@@ -951,7 +975,6 @@ fn extract_functions(data: &Vec<LineDescriptions>, custom_data_types: &Vec<&str>
 
     for processed in processed_data {
         let mut combined = String::new();
-        // single_structure.push(processed);
         for prr in processed {
             combined.push_str(&prr.text);
         }
@@ -962,7 +985,6 @@ fn extract_functions(data: &Vec<LineDescriptions>, custom_data_types: &Vec<&str>
 
     for single_stringified in stringified {
         let tokens = LineDescriptions::to_token(single_stringified.as_str());
-        // println!("{:#?}", tokens);
         if let Token::OpenParenthesis = &tokens[2] {
         } else {
             print_error(&format!(
@@ -1378,23 +1400,42 @@ fn extract_return_types(
 
     function_arguments
 }
-
-#[derive(Debug, Clone)]
-enum FunctionIdentifier {
-    Other(Vec<String>),
-    // Variable(VariableIdentifier),
-    Condition(Conditionals),
+#[derive(Debug)]
+enum VariableAssignType {
+    Expression,
+    Function,
+    Struct,
+    Array(Option<i32>),
+}
+#[derive(Debug)]
+struct VariableAssign {
+    identifier: String,
+    value: String,
+    type_: VariableAssignType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
+struct Return {
+    value: String,
+}
 
+#[derive(Debug)]
+struct FunctionCall {
+    identifier: String,
+    arguments: Vec<String>,
+}
+#[derive(Debug)]
+struct Require {
+    condition: String,
+    message: String,
+}
+
+#[derive(Debug)]
 struct ElIf {
     condition: Vec<Token>,
     arm: Vec<FunctionIdentifier>,
 }
-
-#[derive(Debug, Clone)]
-
+#[derive(Debug)]
 struct Conditionals {
     condition: Vec<Token>,
     arm: Vec<FunctionIdentifier>,
@@ -1402,10 +1443,14 @@ struct Conditionals {
     el: Option<Vec<FunctionIdentifier>>,
 }
 
-impl Conditionals {
-    pub fn new(input: &str) {
-        println!("{input}")
-    }
+#[derive(Debug)]
+enum FunctionIdentifier {
+    VariableIdentifier(VariableIdentifier),
+    VariableAssign(VariableAssign),
+    FunctionCall(FunctionCall),
+    Require(Require),
+    Conditionals(Conditionals),
+    Return(Return),
 }
 
 fn lex_to_token(input: &str) -> Token {

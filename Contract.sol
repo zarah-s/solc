@@ -2,6 +2,9 @@
 pragma solidity ^0.8.8;
 
 contract MyTodo {
+    error INSUFFICIENT_BALANCE();
+    error ONLY_OWNER();
+    address addr = address(0);
     Todo[] todos;
     uint public deleted;
 
