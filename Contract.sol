@@ -5,7 +5,8 @@ contract MyTodo {
     error INSUFFICIENT_BALANCE();
     error ONLY_OWNER();
     address addr = address(0);
-    Todo[] todos;
+    Todo[10000000] todos;
+    uint[] javis = [1, 2];
     uint public deleted;
 
     function structify(uint _id, Status _status) external {

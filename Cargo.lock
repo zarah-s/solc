@@ -12,15 +12,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "compiler"
-version = "0.1.0"
-dependencies = [
- "eval",
- "hex",
- "regex",
-]
-
-[[package]]
 name = "eval"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -137,6 +128,15 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "solc"
+version = "0.1.0"
+dependencies = [
+ "eval",
+ "hex",
+ "regex",
 ]
 
 [[package]]

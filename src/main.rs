@@ -1,5 +1,8 @@
 use regex::Regex;
-use std::{env, fs, process};
+use std::{
+    env, fs, process,
+    time::{self, SystemTime},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 enum Token {
@@ -194,6 +197,8 @@ struct VariableIdentifier {
     mutability: String,
     name: String,
     value: Option<String>,
+    is_array: bool,
+    size: Option<String>,
 }
 
 impl VariableIdentifier {
@@ -204,6 +209,8 @@ impl VariableIdentifier {
         mutability: String,
         name: String,
         value: Option<String>,
+        is_array: bool,
+        size: Option<String>,
     ) -> Self {
         Self {
             data_type,
@@ -212,6 +219,8 @@ impl VariableIdentifier {
             mutability,
             name,
             value,
+            is_array,
+            size,
         }
     }
 }
@@ -338,6 +347,7 @@ impl LineDescriptions {
 }
 
 fn main() {
+    let start_time = time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
     /* GET ENVIRONMENT ARGUMENTS */
     let args: Vec<String> = env::args().collect();
 
@@ -454,9 +464,16 @@ fn main() {
         &custom_data_types_identifiers,
     );
     println!(
-        "{:#?} \n {:#?}\n {:#?}\n {:#?}",
+        "===> STRUCT ===>\n{:#?}\n ===> GLOBAL_VARIABLES ===>\n{:#?}\n ===> ENUMS ===>\n{:#?}\n ===>> CUSTOM_ERRORS ==>>\n{:#?}",
         structs_tree, global_variables, extracted_enums, custom_errors
-    )
+    );
+
+    let end_time = time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
+
+    println!(
+        "Program completed in \x1b[93m{:?}\x1b[0m",
+        (end_time.unwrap() - start_time.unwrap())
+    );
 }
 
 fn print_error(msg: &str) {
@@ -840,8 +857,36 @@ fn validate_variable(
     custom_data_types: &Vec<&str>,
 ) -> (Option<VariableIdentifier>, Option<String>) {
     let spl: Vec<&str> = text.text.split(" ").collect();
+    let mut is_array = false;
+    let mut size: Option<String> = None;
+    let mut data_type = spl[0];
+    if data_type.contains("[") {
+        if data_type.contains("]") {
+            let open_index = data_type.find("[");
+            let close_index = data_type.find("]");
 
-    let data_type = spl[0];
+            if close_index.unwrap() - open_index.unwrap() > 1 {
+                if let Some(_dd) = Regex::new(r"^\d+$")
+                    .unwrap()
+                    .find(&data_type[open_index.unwrap() + 1..close_index.unwrap()])
+                {
+                    if _dd.as_str() == "0" {
+                        print_error(&format!("Invalid array size {}", _dd.as_str()))
+                    }
+                    size = Some(_dd.as_str().to_owned());
+                } else {
+                    print_error(&format!(
+                        "Invalid array size {}",
+                        &data_type[open_index.unwrap() + 1..close_index.unwrap()]
+                    ))
+                }
+            }
+
+            is_array = true;
+        } else {
+            print_error("Missing ]");
+        }
+    }
     let mut visibility = "private";
     let mut mutability = "mutable";
     let mut value: Option<String> = None;
@@ -873,8 +918,16 @@ fn validate_variable(
     let mut variable_type: Option<VariableType> = None;
     for sst in [DATA_TYPES.to_vec(), custom_data_types.to_vec()].concat() {
         if data_type.ends_with("]") {
-            if sst.starts_with(&data_type[..data_type.len() - 2]) {
-                validated_type = true;
+            let open_bracket_index = data_type.find("[");
+            data_type = &data_type[..open_bracket_index.unwrap()];
+            if let None = size {
+                if sst.starts_with(&data_type[..data_type.len() - 2]) {
+                    validated_type = true;
+                }
+            } else {
+                if sst.starts_with(&data_type[..open_bracket_index.unwrap()]) {
+                    validated_type = true;
+                }
             }
         } else {
             if sst == data_type {
@@ -882,16 +935,20 @@ fn validate_variable(
             }
         }
     }
+    // println!("{validated_type}val {data_type}");
     let mut is_custom_error = false;
     if !validated_type {
         let check_custom_err: Vec<&str> = text.text.split(" ").collect();
         if check_custom_err[0] == "error" {
             is_custom_error = true;
         } else {
-            print_error(&format!(
-                "Invalid data type \"{}\" on line  {}",
-                data_type, text.text
-            ));
+            if is_array {
+            } else {
+                print_error(&format!(
+                    "Invalid data type \"{}\" on line  {}",
+                    data_type, text.line
+                ));
+            }
         }
     } else {
         if let Some(_) = DATA_TYPES.iter().find(|pred| pred == &&data_type) {
@@ -903,10 +960,12 @@ fn validate_variable(
 
     if !is_custom_error {
         if let None = variable_type {
-            print_error(&format!(
-                "Invalid data type \"{}\" on line  {}",
-                data_type, text.line
-            ));
+            if !is_array {
+                print_error(&format!(
+                    "Invalid data type \"{}\" on line  {}",
+                    data_type, text.line
+                ));
+            }
         }
     }
 
@@ -920,6 +979,8 @@ fn validate_variable(
             mutability.to_string(),
             name.to_string(),
             value,
+            is_array,
+            size,
         );
         return (Some(structured), None);
     }

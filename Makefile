@@ -14,19 +14,19 @@ compile:
 	cargo run Contract.sol
 
 build: 
-	cargo build --release && cp ./target/release/compiler .
+	cargo build --release && cp ./target/release/solc .
 
 clean:
-	cargo clean && rm -rf ./compiler
+	cargo clean && rm -rf ./solc
 
 copy:
-	cp ./target/release/compiler .
+	cp ./target/release/solc .
 
 rm:
-	rm -rf ./compiler
+	rm -rf ./solc
 
 run: 
-	./compiler Contract.sol
+	./solc Contract.sol
 
 push:
 	git add . && git commit -m $(msg) && git push && echo pushed to remote repository with $(msg) message
