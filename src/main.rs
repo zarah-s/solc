@@ -1,3 +1,4 @@
+use eval::eval;
 use regex::Regex;
 use std::{
     env, fs, process,
@@ -8,8 +9,15 @@ use std::{
 enum Token {
     Identifier(String),
     Contract,
+    Require,
+    Storage,
+    Error,
     Override,
+    Delete,
     Enum,
+    Immutable,
+    Mutable,
+    Constant,
     Internal,
     External,
     Virtual,
@@ -104,12 +112,18 @@ const DATA_TYPES: [&str; 28] = [
     "address[]",
 ];
 
-const KEYWORDS: [&str; 30] = [
+const KEYWORDS: [&str; 36] = [
     "contract",
     "mapping",
+    "error",
+    "immutable",
+    "mutable",
+    "constant",
     "fallback",
     "calldata",
+    "new",
     "cron",
+    "delete",
     "receive",
     "gasless",
     "tx",
@@ -174,6 +188,7 @@ enum VariableType {
     Variable,
     Struct,
     Contract,
+    Enum,
 }
 
 #[derive(Debug, Clone)]
@@ -191,38 +206,14 @@ struct EnumIdentifier {
 #[derive(Debug, Clone)]
 
 struct VariableIdentifier {
-    data_type: String,
+    data_type: Token,
     type_: VariableType,
-    visibility: String,
-    mutability: String,
+    visibility: Token,
+    mutability: Token,
     name: String,
     value: Option<String>,
     is_array: bool,
     size: Option<String>,
-}
-
-impl VariableIdentifier {
-    pub fn new(
-        data_type: String,
-        visibility: String,
-        type_: VariableType,
-        mutability: String,
-        name: String,
-        value: Option<String>,
-        is_array: bool,
-        size: Option<String>,
-    ) -> Self {
-        Self {
-            data_type,
-            visibility,
-            type_,
-            mutability,
-            name,
-            value,
-            is_array,
-            size,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -279,6 +270,7 @@ impl LineDescriptions {
         let mut opened_quotations = 0;
         let identifier_regex = Regex::new(r"[a-zA-Z_]\w*").unwrap();
         for (index, character) in input.chars().enumerate() {
+            // println!("{}", input);
             if character == '"' || character == '\'' {
                 if opened_quotations == 0 {
                     opened_quotations += 1;
@@ -329,24 +321,31 @@ impl LineDescriptions {
                 //     }
                 // } else {
                 if let Some(_) = identifier_regex.find(character.to_string().as_str()) {
-                    combined_char.push_str(character.to_string().as_str())
+                    combined_char.push_str(character.to_string().as_str());
                 } else {
                     lex.push(combined_char.trim().to_string());
                     combined_char.clear();
                 }
                 // }
             } else {
-                combined_char.push_str(character.to_string().as_str())
+                combined_char.push_str(character.to_string().as_str());
+                if index == input.len() - 1 {
+                    lex.push(combined_char.trim().to_string());
+                    combined_char.clear();
+                }
             }
         }
         for lexed in lex {
             lexems.push(lex_to_token(&lexed));
         }
+        // println!("{:?}", lexems)
         lexems
     }
 }
 
 fn main() {
+    // println!("{:?}", LineDescriptions::to_token("new"));
+    // process::exit(1);
     let start_time = time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
     /* GET ENVIRONMENT ARGUMENTS */
     let args: Vec<String> = env::args().collect();
@@ -413,7 +412,7 @@ fn main() {
     /* JOIN STRIPPED INLINE COMMENTS */
     let joined_stripped_vec: Vec<String> = stripped_inline_comments
         .iter()
-        .map(|f| f.clone().to_string())
+        .map(|f| f.to_owned().to_string())
         .collect();
 
     let mut joined_stripped_string = String::new();
@@ -453,23 +452,26 @@ fn main() {
         .map(|pred| pred.identifier.as_str())
         .collect();
 
-    let custom_data_types_identifiers: Vec<&str> = [enum_identifiers, struct_identifiers].concat();
+    let custom_data_types_identifiers: Vec<&str> =
+        [enum_identifiers.clone(), struct_identifiers].concat();
 
     let (global_variables, custom_errors) = extract_global_variables(
         &structured_stripped_compilable_contents,
         &custom_data_types_identifiers,
+        &enum_identifiers,
     );
     extract_functions(
         &structured_stripped_compilable_contents,
         &custom_data_types_identifiers,
+        &global_variables,
+        &enum_identifiers,
     );
-    println!(
-        "===> STRUCT ===>\n{:#?}\n ===> GLOBAL_VARIABLES ===>\n{:#?}\n ===> ENUMS ===>\n{:#?}\n ===>> CUSTOM_ERRORS ==>>\n{:#?}",
-        structs_tree, global_variables, extracted_enums, custom_errors
-    );
+    // println!(
+    //     "===> STRUCT ===>\n{:#?}\n ===> GLOBAL_VARIABLES ===>\n{:#?}\n ===> ENUMS ===>\n{:#?}\n ===>> CUSTOM_ERRORS ==>>\n{:#?}",
+    //     structs_tree, global_variables, extracted_enums, custom_errors
+    // );
 
     let end_time = time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
-
     println!(
         "Program completed in \x1b[93m{:?}\x1b[0m",
         (end_time.unwrap() - start_time.unwrap())
@@ -765,7 +767,6 @@ fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
 /* *************************** STRUCT END ******************************************/
 
 /* *************************** CUSTOM ERROR START ******************************************/
-// fn extract_custom_errors() {}
 /* *************************** CUSTOM ERROR END ******************************************/
 
 /* *************************** VARIABLE START ******************************************/
@@ -773,6 +774,7 @@ fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
 fn extract_global_variables(
     data: &Vec<LineDescriptions>,
     custom_data_types: &Vec<&str>,
+    enums: &Vec<&str>,
 ) -> (Vec<VariableIdentifier>, Vec<String>) {
     let mut global_variables = Vec::new();
     let mut custom_errors: Vec<String> = Vec::new();
@@ -841,7 +843,7 @@ fn extract_global_variables(
     }
 
     for variable in variables {
-        let validated = validate_variable(variable, custom_data_types);
+        let validated = validate_variable(variable, custom_data_types, enums);
         if let Some(_raw) = validated.0 {
             global_variables.push(_raw);
         } else {
@@ -855,148 +857,312 @@ fn extract_global_variables(
 fn validate_variable(
     text: LineDescriptions,
     custom_data_types: &Vec<&str>,
+    enums: &Vec<&str>,
 ) -> (Option<VariableIdentifier>, Option<String>) {
-    let spl: Vec<&str> = text.text.split(" ").collect();
     let mut is_array = false;
     let mut size: Option<String> = None;
-    let mut data_type = spl[0];
-    if data_type.contains("[") {
-        if data_type.contains("]") {
-            let open_index = data_type.find("[");
-            let close_index = data_type.find("]");
-
-            if close_index.unwrap() - open_index.unwrap() > 1 {
-                if let Some(_dd) = Regex::new(r"^\d+$")
-                    .unwrap()
-                    .find(&data_type[open_index.unwrap() + 1..close_index.unwrap()])
-                {
-                    if _dd.as_str() == "0" {
-                        print_error(&format!("Invalid array size {}", _dd.as_str()))
-                    }
-                    size = Some(_dd.as_str().to_owned());
-                } else {
-                    print_error(&format!(
-                        "Invalid array size {}",
-                        &data_type[open_index.unwrap() + 1..close_index.unwrap()]
-                    ))
-                }
-            }
-
-            is_array = true;
-        } else {
-            print_error("Missing ]");
-        }
-    }
-    let mut visibility = "private";
-    let mut mutability = "mutable";
-    let mut value: Option<String> = None;
-    let splited: Vec<&str> = text.text.split("=").collect();
-    let left_padding: Vec<&str> = splited[0].split(" ").collect();
-    let name = left_padding
-        .iter()
-        .filter(|pred| !pred.is_empty())
-        .last()
-        .unwrap();
-    if splited.len() > 1 {
-        value = Some(splited[1].trim().to_string())
-    }
-
-    if let Some(_visibility) = Regex::new(r"\b(public|private|external)\b")
-        .unwrap()
-        .find(splited[0])
-    {
-        visibility = _visibility.as_str();
-    }
-
-    if let Some(_mutability) = Regex::new(r"\b(constant|immutable)\b")
-        .unwrap()
-        .find(splited[0])
-    {
-        mutability = _mutability.as_str();
-    }
-    let mut validated_type = false;
-    let mut variable_type: Option<VariableType> = None;
-    for sst in [DATA_TYPES.to_vec(), custom_data_types.to_vec()].concat() {
-        if data_type.ends_with("]") {
-            let open_bracket_index = data_type.find("[");
-            data_type = &data_type[..open_bracket_index.unwrap()];
-            if let None = size {
-                if sst.starts_with(&data_type[..data_type.len() - 2]) {
-                    validated_type = true;
-                }
-            } else {
-                if sst.starts_with(&data_type[..open_bracket_index.unwrap()]) {
-                    validated_type = true;
-                }
-            }
-        } else {
-            if sst == data_type {
-                validated_type = true;
-            }
-        }
-    }
-    // println!("{validated_type}val {data_type}");
+    let mut data_type: Option<Token> = None;
     let mut is_custom_error = false;
-    if !validated_type {
-        let check_custom_err: Vec<&str> = text.text.split(" ").collect();
-        if check_custom_err[0] == "error" {
-            is_custom_error = true;
-        } else {
-            if is_array {
-            } else {
-                print_error(&format!(
-                    "Invalid data type \"{}\" on line  {}",
-                    data_type, text.line
-                ));
+    let mut variable_name: Option<String> = None;
+    let mut visibility = Token::Private;
+    let mut mutability = Token::Mutable;
+    let mut value: Option<String> = None;
+    let mut type_ = VariableType::Variable;
+    let tokens = LineDescriptions::to_token(&format!("{};", text.text));
+
+    // if tokens.contains(&Token::Memory)
+    //     || tokens.contains(&Token::Storage)
+    //     || tokens.contains(&Token::Calldata)
+    // {
+    //     print_error("Cannot specify storage for variable")
+    // }
+
+    if let Token::Identifier(_identifier) = &tokens[0] {
+        for custom_data_type in custom_data_types {
+            if custom_data_type == _identifier {
+                data_type = Some(tokens[0].to_owned());
+                if enums.contains(&_identifier.as_str()) {
+                    type_ = VariableType::Enum;
+                } else {
+                    type_ = VariableType::Struct;
+                }
             }
         }
     } else {
-        if let Some(_) = DATA_TYPES.iter().find(|pred| pred == &&data_type) {
-            variable_type = Some(VariableType::Variable);
+        if let Token::Error = &tokens[0] {
+            is_custom_error = true;
         } else {
-            variable_type = Some(VariableType::Struct);
+            data_type = Some(tokens[0].to_owned())
         }
     }
 
     if !is_custom_error {
-        if let None = variable_type {
-            if !is_array {
-                print_error(&format!(
-                    "Invalid data type \"{}\" on line  {}",
-                    data_type, text.line
-                ));
+        if let None = data_type {
+            print_error(&format!(
+                "Invalid data type \"{}\" on line  {}",
+                text.text, text.line
+            ));
+        }
+    }
+
+    if let Token::OpenSquareBracket = &tokens[1] {
+        is_array = true;
+
+        let close_bracket_index = tokens
+            .iter()
+            .position(|pred| pred == &Token::CloseSquareBracket);
+
+        if let None = close_bracket_index {
+            print_error(&format!("Missing \"]\" on line  {}", text.line));
+        } else {
+            let slice = &tokens[2..close_bracket_index.unwrap()];
+            if slice.contains(&Token::Equals) {
+                print_error(&format!("Missing \"]\" on line  {}", text.line));
+            } else {
+                if close_bracket_index.unwrap() - 1 > 1 {
+                    let mut expression = String::new();
+                    for slc in slice {
+                        let detokenized = LineDescriptions::from_token_to_string(slc);
+                        expression.push_str(&detokenized);
+                    }
+                    size = validate_expression(&expression, text.clone());
+                }
             }
         }
     }
 
+    let equal_token_position = tokens.iter().position(|pred| pred == &Token::Equals);
+    if let Some(_position) = equal_token_position {
+        let slice_equal_token = &tokens[.._position];
+
+        if let Token::Identifier(_var_name) = &slice_equal_token[slice_equal_token.len() - 1] {
+            variable_name = Some(_var_name.to_string());
+        } else {
+            print_error(&format!("Unprocessible entity {}", text.text))
+        }
+
+        let mut _string_value = String::new();
+
+        for res in &tokens[_position + 1..] {
+            if let Token::SemiColon = res {
+            } else {
+                _string_value.push_str(&LineDescriptions::from_token_to_string(res))
+            }
+        }
+        value = Some(_string_value);
+    } else {
+        if !is_custom_error {
+            for token in &tokens {
+                if let Token::Identifier(_val) = token {
+                    variable_name = Some(_val.to_owned());
+                }
+            }
+
+            if let None = variable_name {
+                print_error(&format!("Unprocessibledd entity {}", text.text))
+            }
+        }
+    }
+
+    if tokens.contains(&Token::Public) {
+        visibility = Token::Public;
+    } else if tokens.contains(&Token::Private) {
+        visibility = Token::Private;
+    } else if tokens.contains(&Token::Internal) {
+        visibility = Token::Internal;
+    } else if tokens.contains(&Token::External) {
+        visibility = Token::External;
+    }
+
+    if tokens.contains(&Token::Immutable) {
+        mutability = Token::Immutable;
+    } else if tokens.contains(&Token::Constant) {
+        mutability = Token::Constant;
+    }
+
     if is_custom_error {
         return (None, Some(text.text));
+    }
+    let structured = VariableIdentifier {
+        data_type: data_type.unwrap(),
+        is_array,
+        mutability,
+        name: variable_name.unwrap(),
+        size,
+        type_,
+        value,
+        visibility,
+    };
+
+    (Some(structured), None)
+}
+
+/* *************************** EXPRESSION VALIDATION START ******************************************/
+
+fn validate_expression(expression: &String, text: LineDescriptions) -> Option<String> {
+    if expression.contains("**") {
+        let mut tokenized_expression = LineDescriptions::to_token(&format!("{};", expression));
+        let mut detokenized_expression = String::new();
+        let mut expr = String::new();
+        for token in &tokenized_expression {
+            detokenized_expression.push_str(&LineDescriptions::from_token_to_string(&token));
+        }
+        while detokenized_expression.contains("**") {
+            let mut start_position: Option<usize> = None;
+            for (i, _token) in tokenized_expression.iter().enumerate() {
+                if let Token::Multiply = _token {
+                    if let Token::Multiply = tokenized_expression[i + 1] {
+                        start_position = Some(i);
+                        break;
+                    }
+                }
+            }
+
+            if let Some(_val) = start_position {
+                let raised_expr = &tokenized_expression[_val - 1.._val + 3];
+                let mut num: usize = 0;
+                let mut power: usize = 0;
+                if let Token::Identifier(_num_identifier) = &raised_expr[0] {
+                    match _num_identifier.parse::<usize>() {
+                        Err(_error) => {
+                            print_error(&format!("{_error} expecting number {},", text.text))
+                        }
+                        Ok(_value) => {
+                            if _value > 0 {
+                                num = _value;
+                            } else {
+                                print_error(&format!("Found 0 {}", text.text))
+                            }
+                        }
+                    }
+                } else {
+                    print_error(&format!("expecting number {},", text.text))
+                }
+
+                if let Token::Identifier(_power_identifier) = &raised_expr[raised_expr.len() - 1] {
+                    match _power_identifier.parse::<usize>() {
+                        Err(_error) => {
+                            print_error(&format!("{_error} expecting number {},", text.text))
+                        }
+                        Ok(_val) => {
+                            power = _val;
+                        }
+                    }
+
+                    let math = num.pow(power as u32);
+                    let left_padding = &tokenized_expression.clone()[.._val - 1];
+                    let right_padding = &tokenized_expression.clone()[left_padding.len() + 4..];
+                    tokenized_expression = [
+                        left_padding,
+                        &[Token::Identifier(math.to_string())],
+                        right_padding,
+                    ]
+                    .concat();
+
+                    detokenized_expression.clear();
+                    for token in tokenized_expression.clone() {
+                        detokenized_expression
+                            .push_str(&LineDescriptions::from_token_to_string(&token));
+                    }
+                } else {
+                    print_error(&format!("expecting number {},", text.text))
+                }
+            } else {
+                print_error(&format!("Something went wrong {},", text.text))
+            }
+        }
+        for token in tokenized_expression {
+            expr.push_str(&LineDescriptions::from_token_to_string(&token));
+        }
+        evaluate_expression(&expr, text)
     } else {
-        let structured = VariableIdentifier::new(
-            data_type.to_string(),
-            visibility.to_string(),
-            variable_type.unwrap(),
-            mutability.to_string(),
-            name.to_string(),
-            value,
-            is_array,
-            size,
-        );
-        return (Some(structured), None);
+        evaluate_expression(expression, text)
     }
 }
 
-/* *************************** VARIABLE START ******************************************/
+/* *************************** EXPRESSION VALIDATION END ******************************************/
+
+/* *************************** EXPRESSION EVALUATION START ******************************************/
+
+fn evaluate_expression(expression: &String, text: LineDescriptions) -> Option<String> {
+    let mut expr = String::new();
+    if expression.ends_with(";") {
+        expr = expression[..expression.len() - 1].to_string();
+    } else {
+        expr = expression.to_owned();
+    }
+    let sz = eval(&expr);
+    let mut size: Option<String> = None;
+
+    match sz {
+        Ok(_val) => {
+            if _val.to_string().contains(".") {
+                match _val.to_string().parse::<f64>() {
+                    Err(_error) => {
+                        print_error(&format!("Not a decimal {}", text.text));
+                    }
+                    Ok(_dec) => {
+                        let fractional_part = _dec.fract();
+                        if fractional_part == 0.0 {
+                            if fractional_part < 1.0 {
+                                print_error(&format!(
+                                    "Uprocessible entity for array size \"0\". {}... ",
+                                    text.text
+                                ));
+                            } else {
+                                //DO SOMETHING HERE
+
+                                size = Some(_dec.trunc().to_string());
+                            }
+                        } else {
+                            print_error(&format!(
+                                "Uprocessible entity for array size. {}... size cannot be fraction",
+                                text.text
+                            ));
+                        }
+                    }
+                }
+            } else {
+                if _val.to_string() == "0" {
+                    print_error(&format!(
+                        "Uprocessible entity for array size \"0\". {}... ",
+                        text.text
+                    ));
+                } else {
+                    //DO SOMETHING HERE
+                    size = Some(_val.to_string());
+                }
+            }
+        }
+        Err(_err) => print_error(&format!("{_err}. {} ", text.text)),
+    }
+
+    if let None = size {
+        print_error(&format!(
+            "Uprocessible entity for array size {}... ",
+            text.text
+        ));
+    }
+
+    size
+}
+
+/* *************************** EXPRESSION EVALUATION END ******************************************/
 
 /* *************************** FUNCTION START ******************************************/
 
-fn extract_functions(data: &Vec<LineDescriptions>, custom_data_types: &Vec<&str>) {
+fn extract_functions(
+    data: &Vec<LineDescriptions>,
+    custom_data_types: &Vec<&str>,
+    global_variables: &Vec<VariableIdentifier>,
+    enums: &Vec<&str>,
+) {
     let mut opened_braces = 0;
     let mut opened_braces_type = OpenedBraceType::None;
     let mut processed_data: Vec<Vec<LineDescriptions>> = Vec::new();
     let mut combined = Vec::new();
     for line in data {
-        let raw = line.text.clone();
+        let raw = &line.text;
 
         if raw.contains("{") {
             for character in raw.chars() {
@@ -1079,25 +1245,32 @@ fn extract_functions(data: &Vec<LineDescriptions>, custom_data_types: &Vec<&str>
         };
         let mut function_override: bool = false;
         let mut function_virtual: bool = false;
+        let mut gasless: bool = false;
         let mut function_visibility = Token::Internal;
         let mut function_returns: Option<Vec<ReturnType>> = None;
         let start_params = function_definition
             .iter()
             .position(|pred| pred == &Token::OpenParenthesis);
-        let end_params = function_definition
-            .iter()
-            .position(|pred| pred == &Token::CloseParenthesis);
 
-        let params_block = &function_definition[start_params.unwrap_or_else(|| {
-            print_error("Shitty syntax");
-            0
-        }) + 1..end_params.unwrap_or_else(|| {
-            print_error("Shitty syntax");
-            0
-        })];
-
+        let mut open_paren_count = 1;
+        let mut pad = 0;
+        for check in &function_definition[start_params.unwrap() + 1..] {
+            if open_paren_count == 0 {
+                break;
+            }
+            if let Token::OpenParenthesis = check {
+                open_paren_count += 1;
+            }
+            if let Token::CloseParenthesis = check {
+                open_paren_count -= 1;
+            }
+            pad += 1;
+        }
+        let params_block =
+            &function_definition[start_params.unwrap() + 1..start_params.unwrap() + pad];
         let splited_params_block: Vec<&[Token]> =
             params_block.split(|pred| pred == &Token::Coma).collect();
+
         let function_arguments =
             extract_function_params(splited_params_block, function_definition, custom_data_types);
         for visibility in [
@@ -1148,6 +1321,15 @@ fn extract_functions(data: &Vec<LineDescriptions>, custom_data_types: &Vec<&str>
             ));
         }
 
+        let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+        if let None = function_body_start_index {
+            print_error(&format!("Unprocessible entity",));
+        }
+
+        let function_body = &tokens[function_body_start_index.unwrap()..];
+        // println!("{:?}", function_body);
+        extract_function_arms(function_body, custom_data_types, global_variables, enums);
+
         if function_definition.contains(&Token::Override) {
             function_override = true;
         }
@@ -1156,10 +1338,13 @@ fn extract_functions(data: &Vec<LineDescriptions>, custom_data_types: &Vec<&str>
             function_virtual = true;
         }
 
-        println!(
-            "{:?} \n {:#?}\n {:#?}\n {function_override}\n {function_virtual}\n {:#?} \n\n\n\n",
-            function_name, function_visibility, function_arguments, function_returns
-        );
+        if function_definition.contains(&Token::Gasless) {
+            gasless = true;
+        }
+        // println!(
+        //     "==> name ==> \n{:?} \n ==> visibility ==>\n{:#?}\n ==> arguments ==>\n{:#?}\n ==> override ==> \n{function_override}\n ==> virtual ==> \n{function_virtual}\n ==> returns ==> \n {:#?}\n ==> gasless ==> \n{gasless} \n\n\n\n",
+        //     function_name, function_visibility, function_arguments, function_returns
+        // );
     }
 }
 
@@ -1176,8 +1361,8 @@ fn extract_function_params(
             let mut name_: Option<String> = None;
             let mut location_: Option<Token> = None;
             let mut is_array = false;
-            let mut size: Option<String> = None;
             let mut is_primitive = false;
+            let mut size: Option<String> = None;
             let vec_: Vec<String> = function_definition
                 .iter()
                 .map(|pred| LineDescriptions::from_token_to_string(pred))
@@ -1209,7 +1394,7 @@ fn extract_function_params(
 
                 if let Token::OpenSquareBracket = &splited_param[1] {
                     is_array = true;
-                    is_primitive = true;
+
                     let close_index = splited_param
                         .iter()
                         .position(|pred| pred == &Token::CloseSquareBracket);
@@ -1220,84 +1405,25 @@ fn extract_function_params(
                             vec_.join(" ")
                         ))
                     } else {
-                        if close_index.unwrap() - 1 != 1 {
-                            if splited_param.len() != 6 {
-                                print_error(&format!("Syntax error {}... Missing \"memory\" or \"calldata\" or argument identifier", vec_.join(" "),))
-                            }
-                            if let None = extract_data_location_from_token(&splited_param[4]) {
-                                print_error(&format!(
-                                    "Expecting \"memory\" or \"calldata\". {} ",
-                                    vec_.join(" "),
-                                ))
-                            } else {
-                                location_ = extract_data_location_from_token(&splited_param[4]);
-                            }
-                            match &splited_param[2] {
-                                Token::Identifier(_val) => {
-                                    if let Some(_dd) = Regex::new(r"^\d+$").unwrap().find(_val) {
-                                        if _val == "0" {
-                                            print_error(&format!("Invalid array size {}", _val))
-                                        }
-                                        size = Some(_val.to_owned());
-                                    } else {
-                                        print_error(&format!("Invalid array size {}", _val))
-                                    }
-                                }
-                                _ => print_error(&format!(
-                                    "Unprocessible entity.. Expecting a size of uint but found {}",
-                                    LineDescriptions::from_token_to_string(&splited_param[2])
-                                )),
+                        let slice = &splited_param[2..close_index.unwrap()];
+                        if !slice.is_empty() {
+                            let mut expression = String::new();
+                            for slc in slice {
+                                let detokenized = LineDescriptions::from_token_to_string(slc);
+                                expression.push_str(&detokenized);
                             }
 
-                            match &splited_param[5] {
-                                Token::Identifier(_val) => name_ = Some(_val.to_owned()),
-
-                                _ => print_error(&format!(
-                                    "Unprocessible entity.. Expecting identifier but found {}",
-                                    LineDescriptions::from_token_to_string(&splited_param[5])
-                                )),
-                            }
-                        } else {
-                            if splited_param.len() != 5 {
-                                print_error(&format!("Syntax error {}... Missing \"memory\" or \"calldata\" or argument identifier", vec_.join(" "),))
-                            }
-                            if let None = extract_data_location_from_token(&splited_param[3]) {
-                                print_error(&format!(
-                                    "Expecting \"memory\" or \"calldata\". {} ",
-                                    vec_.join(" "),
-                                ))
-                            } else {
-                                location_ = extract_data_location_from_token(&splited_param[3]);
-                            }
-
-                            match &splited_param[4] {
-                                Token::Identifier(_val) => name_ = Some(_val.to_owned()),
-
-                                _ => print_error(&format!(
-                                    "Unprocessible entity.. Expecting identifier but found {}",
-                                    LineDescriptions::from_token_to_string(&splited_param[4])
-                                )),
-                            }
+                            size = validate_expression(
+                                &expression,
+                                LineDescriptions {
+                                    line: 0,
+                                    text: "".to_string(),
+                                },
+                            );
                         }
                     }
                 } else if let Some(_location) = extract_data_location_from_token(&splited_param[1])
                 {
-                    if !is_primitive {
-                        print_error(&format!(
-                            "Syntax error... cannot declare \"{}\" on a  non-primive type. {} ",
-                            LineDescriptions::from_token_to_string(&_location),
-                            vec_.join(" "),
-                        ))
-                    } else {
-                        location_ = Some(_location);
-                        if let Token::Identifier(_identifier) = &splited_param[2] {
-                            if validate_identifier_regex(&_identifier, 0) {
-                                name_ = Some(_identifier.to_owned());
-                            }
-                        } else {
-                            print_error(&format!("Invalid function argument {}", vec_.join(" ")))
-                        }
-                    }
                 } else if let Token::Identifier(_identifier) = &splited_param[1] {
                     if validate_identifier_regex(&_identifier, 0) {
                         name_ = Some(_identifier.to_owned());
@@ -1307,11 +1433,44 @@ fn extract_function_params(
                 }
             }
 
+            match &splited_param[splited_param.len() - 1] {
+                Token::Identifier(_val) => name_ = Some(_val.to_owned()),
+
+                _ => print_error(&format!(
+                    "Unprocessible entity.. Expecting identifier but found {}",
+                    LineDescriptions::from_token_to_string(&splited_param[5])
+                )),
+            }
+
             if let None = name_ {
                 print_error(&format!(
                     "Syntax error... missing argument identifier {:?} ",
                     vec_.join(" "),
                 ))
+            }
+
+            if is_array {
+                if splited_param.contains(&Token::Memory) {
+                    location_ = Some(Token::Memory);
+                } else if splited_param.contains(&Token::Calldata) {
+                    location_ = Some(Token::Calldata);
+                } else {
+                    print_error(&format!(
+                        "Expecting \"memory\" or \"calldata\". {} ",
+                        vec_.join(" "),
+                    ))
+                }
+            }
+
+            if is_primitive {
+                if splited_param.contains(&Token::Memory)
+                    && splited_param.contains(&Token::Calldata)
+                {
+                    print_error(&format!(
+                        "Expecting \"memory\" or \"calldata\". {} ",
+                        vec_.join(" "),
+                    ))
+                }
             }
 
             let structured = Argument {
@@ -1380,71 +1539,53 @@ fn extract_return_types(
                 if let Token::OpenSquareBracket = &splited_param[1] {
                     is_array = true;
                     is_primitive = true;
+
                     let close_index = splited_param
                         .iter()
                         .position(|pred| pred == &Token::CloseSquareBracket);
 
-                    if let None = close_index {
-                        print_error(&format!(
-                            "Syntax error... Expecting a close bracket for {}",
-                            vec_.join(" ")
-                        ))
-                    } else {
-                        if close_index.unwrap() - 1 != 1 {
-                            if splited_param.len() != 5 {
-                                print_error(&format!("Syntax error {}... Missing \"memory\" or \"calldata\" or argument identifier", vec_.join(" "),))
-                            }
-                            if let None = extract_data_location_from_token(&splited_param[4]) {
-                                print_error(&format!(
-                                    "Expecting \"memory\" or \"calldata\". {} ",
-                                    vec_.join(" "),
-                                ))
-                            } else {
-                                location_ = extract_data_location_from_token(&splited_param[4]);
-                            }
-                            match &splited_param[2] {
-                                Token::Identifier(_val) => {
-                                    if let Some(_dd) = Regex::new(r"^\d+$").unwrap().find(_val) {
-                                        if _val == "0" {
-                                            print_error(&format!("Invalid array size {}", _val))
-                                        }
-                                        size = Some(_val.to_owned());
-                                    } else {
-                                        print_error(&format!("Invalid array size {}", _val))
-                                    }
-                                }
-                                _ => print_error(&format!(
-                                    "Unprocessible entity.. Expecting a size of uint but found {}",
-                                    LineDescriptions::from_token_to_string(&splited_param[2])
-                                )),
-                            }
-                        } else {
-                            if splited_param.len() != 4 {
-                                print_error(&format!("Syntax error {}... Missing \"memory\" or \"calldata\" or argument identifier", vec_.join(" "),))
-                            }
-                            if let None = extract_data_location_from_token(&splited_param[3]) {
-                                print_error(&format!(
-                                    "Expecting \"memory\" or \"calldata\". {} ",
-                                    vec_.join(" "),
-                                ))
-                            } else {
-                                location_ = extract_data_location_from_token(&splited_param[3]);
-                            }
+                    let slice = &splited_param[2..close_index.unwrap()];
+                    if !slice.is_empty() {
+                        let mut expression = String::new();
+                        for slc in slice {
+                            let detokenized = LineDescriptions::from_token_to_string(slc);
+                            expression.push_str(&detokenized);
                         }
+
+                        size = validate_expression(
+                            &expression,
+                            LineDescriptions {
+                                line: 0,
+                                text: "".to_string(),
+                            },
+                        );
                     }
                 } else if let Some(_location) = extract_data_location_from_token(&splited_param[1])
                 {
-                    if !is_primitive {
-                        print_error(&format!(
-                            "Syntax error... cannot declare \"{}\" on a  non-primive type. {} ",
-                            LineDescriptions::from_token_to_string(&_location),
-                            vec_.join(" "),
-                        ))
-                    } else {
-                        location_ = Some(_location);
-                    }
                 } else {
                     print_error(&format!("Invalid function argument {}", vec_.join(" ")))
+                }
+            }
+
+            if splited_param.contains(&Token::Memory) {
+                location_ = Some(Token::Memory);
+            } else if splited_param.contains(&Token::Calldata) {
+                location_ = Some(Token::Calldata);
+            } else {
+                print_error(&format!(
+                    "Expecting \"memory\" or \"calldata\". {} ",
+                    vec_.join(" "),
+                ))
+            }
+
+            if is_primitive {
+                if !splited_param.contains(&Token::Memory)
+                    && !splited_param.contains(&Token::Calldata)
+                {
+                    print_error(&format!(
+                        "Expecting \"memory\" or \"calldata\". {} ",
+                        vec_.join(" "),
+                    ))
                 }
             }
 
@@ -1461,6 +1602,226 @@ fn extract_return_types(
 
     function_arguments
 }
+
+fn extract_function_arms(
+    body: &[Token],
+    custom_data_types: &Vec<&str>,
+    global_variables: &Vec<VariableIdentifier>,
+    enums: &Vec<&str>,
+) {
+    let mut arms: Vec<Vec<&Token>> = Vec::new();
+    let mut combined: Vec<&Token> = Vec::new();
+
+    let mut opened_packet = 0;
+    let mut packet = FunctionArmType::None;
+    let mut prev_packet = FunctionArmType::None;
+    let mut global_vars_str: Vec<&str> = Vec::new();
+
+    for ddl in global_variables.iter() {
+        global_vars_str.push(&ddl.name)
+    }
+
+    for token in &body[1..body.len() - 1] {
+        combined.push(token);
+        match token {
+            Token::Require => {
+                prev_packet = packet;
+                packet = FunctionArmType::Require;
+            }
+
+            Token::OpenBraces => {
+                opened_packet += 1;
+            }
+            Token::OpenParenthesis => {
+                opened_packet += 1;
+            }
+
+            Token::CloseBraces => {
+                opened_packet -= 1;
+                if opened_packet == 0 {
+                    arms.push(combined.clone());
+                    combined.clear()
+                }
+            }
+            Token::CloseParenthesis => {
+                opened_packet -= 1;
+            }
+            Token::If => {
+                packet = FunctionArmType::Conditional;
+            }
+
+            Token::SemiColon => {
+                packet = prev_packet;
+                prev_packet = FunctionArmType::None;
+                if opened_packet == 0 {
+                    arms.push(combined.clone());
+                    combined.clear()
+                }
+            }
+            Token::Identifier(_id) => {
+                if let FunctionArmType::None = packet {
+                    if custom_data_types.contains(&detokenize(token).as_str())
+                        && global_vars_str.contains(&detokenize(token).as_str())
+                    {
+                        print_error(&format!("Identifier already declared \"{}\"", _id));
+                    }
+
+                    if custom_data_types.contains(&_id.as_str()) {
+                        prev_packet = packet;
+
+                        packet = FunctionArmType::StructAssign;
+                    } else if global_vars_str.contains(&_id.as_str()) {
+                        let local = global_variables
+                            .iter()
+                            .position(|pred| pred.name == _id.to_owned());
+                        if let None = local {
+                            print_error(&format!("Identifier \"{}\" not found", _id))
+                        } else {
+                            if let VariableType::Struct = global_variables[local.unwrap()].type_ {
+                                prev_packet = packet;
+
+                                packet = FunctionArmType::StructAssign;
+                            } else {
+                                prev_packet = packet;
+
+                                packet = FunctionArmType::VariableAssign;
+                            }
+                        }
+                    }
+                }
+            }
+
+            _ => (),
+        }
+    }
+
+    let mut joined_conditionals: Vec<Vec<&Token>> = Vec::new();
+
+    for arm in arms {
+        if let Token::Else = &arm[0] {
+            let last_index = joined_conditionals.len() - 1;
+            for sec in arm {
+                joined_conditionals[last_index].push(sec);
+            }
+        } else {
+            joined_conditionals.push(arm.to_owned());
+        }
+    }
+    // println!("{:#?} \n\n\n\n\n", joined_conditionals);
+
+    extract_function_block(&joined_conditionals, custom_data_types, enums);
+}
+
+fn extract_function_block(
+    arms: &Vec<Vec<&Token>>,
+    custom_data_types: &Vec<&str>,
+    enums: &Vec<&str>,
+) {
+    let mut full_block: Vec<FunctionIdentifier> = Vec::new();
+    for block in arms {
+        let initial = block[0];
+
+        match initial {
+            Token::Identifier(_identifier) => {
+                if custom_data_types.contains(&_identifier.as_str()) {
+                    let variable = extract_function_variable(&block, custom_data_types, enums);
+                    println!("variable {:?}", variable)
+                } else {
+                    if let Token::OpenParenthesis = &block[1] {
+                        let mut args: Vec<String> = Vec::new();
+
+                        for arg in &block[2..block.len() - 2] {
+                            match arg {
+                                Token::Identifier(_id) => {
+                                    args.push(_id.to_string());
+                                }
+                                Token::Coma => (),
+                                _ => print_error(&format!("Invalid function call")),
+                            }
+                        }
+
+                        full_block.push(FunctionIdentifier::FunctionCall(FunctionCall {
+                            arguments: args,
+                            identifier: _identifier.to_owned(),
+                        }));
+
+                        // println!("Function call =>>. {:?}", block);
+                    } else {
+                        println!("identifier =>>. {_identifier}");
+                    }
+                }
+            }
+            Token::If => {
+                println!("if condition");
+            }
+            Token::Delete => {
+                println!("Delete");
+            }
+            Token::Require => {
+                println!("Require");
+                let split: Vec<&[&Token]> = block.split(|pred| pred == &&Token::Coma).collect();
+                let mut condition = String::new();
+                let mut message: String = String::new();
+                for cond in &split[0][2..] {
+                    condition.push_str(&detokenize(cond))
+                }
+
+                if let Some(_) = split.get(1) {
+                    for msg in &split[1][..split[1].len() - 2] {
+                        message.push_str(&detokenize(msg))
+                    }
+                }
+
+                full_block.push(FunctionIdentifier::Require(Require {
+                    condition,
+                    message: if message.trim().is_empty() {
+                        None
+                    } else {
+                        Some(message)
+                    },
+                }))
+
+                // println!("{:?} splitted=======>>", concat)
+            }
+            Token::For => {
+                println!("For");
+            }
+            Token::Return => {
+                let mut value = String::new();
+
+                for blk in &block[1..block.len() - 1] {
+                    value.push_str(&detokenize(blk))
+                }
+                full_block.push(FunctionIdentifier::Return(Return { value }));
+                // println!("Return {:?}", block);
+            }
+            _token => {
+                if DATA_TYPES.contains(&detokenize(_token).as_str()) {
+                    println!("Data Type ");
+                    let variable = extract_function_variable(&block, custom_data_types, enums);
+                    println!("variable {:?}", variable)
+                } else {
+                    print_error(&format!("Unexpected identifier \"{}\"", detokenize(_token)))
+                }
+            }
+        }
+    }
+    println!("{:#?}========>> \n\n\n\n\n", full_block)
+}
+
+fn extract_function_variable(
+    block: &Vec<&Token>,
+    custom_data_types: &Vec<&str>,
+    enums: &Vec<&str>,
+) -> Option<VariableIdentifier> {
+    let mut text = String::new();
+    for strr in block {
+        text.push_str(&format!("{} ", &detokenize(strr)))
+    }
+    let variable = validate_variable(LineDescriptions { text, line: 0 }, custom_data_types, enums);
+    variable.0
+}
+
 #[derive(Debug)]
 enum VariableAssignType {
     Expression,
@@ -1488,7 +1849,7 @@ struct FunctionCall {
 #[derive(Debug)]
 struct Require {
     condition: String,
-    message: String,
+    message: Option<String>,
 }
 
 #[derive(Debug)]
@@ -1512,13 +1873,26 @@ enum FunctionIdentifier {
     Require(Require),
     Conditionals(Conditionals),
     Return(Return),
+    Delete(Vec<Token>),
+}
+
+enum FunctionArmType {
+    StructAssign,
+    VariableAssign,
+    Conditional,
+    Require,
+    For,
+    None,
 }
 
 fn lex_to_token(input: &str) -> Token {
     let token = match input {
         "contract" => Token::Contract,
         "mapping" => Token::Mapping,
+        "storage" => Token::Storage,
+        "delete" => Token::Delete,
         "msg" => Token::Msg,
+        "require" => Token::Require,
         "constructor" => Token::Constructor,
         "receive" => Token::Receive,
         "internal" => Token::Internal,
@@ -1529,6 +1903,7 @@ fn lex_to_token(input: &str) -> Token {
         "enum" => Token::Enum,
         "gasless" => Token::Gasless,
         "address" => Token::Address,
+        "error" => Token::Error,
         "private" => Token::Private,
         "struct" => Token::Struct,
         "function" => Token::Function,
@@ -1537,6 +1912,9 @@ fn lex_to_token(input: &str) -> Token {
         "returns" => Token::Returns,
         "pure" => Token::Pure,
         "override" => Token::Override,
+        "constant" => Token::Constant,
+        "immutable" => Token::Immutable,
+        "mutable" => Token::Mutable,
         "new" => Token::New,
         "virtual" => Token::Virtual,
         "return" => Token::Return,
@@ -1590,6 +1968,13 @@ fn lex_to_token(input: &str) -> Token {
 fn detokenize(input: &Token) -> String {
     let token: String = match input {
         Token::Contract => "contract".to_string(),
+        Token::Storage => "storage".to_string(),
+        Token::Error => "error".to_string(),
+        Token::Delete => "delete".to_string(),
+        Token::Require => "require".to_string(),
+        Token::Mutable => "mutable".to_string(),
+        Token::Immutable => "immutable".to_string(),
+        Token::Constant => "constant".to_string(),
         Token::Mapping => "mapping".to_string(),
         Token::Msg => "msg".to_string(),
         Token::Constructor => "constructor".to_string(),
@@ -1599,7 +1984,7 @@ fn detokenize(input: &Token) -> String {
         Token::Cron => "cron".to_string(),
         Token::Enum => "enum".to_string(),
         Token::Virtual => "virtual".to_string(),
-        Token::New => "new".to_string(),
+        Token::New => "new ".to_string(),
         Token::Override => "override".to_string(),
         Token::Gasless => "gasless".to_string(),
         Token::Address => "address".to_string(),
@@ -1610,7 +1995,7 @@ fn detokenize(input: &Token) -> String {
         Token::View => "view".to_string(),
         Token::Returns => "returns".to_string(),
         Token::Pure => "pure".to_string(),
-        Token::Return => "return".to_string(),
+        Token::Return => "return ".to_string(),
         Token::External => "external".to_string(),
         Token::Internal => "internal".to_string(),
         Token::Payable => "payable".to_string(),

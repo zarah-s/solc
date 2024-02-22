@@ -4,14 +4,29 @@ pragma solidity ^0.8.8;
 contract MyTodo {
     error INSUFFICIENT_BALANCE();
     error ONLY_OWNER();
-    address addr = address(0);
-    Todo[10000000] todos;
+    struct addr {
+        string name;
+    }
+    // address addr = address(0);
+    Status status = Status.Idle;
+    address public constant oi = address(0);
+    string public immutable str = string("sdf");
+    Todo[((1 * 10 ** 2) + 20)] todos;
     uint[] javis = [1, 2];
     uint public deleted;
 
-    function structify(uint _id, Status _status) external {
-        Todo storage todo = todos[_id - 1];
+    function structify(uint[2 * 10 ** 2] memory _id, Status _status) internal {
+        // if (true) {} else if (false) {
+        //     addr = msg.sender;
+        // } else {
+        //     addr = msg.sender;
+        // }
+        // if (false) {}
+        // Todo storage todo = todos[_id - 1];
+
         todo.status = Status(_status);
+        deleteTodo(2);
+        structify(1, 2, 3, 4, 5);
     }
 
     enum Status {
@@ -57,9 +72,11 @@ contract MyTodo {
         );
     }
 
-    function getTodos() external view returns (Todo[] memory) {
+    function getTodos() external view returns (Todo[2 * 10 ** 2] memory) {
         Todo[] memory todos_ = new Todo[](todos.length - deleted);
         uint _count;
+        uint _def;
+        Status _ppd;
         for (uint i = 0; i < todos.length; i++) {
             if (todos[i].timestamp != 0) {
                 todos_[_count] = todos[i];
@@ -69,7 +86,7 @@ contract MyTodo {
         return todos_;
     }
 
-    function deleteTodo(uint _id) external {
+    function deleteTodo(uint _id) external gasless {
         require(_id > 0, "Invalid id");
         require(_id - 1 < todos.length, "Invalid id");
         delete todos[_id - 1];
