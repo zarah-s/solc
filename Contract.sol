@@ -11,7 +11,8 @@ contract MyTodo {
     Status status = Status.Idle;
     address public constant oi = address(0);
     string public immutable str = string("sdf");
-    Todo[((1 * 10 ** 2) + 20)] todos;
+    mapping(address => uint) name;
+    Todo[] todos;
     uint[] javis = [1, 2];
     uint public deleted;
 
@@ -22,11 +23,12 @@ contract MyTodo {
         //     addr = msg.sender;
         // }
         // if (false) {}
-        // Todo storage todo = todos[_id - 1];
-
+        // name[msg.sender] = 5;
+        Todo storage todo = todos[_id - 1];
+        oi = msg.sender;
         todo.status = Status(_status);
         deleteTodo(2);
-        structify(1, 2, 3, 4, 5);
+        uint test = structify(1, 2, 3, 4, 5);
     }
 
     enum Status {

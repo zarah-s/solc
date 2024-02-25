@@ -13,6 +13,8 @@ enum Token {
     Storage,
     Error,
     Override,
+    Push,
+    Pop,
     Delete,
     Enum,
     Immutable,
@@ -112,10 +114,12 @@ const DATA_TYPES: [&str; 28] = [
     "address[]",
 ];
 
-const KEYWORDS: [&str; 36] = [
+const KEYWORDS: [&str; 38] = [
     "contract",
     "mapping",
     "error",
+    "push",
+    "pop",
     "immutable",
     "mutable",
     "constant",
@@ -1709,13 +1713,19 @@ fn extract_function_arms(
     }
     // println!("{:#?} \n\n\n\n\n", joined_conditionals);
 
-    extract_function_block(&joined_conditionals, custom_data_types, enums);
+    extract_function_block(
+        &joined_conditionals,
+        custom_data_types,
+        enums,
+        global_variables,
+    );
 }
 
 fn extract_function_block(
     arms: &Vec<Vec<&Token>>,
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
+    global_variables: &Vec<VariableIdentifier>,
 ) {
     let mut full_block: Vec<FunctionIdentifier> = Vec::new();
     for block in arms {
@@ -1725,7 +1735,11 @@ fn extract_function_block(
             Token::Identifier(_identifier) => {
                 if custom_data_types.contains(&_identifier.as_str()) {
                     let variable = extract_function_variable(&block, custom_data_types, enums);
-                    println!("variable {:?}", variable)
+                    if let None = variable {
+                        print_error("OOPS!!!");
+                    }
+
+                    full_block.push(FunctionIdentifier::VariableIdentifier(variable.unwrap()));
                 } else {
                     if let Token::OpenParenthesis = &block[1] {
                         let mut args: Vec<String> = Vec::new();
@@ -1744,10 +1758,67 @@ fn extract_function_block(
                             arguments: args,
                             identifier: _identifier.to_owned(),
                         }));
-
-                        // println!("Function call =>>. {:?}", block);
                     } else {
-                        println!("identifier =>>. {_identifier}");
+                        let global_variables_identifiers: Vec<&String> =
+                            global_variables.iter().map(|pred| &pred.name).collect();
+
+                        if global_variables_identifiers.contains(&_identifier) {
+                            let var = global_variables
+                                .iter()
+                                .find(|pred| pred.name == _identifier.to_string());
+
+                            if let Some(_var) = var {
+                                let function_scope_variable =
+                                    extract_function_scope_variable(_var, block, _identifier);
+                                if let Some(_) = function_scope_variable {
+                                    full_block.push(function_scope_variable.unwrap());
+                                }
+                            } else {
+                                print_error(&format!("Unidentified variable {}", _identifier))
+                            }
+                        } else {
+                            let mut local_variables_identifiers: Vec<&String> = Vec::new();
+
+                            for code_block in &full_block {
+                                match code_block {
+                                    FunctionIdentifier::VariableIdentifier(_id) => {
+                                        local_variables_identifiers.push(&_id.name);
+                                    }
+                                    _ => (),
+                                }
+                            }
+
+                            if local_variables_identifiers.contains(&_identifier) {
+                                let mut local_variable_identifiers = Vec::new();
+                                for code_block in &full_block {
+                                    match code_block {
+                                        FunctionIdentifier::VariableIdentifier(
+                                            _variable_identifier,
+                                        ) => {
+                                            local_variable_identifiers.push(_variable_identifier);
+                                        }
+                                        _ => (),
+                                    }
+                                }
+                                let var = local_variable_identifiers
+                                    .iter()
+                                    .find(|pred| pred.name == _identifier.to_string());
+                                if let Some(_var) = var {
+                                    let function_scope_variable =
+                                        extract_function_scope_variable(_var, block, _identifier);
+                                    if let Some(_) = function_scope_variable {
+                                        full_block.push(function_scope_variable.unwrap())
+                                    }
+                                } else {
+                                    print_error(&format!("Unidentified variable {}", _identifier))
+                                }
+                                // println!("Local Variable Identifier========> {block:?}");
+                            } else {
+                                print_error(&format!("Unidentified variable {}", _identifier))
+                            }
+
+                            // println!("identifier =>>. {_identifier}");
+                        }
                     }
                 }
             }
@@ -1755,10 +1826,10 @@ fn extract_function_block(
                 println!("if condition");
             }
             Token::Delete => {
-                println!("Delete");
+                // println!("Delete");
+                println!("{:?}", block)
             }
             Token::Require => {
-                println!("Require");
                 let split: Vec<&[&Token]> = block.split(|pred| pred == &&Token::Coma).collect();
                 let mut condition = String::new();
                 let mut message: String = String::new();
@@ -1780,8 +1851,6 @@ fn extract_function_block(
                         Some(message)
                     },
                 }))
-
-                // println!("{:?} splitted=======>>", concat)
             }
             Token::For => {
                 println!("For");
@@ -1793,13 +1862,15 @@ fn extract_function_block(
                     value.push_str(&detokenize(blk))
                 }
                 full_block.push(FunctionIdentifier::Return(Return { value }));
-                // println!("Return {:?}", block);
             }
             _token => {
                 if DATA_TYPES.contains(&detokenize(_token).as_str()) {
-                    println!("Data Type ");
                     let variable = extract_function_variable(&block, custom_data_types, enums);
-                    println!("variable {:?}", variable)
+                    if let None = variable {
+                        print_error("OOPS!!!");
+                    }
+
+                    full_block.push(FunctionIdentifier::VariableIdentifier(variable.unwrap()));
                 } else {
                     print_error(&format!("Unexpected identifier \"{}\"", detokenize(_token)))
                 }
@@ -1822,18 +1893,176 @@ fn extract_function_variable(
     variable.0
 }
 
+fn extract_function_scope_variable(
+    _var: &VariableIdentifier,
+    block: &Vec<&Token>,
+    _identifier: &String,
+) -> Option<FunctionIdentifier> {
+    if _var.is_array {
+        if let Token::Dot = block[1] {
+            if let Some(_size) = &_var.size {
+                print_error(&format!(
+                    "Cannot push to a fixed size array \"{}\"",
+                    _identifier
+                ))
+            }
+            let mut value = String::new();
+            for val in &block[4..block.len() - 2] {
+                value.push_str(&detokenize(val))
+            }
+
+            return Some(FunctionIdentifier::VariableAssign(VariableAssign {
+                identifier: _identifier.to_string(),
+                operation: if let Token::Push = block[2] {
+                    VariableAssignOperation::Push
+                } else {
+                    VariableAssignOperation::Pop
+                },
+                variant: None,
+                type_: VariableAssignType::Array(None),
+                value,
+            }));
+        } else if let Token::OpenSquareBracket = block[1] {
+            let equals_index = block.iter().position(|pred| pred == &&Token::Equals);
+            if let Some(_equals_index) = equals_index {
+                let close_bracket_position = block[2.._equals_index]
+                    .iter()
+                    .position(|pred| pred == &&Token::CloseSquareBracket);
+
+                if let Some(_close_bracket_position) = close_bracket_position {
+                    let mut stringified_index = String::new();
+                    let index = &block[2.._equals_index][.._close_bracket_position];
+                    if index.is_empty() {
+                        print_error("Cannot set empty index");
+                    }
+                    for idx in index {
+                        stringified_index.push_str(&detokenize(idx));
+                    }
+                    let values = &block[_equals_index + 1..block.len() - 1];
+                    let mut value = String::new();
+                    for val in values {
+                        value.push_str(&detokenize(val));
+                    }
+
+                    return Some(FunctionIdentifier::VariableAssign(VariableAssign {
+                        identifier: _identifier.to_string(),
+                        operation: VariableAssignOperation::Assign,
+                        variant: None,
+                        type_: VariableAssignType::Array(Some(stringified_index)),
+                        value,
+                    }));
+                } else {
+                    print_error(&format!("Unprocessible Entity {}", _identifier))
+                }
+            } else {
+                print_error(&format!("Unprocessible Entity {}", _identifier))
+            }
+        } else {
+            print_error(&format!("Unprocessible Entity {}", _identifier))
+        }
+        None
+    } else {
+        let equals_index = block.iter().position(|pred| pred == &&Token::Equals);
+        if let Some(_position) = equals_index {
+            let mut value = String::new();
+            for val in &block[_position + 1..block.len() - 1] {
+                value.push_str(&detokenize(val));
+            }
+            if let VariableType::Enum = _var.type_ {
+                Some(FunctionIdentifier::VariableAssign(VariableAssign {
+                    identifier: _identifier.to_string(),
+                    operation: VariableAssignOperation::Assign,
+                    variant: Some(detokenize(block[2])),
+                    type_: VariableAssignType::Enum,
+                    value,
+                }))
+            } else if let VariableType::Struct = _var.type_ {
+                Some(FunctionIdentifier::VariableAssign(VariableAssign {
+                    identifier: _identifier.to_string(),
+                    operation: VariableAssignOperation::Assign,
+                    variant: Some(detokenize(block[2])),
+                    type_: VariableAssignType::Struct,
+                    value,
+                }))
+            } else {
+                Some(FunctionIdentifier::VariableAssign(VariableAssign {
+                    identifier: _identifier.to_string(),
+                    operation: VariableAssignOperation::Assign,
+                    variant: None,
+                    type_: VariableAssignType::Expression,
+                    value,
+                }))
+            }
+        } else if let Some(_) = extract_integer_types_from_token(&_var.data_type) {
+            let mut stringified = String::new();
+            let mut value = String::new();
+            for val in &block[1..block.len() - 1] {
+                stringified.push_str(&detokenize(val));
+            }
+            if stringified == "++" {
+                value = format!("{}+1", _identifier)
+            } else if stringified == "--" {
+                value = format!("{}-1", _identifier)
+            } else if stringified.starts_with("+=") {
+                let other_val_index = stringified.find("=");
+                if let Some(_index) = other_val_index {
+                    value = format!("{}+{}", _identifier, &stringified[_index + 1..])
+                } else {
+                    print_error(&format!("Missing value identifier {}", stringified));
+                }
+            } else if stringified.starts_with("-=") {
+                let other_val_index = stringified.find("=");
+                if let Some(_index) = other_val_index {
+                    value = format!("{}-{}", _identifier, &stringified[_index + 1..])
+                } else {
+                    print_error(&format!("Missing value identifier {}", stringified));
+                }
+            } else {
+                print_error(&format!("Unprocessible entiry {}", stringified));
+            }
+            Some(FunctionIdentifier::VariableAssign(VariableAssign {
+                identifier: _identifier.to_string(),
+                operation: VariableAssignOperation::Assign,
+                variant: None,
+                type_: VariableAssignType::Expression,
+                value,
+            }))
+        } else {
+            print_error(&format!("Missing = {:?}", block));
+            None
+        }
+    }
+}
+
 #[derive(Debug)]
 enum VariableAssignType {
     Expression,
-    Function,
     Struct,
-    Array(Option<i32>),
+    Enum,
+    Array(Option<String>),
 }
 #[derive(Debug)]
 struct VariableAssign {
     identifier: String,
     value: String,
+    variant: Option<String>,
+    operation: VariableAssignOperation,
     type_: VariableAssignType,
+}
+#[derive(Debug)]
+
+struct Delete {
+    identifier: String,
+    type_: VariableAssignType,
+    variant: Option<String>,
+}
+
+#[derive(Debug)]
+enum VariableAssignOperation {
+    Push,
+    Pop,
+    Assign,
+    Append,
 }
 
 #[derive(Debug)]
@@ -1873,7 +2102,7 @@ enum FunctionIdentifier {
     Require(Require),
     Conditionals(Conditionals),
     Return(Return),
-    Delete(Vec<Token>),
+    Delete(Delete),
 }
 
 enum FunctionArmType {
@@ -1891,6 +2120,8 @@ fn lex_to_token(input: &str) -> Token {
         "mapping" => Token::Mapping,
         "storage" => Token::Storage,
         "delete" => Token::Delete,
+        "push" => Token::Push,
+        "pop" => Token::Pop,
         "msg" => Token::Msg,
         "require" => Token::Require,
         "constructor" => Token::Constructor,
@@ -1969,6 +2200,8 @@ fn detokenize(input: &Token) -> String {
     let token: String = match input {
         Token::Contract => "contract".to_string(),
         Token::Storage => "storage".to_string(),
+        Token::Push => "push".to_string(),
+        Token::Pop => "pop".to_string(),
         Token::Error => "error".to_string(),
         Token::Delete => "delete".to_string(),
         Token::Require => "require".to_string(),
@@ -2047,6 +2280,24 @@ fn extract_data_location_from_token(token: &Token) -> Option<Token> {
     match token {
         Token::Memory => Some(Token::Memory),
         Token::Calldata => Some(Token::Calldata),
+        _ => None,
+    }
+}
+
+fn extract_integer_types_from_token(token: &Token) -> Option<Token> {
+    match token {
+        Token::Uint => Some(Token::Uint),
+        Token::Uint120 => Some(Token::Uint120),
+        Token::Uint16 => Some(Token::Uint16),
+        Token::Uint256 => Some(Token::Uint256),
+        Token::Uint32 => Some(Token::Uint32),
+        Token::Uint8 => Some(Token::Uint8),
+        Token::Int => Some(Token::Int),
+        Token::Int120 => Some(Token::Int120),
+        Token::Int16 => Some(Token::Int16),
+        Token::Int32 => Some(Token::Int32),
+        Token::Int8 => Some(Token::Int8),
+
         _ => None,
     }
 }
