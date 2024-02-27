@@ -874,13 +874,6 @@ fn validate_variable(
     let mut type_ = VariableType::Variable;
     let tokens = LineDescriptions::to_token(&format!("{};", text.text));
 
-    // if tokens.contains(&Token::Memory)
-    //     || tokens.contains(&Token::Storage)
-    //     || tokens.contains(&Token::Calldata)
-    // {
-    //     print_error("Cannot specify storage for variable")
-    // }
-
     if let Token::Identifier(_identifier) = &tokens[0] {
         for custom_data_type in custom_data_types {
             if custom_data_type == _identifier {
@@ -1114,8 +1107,6 @@ fn evaluate_expression(expression: &String, text: LineDescriptions) -> Option<St
                                     text.text
                                 ));
                             } else {
-                                //DO SOMETHING HERE
-
                                 size = Some(_dec.trunc().to_string());
                             }
                         } else {
@@ -1133,7 +1124,6 @@ fn evaluate_expression(expression: &String, text: LineDescriptions) -> Option<St
                         text.text
                     ));
                 } else {
-                    //DO SOMETHING HERE
                     size = Some(_val.to_string());
                 }
             }
@@ -1571,15 +1561,17 @@ fn extract_return_types(
                 }
             }
 
-            if splited_param.contains(&Token::Memory) {
-                location_ = Some(Token::Memory);
-            } else if splited_param.contains(&Token::Calldata) {
-                location_ = Some(Token::Calldata);
-            } else {
-                print_error(&format!(
-                    "Expecting \"memory\" or \"calldata\". {} ",
-                    vec_.join(" "),
-                ))
+            if is_primitive {
+                if splited_param.contains(&Token::Memory) {
+                    location_ = Some(Token::Memory);
+                } else if splited_param.contains(&Token::Calldata) {
+                    location_ = Some(Token::Calldata);
+                } else {
+                    print_error(&format!(
+                        "Expecting \"memory\" or \"calldata\". {} ",
+                        vec_.join(" "),
+                    ))
+                }
             }
 
             if is_primitive {
@@ -1730,9 +1722,12 @@ fn extract_function_block(
     let mut full_block: Vec<FunctionIdentifier> = Vec::new();
     for block in arms {
         let initial = block[0];
-
         match initial {
             Token::Identifier(_identifier) => {
+                match block[block.len() - 1] {
+                    Token::SemiColon => (),
+                    _ => print_error("Missing ;"),
+                }
                 if custom_data_types.contains(&_identifier.as_str()) {
                     let variable = extract_function_variable(&block, custom_data_types, enums);
                     if let None = variable {
@@ -1759,6 +1754,158 @@ fn extract_function_block(
                             identifier: _identifier.to_owned(),
                         }));
                     } else {
+                        let mut local_variables_identifiers: Vec<&String> = Vec::new();
+
+                        for code_block in &full_block {
+                            match code_block {
+                                FunctionIdentifier::VariableIdentifier(_id) => {
+                                    local_variables_identifiers.push(&_id.name);
+                                }
+                                _ => (),
+                            }
+                        }
+
+                        if local_variables_identifiers.contains(&_identifier) {
+                            let mut local_variable_identifiers = Vec::new();
+                            for code_block in &full_block {
+                                match code_block {
+                                    FunctionIdentifier::VariableIdentifier(
+                                        _variable_identifier,
+                                    ) => {
+                                        local_variable_identifiers.push(_variable_identifier);
+                                    }
+                                    _ => (),
+                                }
+                            }
+                            let var = local_variable_identifiers
+                                .iter()
+                                .find(|pred| pred.name == _identifier.to_string());
+                            if let Some(_var) = var {
+                                let function_scope_variable =
+                                    extract_function_scope_variable(_var, block, _identifier);
+                                if let Some(_) = function_scope_variable {
+                                    full_block.push(function_scope_variable.unwrap())
+                                }
+                            } else {
+                                print_error(&format!("Unidentified variable {}", _identifier))
+                            }
+                        } else {
+                            let global_variables_identifiers: Vec<&String> =
+                                global_variables.iter().map(|pred| &pred.name).collect();
+
+                            if global_variables_identifiers.contains(&_identifier) {
+                                let var = global_variables
+                                    .iter()
+                                    .find(|pred| pred.name == _identifier.to_string());
+
+                                if let Some(_var) = var {
+                                    let function_scope_variable =
+                                        extract_function_scope_variable(_var, block, _identifier);
+                                    if let Some(_) = function_scope_variable {
+                                        full_block.push(function_scope_variable.unwrap());
+                                    }
+                                } else {
+                                    print_error(&format!("Unidentified variable {}", _identifier))
+                                }
+                            } else {
+                                print_error(&format!("Unidentified variable {}", _identifier))
+                            }
+                        }
+                    }
+                }
+            }
+            Token::If => {
+                println!("if condition");
+            }
+            Token::Delete => match block[1] {
+                Token::Identifier(_identifier) => {
+                    match block[block.len() - 1] {
+                        Token::SemiColon => (),
+                        _ => print_error("Missing ;"),
+                    }
+
+                    let mut local_variables_identifiers: Vec<&String> = Vec::new();
+
+                    for code_block in &full_block {
+                        match code_block {
+                            FunctionIdentifier::VariableIdentifier(_id) => {
+                                local_variables_identifiers.push(&_id.name);
+                            }
+                            _ => (),
+                        }
+                    }
+
+                    if local_variables_identifiers.contains(&_identifier) {
+                        let mut local_variable_identifiers = Vec::new();
+                        for code_block in &full_block {
+                            match code_block {
+                                FunctionIdentifier::VariableIdentifier(_variable_identifier) => {
+                                    local_variable_identifiers.push(_variable_identifier);
+                                }
+                                _ => (),
+                            }
+                        }
+                        let var = local_variable_identifiers
+                            .iter()
+                            .find(|pred| pred.name == _identifier.to_string());
+                        if let Some(_var) = var {
+                            let close_brack_index = block
+                                .iter()
+                                .position(|pred| pred == &&Token::CloseSquareBracket);
+                            let open_brack_index = block
+                                .iter()
+                                .position(|pred| pred == &&Token::OpenSquareBracket);
+                            let mut array_index: Option<String> = None;
+                            if let Some(_open_index) = open_brack_index {
+                                if let Some(_close_brack_index) = close_brack_index {
+                                    let mut stringified = String::new();
+                                    for _str in &block[_open_index + 1.._close_brack_index] {
+                                        stringified.push_str(&detokenize(_str));
+                                    }
+                                    array_index = Some(stringified)
+                                } else {
+                                    print_error("Missing ]");
+                                }
+                            }
+                            if _var.is_array {
+                                full_block.push(FunctionIdentifier::Delete(Delete {
+                                    identifier: _identifier.to_string(),
+                                    type_: VariableAssignType::Array(array_index),
+                                    variant: None,
+                                    data_type: _var.data_type.clone(),
+                                }))
+                            } else if let VariableType::Struct = _var.type_ {
+                                if let Token::Dot = block[2] {
+                                    let mut variants = String::new();
+                                    for _variant in &block[3..block.len() - 1] {
+                                        variants.push_str(&detokenize(_variant))
+                                    }
+                                    full_block.push(FunctionIdentifier::Delete(Delete {
+                                        identifier: _identifier.to_string(),
+                                        type_: VariableAssignType::Struct,
+                                        variant: Some(variants),
+                                        data_type: _var.data_type.clone(),
+                                    }));
+                                } else {
+                                    full_block.push(FunctionIdentifier::Delete(Delete {
+                                        identifier: _identifier.to_string(),
+                                        type_: VariableAssignType::Struct,
+                                        variant: None,
+                                        data_type: _var.data_type.clone(),
+                                    }));
+                                }
+                            } else {
+                                full_block.push(FunctionIdentifier::Delete(Delete {
+                                    identifier: _identifier.to_string(),
+                                    type_: VariableAssignType::Expression,
+                                    variant: None,
+                                    data_type: _var.data_type.clone(),
+                                }))
+                            }
+                        } else {
+                            print_error(&format!("Unidentified variable {}", _identifier))
+                        }
+                    } else {
                         let global_variables_identifiers: Vec<&String> =
                             global_variables.iter().map(|pred| &pred.name).collect();
 
@@ -1768,73 +1915,86 @@ fn extract_function_block(
                                 .find(|pred| pred.name == _identifier.to_string());
 
                             if let Some(_var) = var {
-                                let function_scope_variable =
-                                    extract_function_scope_variable(_var, block, _identifier);
-                                if let Some(_) = function_scope_variable {
-                                    full_block.push(function_scope_variable.unwrap());
+                                let close_brack_index = block
+                                    .iter()
+                                    .position(|pred| pred == &&Token::CloseSquareBracket);
+
+                                let open_brack_index = block
+                                    .iter()
+                                    .position(|pred| pred == &&Token::OpenSquareBracket);
+                                let mut array_index: Option<String> = None;
+                                if let Some(_open_index) = open_brack_index {
+                                    if let Some(_close_brack_index) = close_brack_index {
+                                        let mut stringified = String::new();
+                                        for _str in &block[_open_index + 1.._close_brack_index] {
+                                            stringified.push_str(&detokenize(_str));
+                                        }
+                                        array_index = Some(stringified)
+                                    } else {
+                                        print_error("Missing ]");
+                                    }
+                                }
+                                if _var.is_array {
+                                    full_block.push(FunctionIdentifier::Delete(Delete {
+                                        identifier: _identifier.to_string(),
+                                        type_: VariableAssignType::Array(array_index),
+                                        variant: None,
+                                        data_type: _var.data_type.clone(),
+                                    }))
+                                } else if let VariableType::Struct = _var.type_ {
+                                    if let Token::Dot = block[2] {
+                                        let mut variants = String::new();
+                                        for _variant in &block[3..block.len() - 1] {
+                                            variants.push_str(&detokenize(_variant))
+                                        }
+                                        full_block.push(FunctionIdentifier::Delete(Delete {
+                                            identifier: _identifier.to_string(),
+                                            type_: VariableAssignType::Struct,
+                                            variant: Some(variants),
+                                            data_type: _var.data_type.clone(),
+                                        }));
+                                    } else {
+                                        full_block.push(FunctionIdentifier::Delete(Delete {
+                                            identifier: _identifier.to_string(),
+                                            type_: VariableAssignType::Struct,
+                                            variant: None,
+                                            data_type: _var.data_type.clone(),
+                                        }));
+                                    }
+                                } else {
+                                    full_block.push(FunctionIdentifier::Delete(Delete {
+                                        identifier: _identifier.to_string(),
+                                        type_: VariableAssignType::Expression,
+                                        variant: None,
+                                        data_type: _var.data_type.clone(),
+                                    }))
                                 }
                             } else {
                                 print_error(&format!("Unidentified variable {}", _identifier))
                             }
                         } else {
-                            let mut local_variables_identifiers: Vec<&String> = Vec::new();
-
-                            for code_block in &full_block {
-                                match code_block {
-                                    FunctionIdentifier::VariableIdentifier(_id) => {
-                                        local_variables_identifiers.push(&_id.name);
-                                    }
-                                    _ => (),
-                                }
-                            }
-
-                            if local_variables_identifiers.contains(&_identifier) {
-                                let mut local_variable_identifiers = Vec::new();
-                                for code_block in &full_block {
-                                    match code_block {
-                                        FunctionIdentifier::VariableIdentifier(
-                                            _variable_identifier,
-                                        ) => {
-                                            local_variable_identifiers.push(_variable_identifier);
-                                        }
-                                        _ => (),
-                                    }
-                                }
-                                let var = local_variable_identifiers
-                                    .iter()
-                                    .find(|pred| pred.name == _identifier.to_string());
-                                if let Some(_var) = var {
-                                    let function_scope_variable =
-                                        extract_function_scope_variable(_var, block, _identifier);
-                                    if let Some(_) = function_scope_variable {
-                                        full_block.push(function_scope_variable.unwrap())
-                                    }
-                                } else {
-                                    print_error(&format!("Unidentified variable {}", _identifier))
-                                }
-                                // println!("Local Variable Identifier========> {block:?}");
-                            } else {
-                                print_error(&format!("Unidentified variable {}", _identifier))
-                            }
-
-                            // println!("identifier =>>. {_identifier}");
+                            print_error(&format!("Unidentified variable {}", _identifier))
                         }
                     }
                 }
-            }
-            Token::If => {
-                println!("if condition");
-            }
-            Token::Delete => {
-                // println!("Delete");
-                println!("{:?}", block)
-            }
+                _ => print_error("Invalid delete expression."),
+            },
             Token::Require => {
+                match block[block.len() - 1] {
+                    Token::SemiColon => (),
+                    _ => print_error("Missing ;"),
+                }
                 let split: Vec<&[&Token]> = block.split(|pred| pred == &&Token::Coma).collect();
                 let mut condition = String::new();
                 let mut message: String = String::new();
-                for cond in &split[0][2..] {
-                    condition.push_str(&detokenize(cond))
+                if split.len() == 2 {
+                    for cond in &split[0][2..] {
+                        condition.push_str(&detokenize(cond))
+                    }
+                } else {
+                    for cond in &split[0][2..split[0].len() - 2] {
+                        condition.push_str(&detokenize(cond))
+                    }
                 }
 
                 if let Some(_) = split.get(1) {
@@ -1856,6 +2016,10 @@ fn extract_function_block(
                 println!("For");
             }
             Token::Return => {
+                match block[block.len() - 1] {
+                    Token::SemiColon => (),
+                    _ => print_error("Missing ;"),
+                }
                 let mut value = String::new();
 
                 for blk in &block[1..block.len() - 1] {
@@ -1864,6 +2028,10 @@ fn extract_function_block(
                 full_block.push(FunctionIdentifier::Return(Return { value }));
             }
             _token => {
+                match block[block.len() - 1] {
+                    Token::SemiColon => (),
+                    _ => print_error("Missing ;"),
+                }
                 if DATA_TYPES.contains(&detokenize(_token).as_str()) {
                     let variable = extract_function_variable(&block, custom_data_types, enums);
                     if let None = variable {
@@ -2050,11 +2218,11 @@ struct VariableAssign {
     type_: VariableAssignType,
 }
 #[derive(Debug)]
-
 struct Delete {
     identifier: String,
     type_: VariableAssignType,
     variant: Option<String>,
+    data_type: Token,
 }
 
 #[derive(Debug)]
@@ -2062,7 +2230,6 @@ enum VariableAssignOperation {
     Push,
     Pop,
     Assign,
-    Append,
 }
 
 #[derive(Debug)]

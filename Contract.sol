@@ -16,7 +16,12 @@ contract MyTodo {
     uint[] javis = [1, 2];
     uint public deleted;
 
+    function rtdfdf() external view returns (bool) {
+        return true;
+    }
+
     function structify(uint[2 * 10 ** 2] memory _id, Status _status) internal {
+        Todo ffd = Tod(1, "title", "desc", 12122, Status.Idle, Tod([1, 2]));
         // if (true) {} else if (false) {
         //     addr = msg.sender;
         // } else {
@@ -24,7 +29,19 @@ contract MyTodo {
         // }
         // if (false) {}
         // name[msg.sender] = 5;
+        require(rtdfdf());
+        Status status = Status.Idle;
+
+        uint[] nums = [1, 23, 4];
+        delete nums;
+        uint newNum = 10;
+        delete newNum;
+
         Todo storage todo = todos[_id - 1];
+        delete todo.id;
+        delete ffd.tod;
+        Todo memory ffh;
+        ffh.id = 1;
         oi = msg.sender;
         todo.status = Status(_status);
         deleteTodo(2);
@@ -91,7 +108,7 @@ contract MyTodo {
     function deleteTodo(uint _id) external gasless {
         require(_id > 0, "Invalid id");
         require(_id - 1 < todos.length, "Invalid id");
-        delete todos[_id - 1];
+        delete todos[_id - 1 * (2 - 1)];
         deleted++;
     }
 }
