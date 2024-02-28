@@ -20,7 +20,10 @@ contract MyTodo {
         return true;
     }
 
-    function structify(uint[2 * 10 ** 2] memory _id, Status _status) internal {
+    function structify(
+        uint[2 * 10 ** 2] calldata _id,
+        Status _status
+    ) external gasless {
         Todo ffd = Tod(1, "title", "desc", 12122, Status.Idle, Tod([1, 2]));
         // if (true) {} else if (false) {
         //     addr = msg.sender;
@@ -32,18 +35,18 @@ contract MyTodo {
         require(rtdfdf());
         Status status = Status.Idle;
 
-        uint[] nums = [1, 23, 4];
+        uint[3] nums = [1, 23, 4];
         delete nums;
         uint newNum = 10;
         delete newNum;
 
-        Todo storage todo = todos[_id - 1];
-        delete todo.id;
+        Todo storage todo_ = todos_[_id - 1];
+        delete todo_.id;
         delete ffd.tod;
         Todo memory ffh;
-        ffh.id = 1;
+        ffh = Tod(1, "title", "desc", 12122, Status.Idle, Tod([1, 2]));
         oi = msg.sender;
-        todo.status = Status(_status);
+        todo_.status = Status(_status);
         deleteTodo(2);
         uint test = structify(1, 2, 3, 4, 5);
     }
@@ -97,10 +100,10 @@ contract MyTodo {
         uint _def;
         Status _ppd;
         for (uint i = 0; i < todos.length; i++) {
-            if (todos[i].timestamp != 0) {
-                todos_[_count] = todos[i];
-                _count++;
-            }
+            // if (todos[i].timestamp != 0) {
+            todos_[_count] = todos[i];
+            _count++;
+            // }
         }
         return todos_;
     }

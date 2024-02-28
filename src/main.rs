@@ -464,16 +464,16 @@ fn main() {
         &custom_data_types_identifiers,
         &enum_identifiers,
     );
-    extract_functions(
+    let functions = extract_functions(
         &structured_stripped_compilable_contents,
         &custom_data_types_identifiers,
         &global_variables,
         &enum_identifiers,
     );
-    // println!(
-    //     "===> STRUCT ===>\n{:#?}\n ===> GLOBAL_VARIABLES ===>\n{:#?}\n ===> ENUMS ===>\n{:#?}\n ===>> CUSTOM_ERRORS ==>>\n{:#?}",
-    //     structs_tree, global_variables, extracted_enums, custom_errors
-    // );
+    println!(
+        "===> STRUCT ===>\n{:#?}\n\n ===> GLOBAL_VARIABLES ===>\n{:#?}\n\n ===> ENUMS ===>\n{:#?}\n\n ===>> CUSTOM_ERRORS ==>>\n{:#?}\n\n ===>> FUNCTIONS ==>>\n{:#?}",
+        structs_tree, global_variables, extracted_enums, custom_errors,functions
+    );
 
     let end_time = time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
     println!(
@@ -1150,11 +1150,12 @@ fn extract_functions(
     custom_data_types: &Vec<&str>,
     global_variables: &Vec<VariableIdentifier>,
     enums: &Vec<&str>,
-) {
+) -> Vec<FunctionIdentifier> {
     let mut opened_braces = 0;
     let mut opened_braces_type = OpenedBraceType::None;
     let mut processed_data: Vec<Vec<LineDescriptions>> = Vec::new();
     let mut combined = Vec::new();
+    let mut function_identifiers: Vec<FunctionIdentifier> = Vec::new();
     for line in data {
         let raw = &line.text;
 
@@ -1322,7 +1323,12 @@ fn extract_functions(
 
         let function_body = &tokens[function_body_start_index.unwrap()..];
         // println!("{:?}", function_body);
-        extract_function_arms(function_body, custom_data_types, global_variables, enums);
+        let arms: Vec<FunctionArm> = extract_function_arms(
+            &function_body.to_vec(),
+            custom_data_types,
+            global_variables,
+            enums,
+        );
 
         if function_definition.contains(&Token::Override) {
             function_override = true;
@@ -1335,11 +1341,20 @@ fn extract_functions(
         if function_definition.contains(&Token::Gasless) {
             gasless = true;
         }
-        // println!(
-        //     "==> name ==> \n{:?} \n ==> visibility ==>\n{:#?}\n ==> arguments ==>\n{:#?}\n ==> override ==> \n{function_override}\n ==> virtual ==> \n{function_virtual}\n ==> returns ==> \n {:#?}\n ==> gasless ==> \n{gasless} \n\n\n\n",
-        //     function_name, function_visibility, function_arguments, function_returns
-        // );
+        let structure: FunctionIdentifier = FunctionIdentifier {
+            arguments: function_arguments,
+            arms,
+            gasless,
+            name: function_name.to_string(),
+            r#override: function_override,
+            returns: function_returns,
+            r#virtual: function_virtual,
+            visibility: function_visibility,
+        };
+        function_identifiers.push(structure);
     }
+
+    function_identifiers
 }
 
 fn extract_function_params(
@@ -1600,11 +1615,11 @@ fn extract_return_types(
 }
 
 fn extract_function_arms(
-    body: &[Token],
+    body: &Vec<Token>,
     custom_data_types: &Vec<&str>,
     global_variables: &Vec<VariableIdentifier>,
     enums: &Vec<&str>,
-) {
+) -> Vec<FunctionArm> {
     let mut arms: Vec<Vec<&Token>> = Vec::new();
     let mut combined: Vec<&Token> = Vec::new();
 
@@ -1710,7 +1725,7 @@ fn extract_function_arms(
         custom_data_types,
         enums,
         global_variables,
-    );
+    )
 }
 
 fn extract_function_block(
@@ -1718,8 +1733,8 @@ fn extract_function_block(
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
     global_variables: &Vec<VariableIdentifier>,
-) {
-    let mut full_block: Vec<FunctionIdentifier> = Vec::new();
+) -> Vec<FunctionArm> {
+    let mut full_block: Vec<FunctionArm> = Vec::new();
     for block in arms {
         let initial = block[0];
         match initial {
@@ -1734,7 +1749,7 @@ fn extract_function_block(
                         print_error("OOPS!!!");
                     }
 
-                    full_block.push(FunctionIdentifier::VariableIdentifier(variable.unwrap()));
+                    full_block.push(FunctionArm::VariableIdentifier(variable.unwrap()));
                 } else {
                     if let Token::OpenParenthesis = &block[1] {
                         let mut args: Vec<String> = Vec::new();
@@ -1749,7 +1764,7 @@ fn extract_function_block(
                             }
                         }
 
-                        full_block.push(FunctionIdentifier::FunctionCall(FunctionCall {
+                        full_block.push(FunctionArm::FunctionCall(FunctionCall {
                             arguments: args,
                             identifier: _identifier.to_owned(),
                         }));
@@ -1758,7 +1773,7 @@ fn extract_function_block(
 
                         for code_block in &full_block {
                             match code_block {
-                                FunctionIdentifier::VariableIdentifier(_id) => {
+                                FunctionArm::VariableIdentifier(_id) => {
                                     local_variables_identifiers.push(&_id.name);
                                 }
                                 _ => (),
@@ -1769,9 +1784,7 @@ fn extract_function_block(
                             let mut local_variable_identifiers = Vec::new();
                             for code_block in &full_block {
                                 match code_block {
-                                    FunctionIdentifier::VariableIdentifier(
-                                        _variable_identifier,
-                                    ) => {
+                                    FunctionArm::VariableIdentifier(_variable_identifier) => {
                                         local_variable_identifiers.push(_variable_identifier);
                                     }
                                     _ => (),
@@ -1828,7 +1841,7 @@ fn extract_function_block(
 
                     for code_block in &full_block {
                         match code_block {
-                            FunctionIdentifier::VariableIdentifier(_id) => {
+                            FunctionArm::VariableIdentifier(_id) => {
                                 local_variables_identifiers.push(&_id.name);
                             }
                             _ => (),
@@ -1839,7 +1852,7 @@ fn extract_function_block(
                         let mut local_variable_identifiers = Vec::new();
                         for code_block in &full_block {
                             match code_block {
-                                FunctionIdentifier::VariableIdentifier(_variable_identifier) => {
+                                FunctionArm::VariableIdentifier(_variable_identifier) => {
                                     local_variable_identifiers.push(_variable_identifier);
                                 }
                                 _ => (),
@@ -1868,7 +1881,7 @@ fn extract_function_block(
                                 }
                             }
                             if _var.is_array {
-                                full_block.push(FunctionIdentifier::Delete(Delete {
+                                full_block.push(FunctionArm::Delete(Delete {
                                     identifier: _identifier.to_string(),
                                     type_: VariableAssignType::Array(array_index),
                                     variant: None,
@@ -1880,14 +1893,14 @@ fn extract_function_block(
                                     for _variant in &block[3..block.len() - 1] {
                                         variants.push_str(&detokenize(_variant))
                                     }
-                                    full_block.push(FunctionIdentifier::Delete(Delete {
+                                    full_block.push(FunctionArm::Delete(Delete {
                                         identifier: _identifier.to_string(),
                                         type_: VariableAssignType::Struct,
                                         variant: Some(variants),
                                         data_type: _var.data_type.clone(),
                                     }));
                                 } else {
-                                    full_block.push(FunctionIdentifier::Delete(Delete {
+                                    full_block.push(FunctionArm::Delete(Delete {
                                         identifier: _identifier.to_string(),
                                         type_: VariableAssignType::Struct,
                                         variant: None,
@@ -1895,7 +1908,7 @@ fn extract_function_block(
                                     }));
                                 }
                             } else {
-                                full_block.push(FunctionIdentifier::Delete(Delete {
+                                full_block.push(FunctionArm::Delete(Delete {
                                     identifier: _identifier.to_string(),
                                     type_: VariableAssignType::Expression,
                                     variant: None,
@@ -1935,7 +1948,7 @@ fn extract_function_block(
                                     }
                                 }
                                 if _var.is_array {
-                                    full_block.push(FunctionIdentifier::Delete(Delete {
+                                    full_block.push(FunctionArm::Delete(Delete {
                                         identifier: _identifier.to_string(),
                                         type_: VariableAssignType::Array(array_index),
                                         variant: None,
@@ -1947,14 +1960,14 @@ fn extract_function_block(
                                         for _variant in &block[3..block.len() - 1] {
                                             variants.push_str(&detokenize(_variant))
                                         }
-                                        full_block.push(FunctionIdentifier::Delete(Delete {
+                                        full_block.push(FunctionArm::Delete(Delete {
                                             identifier: _identifier.to_string(),
                                             type_: VariableAssignType::Struct,
                                             variant: Some(variants),
                                             data_type: _var.data_type.clone(),
                                         }));
                                     } else {
-                                        full_block.push(FunctionIdentifier::Delete(Delete {
+                                        full_block.push(FunctionArm::Delete(Delete {
                                             identifier: _identifier.to_string(),
                                             type_: VariableAssignType::Struct,
                                             variant: None,
@@ -1962,7 +1975,7 @@ fn extract_function_block(
                                         }));
                                     }
                                 } else {
-                                    full_block.push(FunctionIdentifier::Delete(Delete {
+                                    full_block.push(FunctionArm::Delete(Delete {
                                         identifier: _identifier.to_string(),
                                         type_: VariableAssignType::Expression,
                                         variant: None,
@@ -2003,7 +2016,7 @@ fn extract_function_block(
                     }
                 }
 
-                full_block.push(FunctionIdentifier::Require(Require {
+                full_block.push(FunctionArm::Require(Require {
                     condition,
                     message: if message.trim().is_empty() {
                         None
@@ -2013,7 +2026,20 @@ fn extract_function_block(
                 }))
             }
             Token::For => {
-                println!("For");
+                // let open_brace_index = block.iter().position(|pred| pred == &&Token::OpenBraces);
+
+                // if let Some(_position) = open_brace_index {
+                //     let vars: Vec<Token> = block[_position + 1..block.len() - 1]
+                //         .to_vec()
+                //         .iter()
+                //         .map(|pred| pred.to_owned().to_owned())
+                //         .collect();
+
+                //   let res =   extract_function_arms(&vars, custom_data_types, global_variables, enums);
+                //   println!("RESPONSE HERE =>>> {:?}", res)
+                // }
+
+                // println!("For");
             }
             Token::Return => {
                 match block[block.len() - 1] {
@@ -2025,7 +2051,7 @@ fn extract_function_block(
                 for blk in &block[1..block.len() - 1] {
                     value.push_str(&detokenize(blk))
                 }
-                full_block.push(FunctionIdentifier::Return(Return { value }));
+                full_block.push(FunctionArm::Return(Return { value }));
             }
             _token => {
                 match block[block.len() - 1] {
@@ -2038,14 +2064,15 @@ fn extract_function_block(
                         print_error("OOPS!!!");
                     }
 
-                    full_block.push(FunctionIdentifier::VariableIdentifier(variable.unwrap()));
+                    full_block.push(FunctionArm::VariableIdentifier(variable.unwrap()));
                 } else {
                     print_error(&format!("Unexpected identifier \"{}\"", detokenize(_token)))
                 }
             }
         }
     }
-    println!("{:#?}========>> \n\n\n\n\n", full_block)
+    // println!("{:#?}========>> \n\n\n\n\n", full_block);
+    full_block
 }
 
 fn extract_function_variable(
@@ -2065,7 +2092,7 @@ fn extract_function_scope_variable(
     _var: &VariableIdentifier,
     block: &Vec<&Token>,
     _identifier: &String,
-) -> Option<FunctionIdentifier> {
+) -> Option<FunctionArm> {
     if _var.is_array {
         if let Token::Dot = block[1] {
             if let Some(_size) = &_var.size {
@@ -2079,7 +2106,7 @@ fn extract_function_scope_variable(
                 value.push_str(&detokenize(val))
             }
 
-            return Some(FunctionIdentifier::VariableAssign(VariableAssign {
+            return Some(FunctionArm::VariableAssign(VariableAssign {
                 identifier: _identifier.to_string(),
                 operation: if let Token::Push = block[2] {
                     VariableAssignOperation::Push
@@ -2112,7 +2139,7 @@ fn extract_function_scope_variable(
                         value.push_str(&detokenize(val));
                     }
 
-                    return Some(FunctionIdentifier::VariableAssign(VariableAssign {
+                    return Some(FunctionArm::VariableAssign(VariableAssign {
                         identifier: _identifier.to_string(),
                         operation: VariableAssignOperation::Assign,
                         variant: None,
@@ -2137,7 +2164,7 @@ fn extract_function_scope_variable(
                 value.push_str(&detokenize(val));
             }
             if let VariableType::Enum = _var.type_ {
-                Some(FunctionIdentifier::VariableAssign(VariableAssign {
+                Some(FunctionArm::VariableAssign(VariableAssign {
                     identifier: _identifier.to_string(),
                     operation: VariableAssignOperation::Assign,
                     variant: Some(detokenize(block[2])),
@@ -2145,7 +2172,7 @@ fn extract_function_scope_variable(
                     value,
                 }))
             } else if let VariableType::Struct = _var.type_ {
-                Some(FunctionIdentifier::VariableAssign(VariableAssign {
+                Some(FunctionArm::VariableAssign(VariableAssign {
                     identifier: _identifier.to_string(),
                     operation: VariableAssignOperation::Assign,
                     variant: Some(detokenize(block[2])),
@@ -2153,7 +2180,7 @@ fn extract_function_scope_variable(
                     value,
                 }))
             } else {
-                Some(FunctionIdentifier::VariableAssign(VariableAssign {
+                Some(FunctionArm::VariableAssign(VariableAssign {
                     identifier: _identifier.to_string(),
                     operation: VariableAssignOperation::Assign,
                     variant: None,
@@ -2188,7 +2215,7 @@ fn extract_function_scope_variable(
             } else {
                 print_error(&format!("Unprocessible entiry {}", stringified));
             }
-            Some(FunctionIdentifier::VariableAssign(VariableAssign {
+            Some(FunctionArm::VariableAssign(VariableAssign {
                 identifier: _identifier.to_string(),
                 operation: VariableAssignOperation::Assign,
                 variant: None,
@@ -2200,6 +2227,18 @@ fn extract_function_scope_variable(
             None
         }
     }
+}
+
+#[derive(Debug)]
+struct FunctionIdentifier {
+    name: String,
+    gasless: bool,
+    visibility: Token,
+    arguments: Vec<Argument>,
+    returns: Option<Vec<ReturnType>>,
+    r#override: bool,
+    r#virtual: bool,
+    arms: Vec<FunctionArm>,
 }
 
 #[derive(Debug)]
@@ -2251,18 +2290,18 @@ struct Require {
 #[derive(Debug)]
 struct ElIf {
     condition: Vec<Token>,
-    arm: Vec<FunctionIdentifier>,
+    arm: Vec<FunctionArm>,
 }
 #[derive(Debug)]
 struct Conditionals {
     condition: Vec<Token>,
-    arm: Vec<FunctionIdentifier>,
+    arm: Vec<FunctionArm>,
     elif: Option<Vec<ElIf>>,
-    el: Option<Vec<FunctionIdentifier>>,
+    el: Option<Vec<FunctionArm>>,
 }
 
 #[derive(Debug)]
-enum FunctionIdentifier {
+enum FunctionArm {
     VariableIdentifier(VariableIdentifier),
     VariableAssign(VariableAssign),
     FunctionCall(FunctionCall),
@@ -2270,6 +2309,13 @@ enum FunctionIdentifier {
     Conditionals(Conditionals),
     Return(Return),
     Delete(Delete),
+}
+
+struct For {
+    start: String,
+    condition: String,
+    increment: String,
+    arms: Vec<FunctionArm>,
 }
 
 enum FunctionArmType {
