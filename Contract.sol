@@ -9,22 +9,22 @@ contract MyTodo {
     }
     // address addr = address(0);
     Status status = Status.Idle;
-    address public constant oi = address(0);
-    string public immutable str = string("sdf");
-    mapping(address => uint) name;
+    address public oi = address(0);
+    string public str = string("sdf");
+    mapping(address => mapping(address => mapping(string => uint))) name;
     Todo[] todos;
     uint[] javis = [1, 2];
     uint public deleted;
 
-    function rtdfdf() external view returns (bool) {
+    function rtdfdf() private view returns (bool) {
         return true;
     }
 
     function structify(
         uint[2 * 10 ** 2] calldata _id,
         Status _status
-    ) external gasless {
-        Todo ffd = Tod(1, "title", "desc", 12122, Status.Idle, Tod([1, 2]));
+    ) external {
+        // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
         // if (true) {} else if (false) {
         //     addr = msg.sender;
         // } else {
@@ -33,22 +33,22 @@ contract MyTodo {
         // if (false) {}
         // name[msg.sender] = 5;
         require(rtdfdf());
-        Status status = Status.Idle;
+        status = Status.Idle;
 
-        uint[3] nums = [1, 23, 4];
-        delete nums;
+        // uint[3]          nums = [1, 23, 4];
+        // delete nums;
         uint newNum = 10;
         delete newNum;
 
-        Todo storage todo_ = todos_[_id - 1];
+        Todo storage todo_ = todos[1];
         delete todo_.id;
-        delete ffd.tod;
+        // delete ffd.tod;
         Todo memory ffh;
-        ffh = Tod(1, "title", "desc", 12122, Status.Idle, Tod([1, 2]));
+        // ffh = Tod(1, "title", "desc", 12122, Status.Idle, Tod([1, 2]));
         oi = msg.sender;
         todo_.status = Status(_status);
-        deleteTodo(2);
-        uint test = structify(1, 2, 3, 4, 5);
+        // deleteTodo(2);
+        // uint test = structify(1, 2, 3, 4, 5);
     }
 
     enum Status {
@@ -81,7 +81,7 @@ contract MyTodo {
 
     function createTodo(
         string calldata _title,
-        string calldata _description
+        string memory _description
     ) external {
         todos.push(
             Todo({
@@ -94,7 +94,7 @@ contract MyTodo {
         );
     }
 
-    function getTodos() external view returns (Todo[2 * 10 ** 2] memory) {
+    function getTodos() external view returns (Todo[] memory) {
         Todo[] memory todos_ = new Todo[](todos.length - deleted);
         uint _count;
         uint _def;
@@ -108,7 +108,7 @@ contract MyTodo {
         return todos_;
     }
 
-    function deleteTodo(uint _id) external gasless {
+    function deleteTodo(uint _id) external {
         require(_id > 0, "Invalid id");
         require(_id - 1 < todos.length, "Invalid id");
         delete todos[_id - 1 * (2 - 1)];

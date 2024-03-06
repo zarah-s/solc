@@ -470,6 +470,7 @@ fn main() {
         &global_variables,
         &enum_identifiers,
     );
+
     println!(
         "===> STRUCT ===>\n{:#?}\n\n ===> GLOBAL_VARIABLES ===>\n{:#?}\n\n ===> ENUMS ===>\n{:#?}\n\n ===>> CUSTOM_ERRORS ==>>\n{:#?}\n\n ===>> FUNCTIONS ==>>\n{:#?}",
         structs_tree, global_variables, extracted_enums, custom_errors,functions
@@ -646,7 +647,6 @@ fn extract_enum(data: &Vec<LineDescriptions>) -> Vec<EnumIdentifier> {
 
     enum_identifier
 }
-
 /* *************************** ENUM END ******************************************/
 
 /* *************************** STRUCT START ******************************************/
@@ -767,14 +767,9 @@ fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
 
     struct_identifier
 }
-
 /* *************************** STRUCT END ******************************************/
 
-/* *************************** CUSTOM ERROR START ******************************************/
-/* *************************** CUSTOM ERROR END ******************************************/
-
 /* *************************** VARIABLE START ******************************************/
-
 fn extract_global_variables(
     data: &Vec<LineDescriptions>,
     custom_data_types: &Vec<&str>,
@@ -825,7 +820,7 @@ fn extract_global_variables(
                     && !sst.text.contains("receive")
                     && !sst.text.contains("cron")
                     && !sst.text.contains("function")
-                    && !sst.text.contains("mapping")
+                // && !sst.text.contains("mapping")
                 {
                     if !SYMBOLS.contains(&sst.text.as_str()) {
                         if !sst.text.starts_with("contract") {
@@ -847,6 +842,7 @@ fn extract_global_variables(
     }
 
     for variable in variables {
+        // println!("Here");
         let validated = validate_variable(variable, custom_data_types, enums);
         if let Some(_raw) = validated.0 {
             global_variables.push(_raw);
@@ -873,23 +869,64 @@ fn validate_variable(
     let mut value: Option<String> = None;
     let mut type_ = VariableType::Variable;
     let tokens = LineDescriptions::to_token(&format!("{};", text.text));
+    let mut mapping = Mapping::new();
+    if let Token::Mapping = &tokens[0] {
+        let mut pad = 0;
 
-    if let Token::Identifier(_identifier) = &tokens[0] {
-        for custom_data_type in custom_data_types {
-            if custom_data_type == _identifier {
-                data_type = Some(tokens[0].to_owned());
-                if enums.contains(&_identifier.as_str()) {
-                    type_ = VariableType::Enum;
+        for n in 0..tokens.len() {
+            if pad > n {
+                continue;
+            }
+
+            if let Some(_token) = extract_data_types_from_token(&tokens[n]) {
+                let next = tokens.get(n + 1);
+                if let Some(_next) = next {
+                    pad = n + 1;
+                    if let Token::Equals = _next {
+                        if let Some(_accross_to_value) = tokens.get(n + 3) {
+                            pad = n + 3;
+
+                            if let Token::Mapping = _accross_to_value {
+                                mapping.insert(Some(detokenize(&tokens[n + 5])), None);
+                                pad = n + 5;
+                            } else {
+                                mapping.insert(
+                                    None,
+                                    Some(MappingValue::Raw(detokenize(_accross_to_value))),
+                                )
+                            }
+                        }
+                    }
                 } else {
-                    type_ = VariableType::Struct;
+                }
+            } else {
+                if let Token::Mapping = tokens[n] {
+                    mapping.insert(Some(detokenize(&tokens[n + 2])), None);
+                    pad = n + 2;
+                } else if let Some(_new) = extract_data_types_from_token(&tokens[n]) {
+                    mapping.insert(None, Some(MappingValue::Raw(detokenize(&_new))))
                 }
             }
         }
+        println!("{:#?}", mapping);
     } else {
-        if let Token::Error = &tokens[0] {
-            is_custom_error = true;
+        if let Token::Identifier(_identifier) = &tokens[0] {
+            for custom_data_type in custom_data_types {
+                if custom_data_type == _identifier {
+                    data_type = Some(tokens[0].to_owned());
+                    if enums.contains(&_identifier.as_str()) {
+                        type_ = VariableType::Enum;
+                    } else {
+                        type_ = VariableType::Struct;
+                    }
+                }
+            }
         } else {
-            data_type = Some(tokens[0].to_owned())
+            if let Token::Error = &tokens[0] {
+                is_custom_error = true;
+            } else {
+                data_type = Some(tokens[0].to_owned())
+            }
         }
     }
 
@@ -993,7 +1030,6 @@ fn validate_variable(
 
     (Some(structured), None)
 }
-
 /* *************************** EXPRESSION VALIDATION START ******************************************/
 
 fn validate_expression(expression: &String, text: LineDescriptions) -> Option<String> {
@@ -2167,18 +2203,28 @@ fn extract_function_scope_variable(
                 Some(FunctionArm::VariableAssign(VariableAssign {
                     identifier: _identifier.to_string(),
                     operation: VariableAssignOperation::Assign,
-                    variant: Some(detokenize(block[2])),
+                    variant: None,
                     type_: VariableAssignType::Enum,
                     value,
                 }))
             } else if let VariableType::Struct = _var.type_ {
-                Some(FunctionArm::VariableAssign(VariableAssign {
-                    identifier: _identifier.to_string(),
-                    operation: VariableAssignOperation::Assign,
-                    variant: Some(detokenize(block[2])),
-                    type_: VariableAssignType::Struct,
-                    value,
-                }))
+                if let Token::Dot = block[1] {
+                    Some(FunctionArm::VariableAssign(VariableAssign {
+                        identifier: _identifier.to_string(),
+                        operation: VariableAssignOperation::Assign,
+                        variant: Some(detokenize(block[2])),
+                        type_: VariableAssignType::Struct,
+                        value,
+                    }))
+                } else {
+                    Some(FunctionArm::VariableAssign(VariableAssign {
+                        identifier: _identifier.to_string(),
+                        operation: VariableAssignOperation::Assign,
+                        variant: None,
+                        type_: VariableAssignType::Struct,
+                        value,
+                    }))
+                }
             } else {
                 Some(FunctionArm::VariableAssign(VariableAssign {
                     identifier: _identifier.to_string(),
@@ -2255,6 +2301,63 @@ struct VariableAssign {
     variant: Option<String>,
     operation: VariableAssignOperation,
     type_: VariableAssignType,
+}
+
+#[derive(Debug)]
+
+enum MappingValue {
+    Mapping(Box<Mapping>),
+    Raw(String),
+}
+
+#[derive(Debug)]
+struct Mapping {
+    key: Option<String>,
+    value: Option<MappingValue>,
+}
+
+impl Mapping {
+    fn new() -> Self {
+        Self {
+            key: None,
+            value: None,
+        }
+    }
+
+    fn insert(&mut self, key: Option<String>, value: Option<MappingValue>) {
+        if self.key.is_none() {
+            if let Some(_key) = &key {
+                if let Some(_) = extract_data_types_from_token(&lex_to_token(&_key.as_str())) {
+                    self.key = key;
+                } else {
+                    print_error(&format!("Invalid data type \"{}\"", _key));
+                }
+            }
+        } else if self.value.is_none() {
+            if let Some(_val) = value {
+                self.value = Some(_val);
+            } else {
+                let _key = key.clone().unwrap();
+                if let Some(_) = extract_data_types_from_token(&lex_to_token(_key.as_str())) {
+                    self.value = Some(MappingValue::Mapping(Box::new(Mapping {
+                        key,
+                        value: None,
+                    })));
+                } else {
+                    print_error(&format!("Invalid data type \"{}\"", _key));
+                }
+            }
+        } else {
+            if let Some(ref mut node) = self.value {
+                match node {
+                    MappingValue::Mapping(_map) => {
+                        _map.insert(key, value);
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
 }
 #[derive(Debug)]
 struct Delete {
@@ -2511,6 +2614,26 @@ fn extract_integer_types_from_token(token: &Token) -> Option<Token> {
         Token::Int32 => Some(Token::Int32),
         Token::Int8 => Some(Token::Int8),
 
+        _ => None,
+    }
+}
+
+fn extract_data_types_from_token(token: &Token) -> Option<Token> {
+    match token {
+        Token::Uint => Some(Token::Uint),
+        Token::Uint120 => Some(Token::Uint120),
+        Token::Uint16 => Some(Token::Uint16),
+        Token::Uint256 => Some(Token::Uint256),
+        Token::Uint32 => Some(Token::Uint32),
+        Token::Uint8 => Some(Token::Uint8),
+        Token::Int => Some(Token::Int),
+        Token::Int120 => Some(Token::Int120),
+        Token::Int16 => Some(Token::Int16),
+        Token::Int32 => Some(Token::Int32),
+        Token::Int8 => Some(Token::Int8),
+        Token::String => Some(Token::String),
+        Token::Bool => Some(Token::Bool),
+        Token::Address => Some(Token::Address),
         _ => None,
     }
 }
