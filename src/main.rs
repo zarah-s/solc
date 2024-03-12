@@ -161,7 +161,6 @@ const SYMBOLS: [&str; 22] = [
 ];
 
 #[derive(Debug, Clone)]
-
 struct StructTypes {
     type_: String,
     name_: String,
@@ -842,12 +841,11 @@ fn extract_global_variables(
     }
 
     for variable in variables {
-        // println!("Here");
         let validated = validate_variable(variable, custom_data_types, enums);
         if let Some(_raw) = validated.0 {
             global_variables.push(_raw);
-        } else {
-            custom_errors.push(validated.1.unwrap())
+        } else if let Some(_custom_err) = validated.1 {
+            custom_errors.push(_custom_err)
         }
     }
 
@@ -928,107 +926,109 @@ fn validate_variable(
                 data_type = Some(tokens[0].to_owned())
             }
         }
-    }
 
-    if !is_custom_error {
-        if let None = data_type {
-            print_error(&format!(
-                "Invalid data type \"{}\" on line  {}",
-                text.text, text.line
-            ));
+        if !is_custom_error {
+            if let None = data_type {
+                print_error(&format!(
+                    "Invalid data type \"{}\" on line  {}",
+                    text.text, text.line
+                ));
+            }
         }
-    }
 
-    if let Token::OpenSquareBracket = &tokens[1] {
-        is_array = true;
+        if let Token::OpenSquareBracket = &tokens[1] {
+            is_array = true;
 
-        let close_bracket_index = tokens
-            .iter()
-            .position(|pred| pred == &Token::CloseSquareBracket);
+            let close_bracket_index = tokens
+                .iter()
+                .position(|pred| pred == &Token::CloseSquareBracket);
 
-        if let None = close_bracket_index {
-            print_error(&format!("Missing \"]\" on line  {}", text.line));
-        } else {
-            let slice = &tokens[2..close_bracket_index.unwrap()];
-            if slice.contains(&Token::Equals) {
+            if let None = close_bracket_index {
                 print_error(&format!("Missing \"]\" on line  {}", text.line));
             } else {
-                if close_bracket_index.unwrap() - 1 > 1 {
-                    let mut expression = String::new();
-                    for slc in slice {
-                        let detokenized = LineDescriptions::from_token_to_string(slc);
-                        expression.push_str(&detokenized);
+                let slice = &tokens[2..close_bracket_index.unwrap()];
+                if slice.contains(&Token::Equals) {
+                    print_error(&format!("Missing \"]\" on line  {}", text.line));
+                } else {
+                    if close_bracket_index.unwrap() - 1 > 1 {
+                        let mut expression = String::new();
+                        for slc in slice {
+                            let detokenized = LineDescriptions::from_token_to_string(slc);
+                            expression.push_str(&detokenized);
+                        }
+                        size = validate_expression(&expression, text.clone());
                     }
-                    size = validate_expression(&expression, text.clone());
                 }
             }
         }
-    }
 
-    let equal_token_position = tokens.iter().position(|pred| pred == &Token::Equals);
-    if let Some(_position) = equal_token_position {
-        let slice_equal_token = &tokens[.._position];
+        let equal_token_position = tokens.iter().position(|pred| pred == &Token::Equals);
+        if let Some(_position) = equal_token_position {
+            let slice_equal_token = &tokens[.._position];
 
-        if let Token::Identifier(_var_name) = &slice_equal_token[slice_equal_token.len() - 1] {
-            variable_name = Some(_var_name.to_string());
-        } else {
-            print_error(&format!("Unprocessible entity {}", text.text))
-        }
-
-        let mut _string_value = String::new();
-
-        for res in &tokens[_position + 1..] {
-            if let Token::SemiColon = res {
+            if let Token::Identifier(_var_name) = &slice_equal_token[slice_equal_token.len() - 1] {
+                variable_name = Some(_var_name.to_string());
             } else {
-                _string_value.push_str(&LineDescriptions::from_token_to_string(res))
+                print_error(&format!("Unprocessible entity {}", text.text))
             }
-        }
-        value = Some(_string_value);
-    } else {
-        if !is_custom_error {
-            for token in &tokens {
-                if let Token::Identifier(_val) = token {
-                    variable_name = Some(_val.to_owned());
+
+            let mut _string_value = String::new();
+
+            for res in &tokens[_position + 1..] {
+                if let Token::SemiColon = res {
+                } else {
+                    _string_value.push_str(&LineDescriptions::from_token_to_string(res))
                 }
             }
+            value = Some(_string_value);
+        } else {
+            if !is_custom_error {
+                for token in &tokens {
+                    if let Token::Identifier(_val) = token {
+                        variable_name = Some(_val.to_owned());
+                    }
+                }
 
-            if let None = variable_name {
-                print_error(&format!("Unprocessibledd entity {}", text.text))
+                if let None = variable_name {
+                    print_error(&format!("Unprocessibledd entity {}", text.text))
+                }
             }
         }
+
+        if tokens.contains(&Token::Public) {
+            visibility = Token::Public;
+        } else if tokens.contains(&Token::Private) {
+            visibility = Token::Private;
+        } else if tokens.contains(&Token::Internal) {
+            visibility = Token::Internal;
+        } else if tokens.contains(&Token::External) {
+            visibility = Token::External;
+        }
+
+        if tokens.contains(&Token::Immutable) {
+            mutability = Token::Immutable;
+        } else if tokens.contains(&Token::Constant) {
+            mutability = Token::Constant;
+        }
+
+        if is_custom_error {
+            return (None, Some(text.text));
+        }
+        let structured = VariableIdentifier {
+            data_type: data_type.unwrap(),
+            is_array,
+            mutability,
+            name: variable_name.unwrap(),
+            size,
+            type_,
+            value,
+            visibility,
+        };
+
+        return (Some(structured), None);
     }
 
-    if tokens.contains(&Token::Public) {
-        visibility = Token::Public;
-    } else if tokens.contains(&Token::Private) {
-        visibility = Token::Private;
-    } else if tokens.contains(&Token::Internal) {
-        visibility = Token::Internal;
-    } else if tokens.contains(&Token::External) {
-        visibility = Token::External;
-    }
-
-    if tokens.contains(&Token::Immutable) {
-        mutability = Token::Immutable;
-    } else if tokens.contains(&Token::Constant) {
-        mutability = Token::Constant;
-    }
-
-    if is_custom_error {
-        return (None, Some(text.text));
-    }
-    let structured = VariableIdentifier {
-        data_type: data_type.unwrap(),
-        is_array,
-        mutability,
-        name: variable_name.unwrap(),
-        size,
-        type_,
-        value,
-        visibility,
-    };
-
-    (Some(structured), None)
+    (None, None)
 }
 /* *************************** EXPRESSION VALIDATION START ******************************************/
 
@@ -1398,6 +1398,7 @@ fn extract_function_params(
     function_definition: &[Token],
     custom_data_types: &Vec<&str>,
 ) -> Vec<Argument> {
+    // println!("{:?}", splited_params_block);
     let mut function_arguments: Vec<Argument> = Vec::new();
 
     for splited_param in splited_params_block {
@@ -1469,6 +1470,7 @@ fn extract_function_params(
                     }
                 } else if let Some(_location) = extract_data_location_from_token(&splited_param[1])
                 {
+                    location_ = Some(_location);
                 } else if let Token::Identifier(_identifier) = &splited_param[1] {
                     if validate_identifier_regex(&_identifier, 0) {
                         name_ = Some(_identifier.to_owned());
