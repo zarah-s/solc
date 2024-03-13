@@ -1,0 +1,126 @@
+use regex::Regex;
+
+use crate::mods::{
+    functions::helpers::helpers::{
+        extract_custom_data_types_tokens, print_error, validate_identifier_regex,
+    },
+    types::types::{LineDescriptions, StructIdentifier, StructTypes, Token},
+};
+
+pub fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
+    let extracted_structs = extract_custom_data_types_tokens(&Token::Struct, data);
+    let mut struct_identifier: Vec<StructIdentifier> = Vec::new();
+
+    for struct_inst in extracted_structs {
+        let mut _identifier: Option<String> = None;
+        if let Token::Identifier(_id) = &struct_inst[1] {
+            _identifier = Some(_id.to_string());
+        } else {
+            print_error("Missing struct identifier!!");
+        }
+        let stripped = &struct_inst[3..struct_inst.len() - 1];
+        let splited: Vec<&[Token]> = stripped.split(|pred| pred == &Token::SemiColon).collect();
+        let mut combined_types: Vec<StructTypes> = Vec::new();
+        // println!("{:?}", splited);
+        for splited_param in splited.iter().filter(|pred| !pred.is_empty()) {
+            let mut type_: Option<String> = None;
+            let mut name_: Option<String> = None;
+            let mut is_array = false;
+            let mut size: Option<String> = None;
+            if !splited_param.is_empty() {
+                if splited_param.len() < 2 {
+                    print_error(&format!("Invalid Struct params ",))
+                }
+
+                type_ = Some(format!(
+                    "{}",
+                    LineDescriptions::from_token_to_string(&splited_param[0],)
+                ));
+
+                if let Token::OpenSquareBracket = &splited_param[1] {
+                    is_array = true;
+                    let close_index = splited_param
+                        .iter()
+                        .position(|pred| pred == &Token::CloseSquareBracket);
+
+                    if let None = close_index {
+                        print_error(&format!(
+                            "Syntax error... Expecting a close bracket for struct",
+                        ))
+                    } else {
+                        if close_index.unwrap() - 1 != 1 {
+                            if splited_param.len() != 5 {
+                                print_error(&format!("Syntax error on struct"))
+                            }
+
+                            match &splited_param[2] {
+                                Token::Identifier(_val) => {
+                                    if let Some(_dd) = Regex::new(r"^\d+$").unwrap().find(_val) {
+                                        if _val == "0" {
+                                            print_error(&format!("Invalid array size {}", _val))
+                                        }
+                                        size = Some(_val.to_owned());
+                                    } else {
+                                        print_error(&format!("Invalid array size {}", _val))
+                                    }
+                                }
+                                _ => print_error(&format!(
+                                    "Unprocessible entity.. Expecting a size of uint but found {}",
+                                    LineDescriptions::from_token_to_string(&splited_param[2])
+                                )),
+                            }
+
+                            match &splited_param[4] {
+                                Token::Identifier(_val) => name_ = Some(_val.to_owned()),
+
+                                _ => print_error(&format!(
+                                    "Unprocessible entity.. Expecting identifier but found {}",
+                                    LineDescriptions::from_token_to_string(&splited_param[4])
+                                )),
+                            }
+                        } else {
+                            if splited_param.len() != 4 {
+                                print_error(&format!("Syntax error on struct"));
+                            }
+                            // panic!("sdf");
+                            match &splited_param[3] {
+                                Token::Identifier(_val) => name_ = Some(_val.to_owned()),
+
+                                _ => print_error(&format!(
+                                    "Unprocessible entity.. Expecting identifier but found {}",
+                                    LineDescriptions::from_token_to_string(&splited_param[3])
+                                )),
+                            }
+                        }
+                    }
+                } else if let Token::Identifier(_identifier) = &splited_param[1] {
+                    if validate_identifier_regex(&_identifier, 0) {
+                        name_ = Some(_identifier.to_owned());
+                    }
+                } else {
+                    print_error(&format!("Invalid struct",))
+                }
+            }
+
+            if let None = name_ {
+                print_error(&format!("Syntax error... missing struct identifier  ",))
+            }
+
+            let structured = StructTypes {
+                is_array,
+                name_: name_.unwrap(),
+                size: size,
+                type_: type_.unwrap(),
+            };
+            combined_types.push(structured);
+        }
+
+        let struct_build = StructIdentifier {
+            identifier: _identifier.unwrap(),
+            types: combined_types,
+        };
+        struct_identifier.push(struct_build);
+    }
+
+    struct_identifier
+}

@@ -1,6 +1,6 @@
 use std::{fs, process};
 
-use crate::mods::functions::helpers::helpers::helpers::print_error;
+use crate::mods::functions::helpers::helpers::print_error;
 
 pub fn process_file_contents(args: Vec<String>, file_contents: &mut String) {
     /* CHECK FOR VALID ARGUMENTS */
