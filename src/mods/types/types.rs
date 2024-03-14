@@ -154,9 +154,17 @@ pub struct LineDescriptions {
 }
 
 #[derive(Debug)]
+pub enum FunctionMutability {
+    View,
+    Pure,
+    Mutable,
+}
+
+#[derive(Debug)]
 pub struct FunctionIdentifier {
     pub name: String,
     pub gasless: bool,
+    pub mutability: FunctionMutability,
     pub visibility: Token,
     pub arguments: Vec<Argument>,
     pub returns: Option<Vec<ReturnType>>,

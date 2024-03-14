@@ -8,8 +8,9 @@ use crate::mods::{
     },
     types::types::{
         Argument, Delete, FunctionArm, FunctionArmType, FunctionCall, FunctionIdentifier,
-        LineDescriptions, OpenedBraceType, Require, Return, ReturnType, Token, VariableAssign,
-        VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
+        FunctionMutability, LineDescriptions, OpenedBraceType, Require, Return, ReturnType, Token,
+        VariableAssign, VariableAssignOperation, VariableAssignType, VariableIdentifier,
+        VariableType,
     },
 };
 
@@ -109,6 +110,7 @@ pub fn extract_functions(
         let mut function_override: bool = false;
         let mut function_virtual: bool = false;
         let mut gasless: bool = false;
+        let mut function_mutability = FunctionMutability::Mutable;
         let mut function_visibility = Token::Internal;
         let mut function_returns: Option<Vec<ReturnType>> = None;
         let start_params = function_definition
@@ -198,6 +200,12 @@ pub fn extract_functions(
             enums,
         );
 
+        if function_definition.contains(&Token::View) {
+            function_mutability = FunctionMutability::View;
+        } else if function_definition.contains(&Token::Pure) {
+            function_mutability = FunctionMutability::Pure;
+        }
+
         if function_definition.contains(&Token::Override) {
             function_override = true;
         }
@@ -212,6 +220,7 @@ pub fn extract_functions(
         let structure: FunctionIdentifier = FunctionIdentifier {
             arguments: function_arguments,
             arms,
+            mutability: function_mutability,
             gasless,
             name: function_name.to_string(),
             r#override: function_override,

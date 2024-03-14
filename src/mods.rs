@@ -22,6 +22,7 @@ pub mod functions {
     }
 }
 
-// pub mod implementations {
-//     pub mod line_descriptor;
-// }
+pub mod implementations {
+    pub mod line_descriptors;
+    pub mod mapping;
+}

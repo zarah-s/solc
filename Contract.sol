@@ -9,21 +9,23 @@ contract MyTodo {
     }
     // address addr = address(0);
     Status status = Status.Idle;
-    address public oi = address(0);
+    address public oi = (address(0));
+
     string public str = string("sdf");
     mapping(address => mapping(address => mapping(string => uint))) name;
     Todo[] todos;
     uint[] javis = [1, 2];
     uint public deleted;
 
-    function rtdfdf() private view returns (bool) {
-        return true;
+    function rtdfdf() private view returns (bool, string[] memory) {
+        return (true, ["Hello"]);
     }
 
     function structify(
         uint[2 * 10 ** 2] calldata _id,
         Status _status
     ) external {
+        uint _id = 1;
         // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
         // if (true) {} else if (false) {
         //     addr = msg.sender;

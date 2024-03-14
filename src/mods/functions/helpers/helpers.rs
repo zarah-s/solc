@@ -304,9 +304,9 @@ pub fn validate_expression(expression: &String, text: LineDescriptions) -> Optio
 fn evaluate_expression(expression: &String, text: LineDescriptions) -> Option<String> {
     let mut expr = String::new();
     if expression.ends_with(";") {
-        expr = expression[..expression.len() - 1].to_string();
+        expr.push_str(&expression[..expression.len() - 1]);
     } else {
-        expr = expression.to_owned();
+        expr.push_str(expression)
     }
     let sz = eval(&expr);
     let mut size: Option<String> = None;
