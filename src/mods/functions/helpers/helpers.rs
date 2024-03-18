@@ -487,6 +487,7 @@ pub fn validate_variable(
     text: LineDescriptions,
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
+    is_function_variable: bool,
 ) -> (Option<VariableIdentifier>, Option<String>) {
     let mut is_array = false;
     let mut size: Option<String> = None;
@@ -497,6 +498,8 @@ pub fn validate_variable(
     let mut mutability = Token::Mutable;
     let mut value: Option<String> = None;
     let mut type_ = VariableType::Variable;
+    let mut storage: Option<Token> = None;
+    let mut is_primitive = true;
     let tokens = LineDescriptions::to_token(&format!("{};", text.text));
     let mut mapping = Mapping::new();
     if let Token::Mapping = &tokens[0] {
@@ -546,6 +549,10 @@ pub fn validate_variable(
                     if enums.contains(&_identifier.as_str()) {
                         type_ = VariableType::Enum;
                     } else {
+                        if is_function_variable {
+                            is_primitive = false;
+                        }
+
                         type_ = VariableType::Struct;
                     }
                 }
@@ -554,6 +561,11 @@ pub fn validate_variable(
             if let Token::Error = &tokens[0] {
                 is_custom_error = true;
             } else {
+                if let Token::String = &tokens[0] {
+                    if is_function_variable {
+                        is_primitive = false;
+                    }
+                }
                 data_type = Some(tokens[0].to_owned())
             }
         }
@@ -569,7 +581,9 @@ pub fn validate_variable(
 
         if let Token::OpenSquareBracket = &tokens[1] {
             is_array = true;
-
+            if is_function_variable {
+                is_primitive = false;
+            }
             let close_bracket_index = tokens
                 .iter()
                 .position(|pred| pred == &Token::CloseSquareBracket);
@@ -590,6 +604,16 @@ pub fn validate_variable(
                         size = validate_expression(&expression, text.clone());
                     }
                 }
+            }
+        }
+
+        if !is_primitive {
+            if tokens.contains(&Token::Storage) || tokens.contains(&Token::Memory) {
+                storage = Some(tokens[1].to_owned())
+            } else {
+                print_error(
+                    &format!("Data location must be \"storage\", \"memory\" or \"calldata\" for variable, but none was given. {}",text.text),
+                )
             }
         }
 
@@ -654,6 +678,7 @@ pub fn validate_variable(
             type_,
             value,
             visibility,
+            storage_location: storage,
         };
 
         return (Some(structured), None);

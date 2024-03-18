@@ -242,7 +242,6 @@ fn extract_function_params(
     function_definition: &[Token],
     custom_data_types: &Vec<&str>,
 ) -> Vec<Argument> {
-    // println!("{:?}", splited_params_block);
     let mut function_arguments: Vec<Argument> = Vec::new();
 
     for splited_param in splited_params_block {
@@ -251,7 +250,7 @@ fn extract_function_params(
             let mut name_: Option<String> = None;
             let mut location_: Option<Token> = None;
             let mut is_array = false;
-            let mut is_primitive = false;
+            let mut is_primitive = true;
             let mut size: Option<String> = None;
             let vec_: Vec<String> = function_definition
                 .iter()
@@ -269,7 +268,7 @@ fn extract_function_params(
                     )
                 {
                     if let Token::String = splited_param[0] {
-                        is_primitive = true;
+                        is_primitive = false;
                     }
                     type_ = Some(format!(
                         "{}",
@@ -353,7 +352,7 @@ fn extract_function_params(
                 }
             }
 
-            if is_primitive {
+            if !is_primitive {
                 if splited_param.contains(&Token::Memory)
                     && splited_param.contains(&Token::Calldata)
                 {
@@ -392,7 +391,7 @@ fn extract_return_types(
             let mut location_: Option<Token> = None;
             let mut is_array = false;
             let mut size: Option<String> = None;
-            let mut is_primitive = false;
+            let mut is_primitive = true;
 
             let vec_: Vec<String> = function_definition
                 .iter()
@@ -403,7 +402,7 @@ fn extract_return_types(
                 .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
             {
                 if let Token::String = splited_param[0] {
-                    is_primitive = true;
+                    is_primitive = false;
                 }
                 type_ = Some(format!(
                     "{}",
@@ -413,7 +412,7 @@ fn extract_return_types(
                 if custom_data_types
                     .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
                 {
-                    is_primitive = true;
+                    is_primitive = false;
                     type_ = Some(format!(
                         "{}",
                         LineDescriptions::from_token_to_string(&splited_param[0],)
@@ -429,7 +428,7 @@ fn extract_return_types(
             if splited_param.len() > 1 {
                 if let Token::OpenSquareBracket = &splited_param[1] {
                     is_array = true;
-                    is_primitive = true;
+                    is_primitive = false;
 
                     let close_index = splited_param
                         .iter()
@@ -458,7 +457,7 @@ fn extract_return_types(
                 }
             }
 
-            if is_primitive {
+            if !is_primitive {
                 if splited_param.contains(&Token::Memory) {
                     location_ = Some(Token::Memory);
                 } else if splited_param.contains(&Token::Calldata) {
@@ -471,7 +470,7 @@ fn extract_return_types(
                 }
             }
 
-            if is_primitive {
+            if !is_primitive {
                 if !splited_param.contains(&Token::Memory)
                     && !splited_param.contains(&Token::Calldata)
                 {
@@ -999,7 +998,12 @@ fn extract_function_variable(
     for strr in block {
         text.push_str(&format!("{} ", &detokenize(strr)))
     }
-    let variable = validate_variable(LineDescriptions { text, line: 0 }, custom_data_types, enums);
+    let variable = validate_variable(
+        LineDescriptions { text, line: 0 },
+        custom_data_types,
+        enums,
+        true,
+    );
     variable.0
 }
 

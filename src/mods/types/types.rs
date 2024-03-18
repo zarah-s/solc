@@ -135,6 +135,7 @@ pub struct VariableIdentifier {
     pub value: Option<String>,
     pub is_array: bool,
     pub size: Option<String>,
+    pub storage_location: Option<Token>,
 }
 
 #[derive(Debug)]

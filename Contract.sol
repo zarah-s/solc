@@ -13,6 +13,7 @@ contract MyTodo {
     // address addr = address(0);
     Status status = Status.Idle;
     address public oi = (address(0));
+    Tod tod;
     mapping(address => uint) balanceOf;
 
     string public str = string("sdf");
@@ -27,6 +28,8 @@ contract MyTodo {
 
     function rtdfdf() private view returns (bool, string[1] memory) {
         (bool name, string memory janet) = tupple(5);
+
+        Tod storage __todd = tod;
         uint newNum = 10;
         delete newNum;
         return (true, ["Hello"]);
@@ -41,6 +44,7 @@ contract MyTodo {
         Status _status
     ) external {
         uint _id = 1;
+        string memory ddf = "sdfsd";
         // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
         // if (true) {} else if (false) {
         //     addr = msg.sender;
@@ -71,7 +75,7 @@ contract MyTodo {
     enum Status {
         Idle,
         Pending,
-        Done1
+        Done
     }
 
     enum Gender {
