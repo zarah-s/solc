@@ -7,9 +7,13 @@ contract MyTodo {
     struct addr {
         string name;
     }
+
+    bool boolean = retBool();
+
     // address addr = address(0);
     Status status = Status.Idle;
     address public oi = (address(0));
+    mapping(address => uint) balanceOf;
 
     string public str = string("sdf");
     mapping(address => mapping(address => mapping(string => uint))) name;
@@ -17,8 +21,19 @@ contract MyTodo {
     uint[] javis = [1, 2];
     uint public deleted;
 
-    function rtdfdf() private view returns (bool, string[] memory) {
+    function tupple(uint num) private view returns (bool, string memory) {
+        return (true, "hello");
+    }
+
+    function rtdfdf() private view returns (bool, string[1] memory) {
+        (bool name, string memory janet) = tupple(5);
+        uint newNum = 10;
+        delete newNum;
         return (true, ["Hello"]);
+    }
+
+    function retBool() internal view returns (bool) {
+        return false;
     }
 
     function structify(
@@ -34,7 +49,7 @@ contract MyTodo {
         // }
         // if (false) {}
         // name[msg.sender] = 5;
-        require(rtdfdf());
+        // require(rtdfdf());
         status = Status.Idle;
 
         // uint[3]          nums = [1, 23, 4];

@@ -250,11 +250,18 @@ pub struct Conditionals {
 pub enum FunctionArm {
     VariableIdentifier(VariableIdentifier),
     VariableAssign(VariableAssign),
+    TuppleAssignment(TuppleAssignment),
     FunctionCall(FunctionCall),
     Require(Require),
     Conditionals(Conditionals),
     Return(Return),
     Delete(Delete),
+}
+
+#[derive(Debug)]
+pub struct TuppleAssignment {
+    pub variables: Vec<VariableIdentifier>,
+    pub value: String,
 }
 
 pub struct For {

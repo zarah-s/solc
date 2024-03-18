@@ -76,6 +76,7 @@ pub fn extract_global_variables(
     }
 
     for variable in variables {
+        // println!("{variable:?}");
         let validated = validate_variable(variable, custom_data_types, enums);
         if let Some(_raw) = validated.0 {
             global_variables.push(_raw);

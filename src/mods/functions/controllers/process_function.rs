@@ -2,15 +2,18 @@ use std::process;
 
 use crate::mods::{
     constants::constants::DATA_TYPES,
-    functions::helpers::helpers::{
-        detokenize, extract_data_location_from_token, extract_integer_types_from_token,
-        print_error, validate_expression, validate_identifier_regex, validate_variable,
+    functions::{
+        controllers::process_state_variables::extract_global_variables,
+        helpers::helpers::{
+            detokenize, extract_data_location_from_token, extract_integer_types_from_token,
+            print_error, validate_expression, validate_identifier_regex, validate_variable,
+        },
     },
     types::types::{
         Argument, Delete, FunctionArm, FunctionArmType, FunctionCall, FunctionIdentifier,
         FunctionMutability, LineDescriptions, OpenedBraceType, Require, Return, ReturnType, Token,
-        VariableAssign, VariableAssignOperation, VariableAssignType, VariableIdentifier,
-        VariableType,
+        TuppleAssignment, VariableAssign, VariableAssignOperation, VariableAssignType,
+        VariableIdentifier, VariableType,
     },
 };
 
@@ -904,22 +907,7 @@ fn extract_function_block(
                     },
                 }))
             }
-            Token::For => {
-                // let open_brace_index = block.iter().position(|pred| pred == &&Token::OpenBraces);
-
-                // if let Some(_position) = open_brace_index {
-                //     let vars: Vec<Token> = block[_position + 1..block.len() - 1]
-                //         .to_vec()
-                //         .iter()
-                //         .map(|pred| pred.to_owned().to_owned())
-                //         .collect();
-
-                //   let res =   extract_function_arms(&vars, custom_data_types, global_variables, enums);
-                //   println!("RESPONSE HERE =>>> {:?}", res)
-                // }
-
-                // println!("For");
-            }
+            Token::For => {}
             Token::Return => {
                 match block[block.len() - 1] {
                     Token::SemiColon => (),
@@ -944,13 +932,61 @@ fn extract_function_block(
                     }
 
                     full_block.push(FunctionArm::VariableIdentifier(variable.unwrap()));
+                } else if let Token::OpenParenthesis = _token {
+                    let end_index = block
+                        .iter()
+                        .position(|pred| pred == &&Token::CloseParenthesis);
+                    if let Some(_index) = end_index {
+                        let vars_ = &block[1.._index];
+                        let mut value: Option<String> = None;
+
+                        {
+                            let mut __value = String::new();
+                            for __val in &block[_index + 2..block.len() - 1] {
+                                __value.push_str(&detokenize(__val))
+                            }
+                            value = Some(__value);
+                        }
+
+                        let splited = vars_
+                            .split(|pred| pred == &&Token::Coma)
+                            .collect::<Vec<_>>();
+
+                        let mut line_descriptors: Vec<LineDescriptions> = vec![LineDescriptions {
+                            line: 0,
+                            text: "contract{".to_string(),
+                        }];
+                        for line in splited {
+                            let mut line_text = String::new();
+                            for __val in line {
+                                line_text.push_str(&format!("{} ", &detokenize(__val)))
+                            }
+                            line_descriptors.push(LineDescriptions {
+                                text: line_text.trim().to_string(),
+                                line: 0,
+                            })
+                        }
+                        line_descriptors.push(LineDescriptions {
+                            text: "}".to_string(),
+                            line: 0,
+                        });
+                        let (__variables, _): (Vec<VariableIdentifier>, Vec<String>) =
+                            extract_global_variables(&line_descriptors, custom_data_types, enums);
+                        full_block.push(FunctionArm::TuppleAssignment(TuppleAssignment {
+                            value: value.unwrap(),
+                            variables: __variables,
+                        }))
+                        // println!("{:?}", &line_descriptors);
+                        // println!("{:?}", __variables)
+                    } else {
+                        print_error(&format!("Expecting \")\"",))
+                    }
                 } else {
                     print_error(&format!("Unexpected identifier \"{}\"", detokenize(_token)))
                 }
             }
         }
     }
-    // println!("{:#?}========>> \n\n\n\n\n", full_block);
     full_block
 }
 
