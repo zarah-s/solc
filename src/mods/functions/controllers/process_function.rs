@@ -10,10 +10,10 @@ use crate::mods::{
         },
     },
     types::types::{
-        Argument, Delete, FunctionArm, FunctionArmType, FunctionCall, FunctionIdentifier,
-        FunctionMutability, LineDescriptions, OpenedBraceType, Require, Return, ReturnType, Token,
-        TuppleAssignment, VariableAssign, VariableAssignOperation, VariableAssignType,
-        VariableIdentifier, VariableType,
+        Argument, ConditionalType, Conditionals, Delete, ElIf, FunctionArm, FunctionArmType,
+        FunctionCall, FunctionIdentifier, FunctionMutability, LineDescriptions, OpenedBraceType,
+        Require, Return, ReturnType, Token, TuppleAssignment, VariableAssign,
+        VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
     },
 };
 
@@ -503,7 +503,7 @@ fn extract_function_arms(
 ) -> Vec<FunctionArm> {
     let mut arms: Vec<Vec<&Token>> = Vec::new();
     let mut combined: Vec<&Token> = Vec::new();
-
+    // println!("{:?}", body);
     let mut opened_packet = 0;
     let mut packet = FunctionArmType::None;
     let mut prev_packet = FunctionArmType::None;
@@ -511,6 +511,10 @@ fn extract_function_arms(
 
     for ddl in global_variables.iter() {
         global_vars_str.push(&ddl.name)
+    }
+
+    if body.is_empty() {
+        return Vec::new();
     }
 
     for token in &body[1..body.len() - 1] {
@@ -709,8 +713,157 @@ fn extract_function_block(
                 }
             }
             Token::If => {
-                println!("if condition");
+                let mut conditional_index = 0;
+                let mut opened_paren_condition = 0;
+
+                let mut tree = Conditionals::new(Vec::new());
+                let mut batched: Vec<Token> = Vec::new();
+                let mut conditional_type = ConditionalType::None;
+                let mut condition: Vec<Token> = Vec::new();
+                let mut skip = 0;
+                let mut opened_braces = 0;
+                for (index, blk) in block.iter().enumerate() {
+                    if index > 0 && skip == index {
+                        continue;
+                    }
+                    if let Token::If = blk {
+                        if index > 0 {
+                            let backward_index = block.get(index - 1);
+                            if let Some(_idx) = backward_index {
+                                if let Token::If = _idx {
+                                    //
+                                } else {
+                                    conditional_type = ConditionalType::If;
+                                }
+                            }
+                        } else {
+                            conditional_type = ConditionalType::If;
+                        }
+                    }
+
+                    if let Token::Else = blk {
+                        let forward_index = block.get(index + 1);
+                        if let Some(_idx) = forward_index {
+                            if let Token::If = _idx {
+                                conditional_type = ConditionalType::ElIf;
+                                skip = index + 1;
+                            } else {
+                                conditional_type = ConditionalType::El;
+                            }
+                        }
+                    }
+
+                    if let Token::OpenBraces = blk {
+                        opened_braces += 1;
+                    }
+
+                    if let Token::CloseBraces = blk {
+                        opened_braces -= 1;
+                    }
+
+                    if opened_braces == 0 {
+                        match conditional_type {
+                            ConditionalType::If | ConditionalType::ElIf => {
+                                if index > 1 {
+                                    condition.push(blk.clone().clone());
+                                }
+                                if let Token::OpenParenthesis = blk {
+                                    opened_paren_condition += 1;
+                                }
+
+                                if let Token::CloseParenthesis = blk {
+                                    opened_paren_condition -= 1;
+                                }
+
+                                if opened_paren_condition == 0 {
+                                    condition.pop();
+
+                                    if !condition.is_empty() {
+                                        if let ConditionalType::If = conditional_type {
+                                            tree.condition = condition.clone();
+                                        } else {
+                                            tree.elif.push(ElIf {
+                                                arm: Vec::new(),
+                                                condition: condition.clone(),
+                                            });
+                                        }
+                                        condition.clear();
+                                    }
+                                }
+                            }
+
+                            _ => (),
+                        }
+                    }
+
+                    if opened_braces > 0 {
+                        batched.push(blk.clone().clone());
+                    }
+
+                    if opened_braces == 0 && index > 0 {
+                        match conditional_type {
+                            ConditionalType::If => {
+                                if !batched.is_empty() {
+                                    batched.push(Token::CloseBraces);
+                                }
+                                let __arm: Vec<FunctionArm> = extract_function_arms(
+                                    &batched,
+                                    custom_data_types,
+                                    global_variables,
+                                    enums,
+                                );
+                                conditional_index += 1;
+                                tree.arm = __arm;
+
+                                batched.clear();
+                            }
+
+                            ConditionalType::ElIf => {
+                                if !batched.is_empty() {
+                                    batched.push(Token::CloseBraces);
+                                }
+                                let __arm: Vec<FunctionArm> = extract_function_arms(
+                                    &batched,
+                                    custom_data_types,
+                                    global_variables,
+                                    enums,
+                                );
+
+                                let last_len = tree.elif.len();
+                                if last_len > 0 {
+                                    tree.elif[last_len - 1].arm = __arm;
+                                }
+                            }
+
+                            ConditionalType::El => {
+                                if !batched.is_empty() {
+                                    batched.push(Token::CloseBraces);
+                                }
+
+                                let __arm: Vec<FunctionArm> = extract_function_arms(
+                                    &batched,
+                                    custom_data_types,
+                                    global_variables,
+                                    enums,
+                                );
+
+                                tree.el = Some(__arm);
+                                // println!("sdfasd here {:?}", batched);
+                            }
+                            _ => (),
+                        }
+                    }
+                }
+
+                if conditional_index > 0 {
+                    conditional_index -= 1;
+                }
+
+                let structure = FunctionArm::Conditionals(tree);
+
+                full_block.push(structure);
             }
+
             Token::Delete => match block[1] {
                 Token::Identifier(_identifier) => {
                     match block[block.len() - 1] {

@@ -23,6 +23,7 @@ pub mod functions {
 }
 
 pub mod implementations {
+    pub mod conditionals;
     pub mod line_descriptors;
     pub mod mapping;
 }

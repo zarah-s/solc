@@ -4,9 +4,9 @@ pragma solidity ^0.8.8;
 contract MyTodo {
     error INSUFFICIENT_BALANCE();
     error ONLY_OWNER();
-    struct addr {
-        string name;
-    }
+    // struct addr {
+    //     string name;
+    // }
 
     bool boolean = retBool();
 
@@ -39,19 +39,36 @@ contract MyTodo {
         return false;
     }
 
+    address addr;
+
     function structify(
         uint[2 * 10 ** 2] calldata _id,
         Status _status
     ) external {
         uint _id = 1;
         string memory ddf = "sdfsd";
-        // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
-        // if (true) {} else if (false) {
-        //     addr = msg.sender;
-        // } else {
-        //     addr = msg.sender;
-        // }
-        // if (false) {}
+        addr = msg.sender;
+        //
+        if ((true && true) || 1 == 1) {
+            Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
+            if (true) {
+                addr = msg.sender;
+            }
+            Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
+        } else if (false) {
+            // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
+            addr = msg.sender;
+
+            // addr = msg.sender;
+        } else if (true) {
+            // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
+            addr = msg.sender;
+
+            // addr = msg.sender;
+        } else {
+            addr = msg.sender;
+        }
+        if (false) {}
         // name[msg.sender] = 5;
         // require(rtdfdf());
         status = Status.Idle;

@@ -235,6 +235,14 @@ pub struct Require {
 }
 
 #[derive(Debug)]
+pub enum ConditionalType {
+    If,
+    ElIf,
+    El,
+    None,
+}
+
+#[derive(Debug)]
 pub struct ElIf {
     pub condition: Vec<Token>,
     pub arm: Vec<FunctionArm>,
@@ -243,7 +251,7 @@ pub struct ElIf {
 pub struct Conditionals {
     pub condition: Vec<Token>,
     pub arm: Vec<FunctionArm>,
-    pub elif: Option<Vec<ElIf>>,
+    pub elif: Vec<ElIf>,
     pub el: Option<Vec<FunctionArm>>,
 }
 
