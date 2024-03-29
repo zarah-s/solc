@@ -14,6 +14,7 @@ contract MyTodo {
     Status status = Status.Idle;
     address public oi = (address(0));
     Tod tod;
+    address ford;
     mapping(address => uint) balanceOf;
 
     string public str = string("sdf");
@@ -21,6 +22,77 @@ contract MyTodo {
     Todo[] todos;
     uint[] javis = [1, 2];
     uint public deleted;
+
+    function tupple2(uint num) private view returns (bool, string memory) {
+        return (true, "hello");
+    }
+
+    function rtdfdf2() private view returns (bool, string[1] memory) {
+        (bool name, string memory janet) = tupple(5);
+
+        Tod storage __todd = tod;
+        uint newNum = 10;
+        delete newNum;
+        return (true, ["Hello"]);
+    }
+
+    function retBool2() internal view returns (bool) {
+        return false;
+    }
+
+    address addr;
+
+    function structify(
+        uint[2 * 10 ** 2] calldata _id,
+        Status _status
+    ) external {
+        uint _id = 1;
+        string memory ddf = "sdfsd";
+        addr = msg.sender;
+        //
+        if ((true && true) || 1 == 1) {
+            // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
+            if (true) {
+                addr = msg.sender;
+                if (false && 1 != 1) {
+                    addr = address(0);
+                }
+            }
+            // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
+        } else if (false) {
+            // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
+            addr = msg.sender;
+
+            // addr = msg.sender;
+        } else if (true) {
+            // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
+            addr = msg.sender;
+
+            // addr = msg.sender;
+        } else {
+            retBool();
+            addr = msg.sender;
+        }
+        if (false) {}
+        // name[msg.sender] = 5;
+        // require(rtdfdf());
+        status = Status.Idle;
+
+        // uint[3]          nums = [1, 23, 4];
+        // delete nums;
+        uint newNum = 10;
+        delete newNum;
+
+        Todo storage todo_ = todos[1];
+        delete todo_.id;
+        // delete ffd.tod;
+        Todo memory ffh;
+        // ffh = Tod(1, "title", "desc", 12122, Status.Idle, Tod([1, 2]));
+        oi = msg.sender;
+        todo_.status = Status(_status);
+        // deleteTodo(2);
+        // uint test = structify(1, 2, 3, 4, 5);
+    }
 
     function tupple(uint num) private view returns (bool, string memory) {
         return (true, "hello");
@@ -39,22 +111,29 @@ contract MyTodo {
         return false;
     }
 
-    address addr;
+    // address addr;
 
-    function structify(
+    function structify2(
         uint[2 * 10 ** 2] calldata _id,
-        Status _status
+        Status _status,
+        string memory __arg
     ) external {
-        uint _id = 1;
+        uint __id = 1;
         string memory ddf = "sdfsd";
         addr = msg.sender;
         //
-        if ((true && true) || 1 == 1) {
-            Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
+        if ((true && true) || __id == 1) {
+            // __id =10;
+            string memory ___arg;
+            ___arg = "Hello";
+            // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
             if (true) {
                 addr = msg.sender;
+                if (false && 1 != 1) {
+                    addr = address(0);
+                }
             }
-            Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
+            // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
         } else if (false) {
             // Todo memory ffd = Tod(1, "title", "desc", 12122, Status.Idle, []);
             addr = msg.sender;
@@ -66,6 +145,7 @@ contract MyTodo {
 
             // addr = msg.sender;
         } else {
+            retBool();
             addr = msg.sender;
         }
         if (false) {}
@@ -146,7 +226,7 @@ contract MyTodo {
         return todos_;
     }
 
-    function deleteTodo(uint _id) external {
+    function deleteTodo(uint _id)  view returns(uint) gasless {
         require(_id > 0, "Invalid id");
         require(_id - 1 < todos.length, "Invalid id");
         delete todos[_id - 1 * (2 - 1)];

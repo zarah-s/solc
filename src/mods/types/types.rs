@@ -76,6 +76,8 @@ pub enum Token {
     Coma,
     Pipe,
     Ampersand,
+    True,
+    False,
 }
 
 #[derive(Debug, Clone)]
@@ -265,6 +267,7 @@ pub enum FunctionArm {
     Conditionals(Conditionals),
     Return(Return),
     Delete(Delete),
+    Loop(Loop),
 }
 
 #[derive(Debug)]
@@ -273,11 +276,20 @@ pub struct TuppleAssignment {
     pub value: String,
 }
 
-pub struct For {
-    pub start: String,
+#[derive(Debug)]
+pub struct Loop {
+    pub identifier: Option<String>,
+    pub value: Option<String>,
     pub condition: String,
-    pub increment: String,
+    pub op: Option<String>,
     pub arms: Vec<FunctionArm>,
+    pub r#type: LoopType,
+}
+
+#[derive(Debug)]
+pub enum LoopType {
+    For,
+    While,
 }
 
 pub enum FunctionArmType {
@@ -285,6 +297,6 @@ pub enum FunctionArmType {
     VariableAssign,
     Conditional,
     Require,
-    For,
+    Loop,
     None,
 }

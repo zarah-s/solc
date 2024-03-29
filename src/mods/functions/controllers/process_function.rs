@@ -11,8 +11,8 @@ use crate::mods::{
     },
     types::types::{
         Argument, ConditionalType, Conditionals, Delete, ElIf, FunctionArm, FunctionArmType,
-        FunctionCall, FunctionIdentifier, FunctionMutability, LineDescriptions, OpenedBraceType,
-        Require, Return, ReturnType, Token, TuppleAssignment, VariableAssign,
+        FunctionCall, FunctionIdentifier, FunctionMutability, LineDescriptions, Loop, LoopType,
+        OpenedBraceType, Require, Return, ReturnType, Token, TuppleAssignment, VariableAssign,
         VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
     },
 };
@@ -201,6 +201,7 @@ pub fn extract_functions(
             custom_data_types,
             global_variables,
             enums,
+            Vec::new(),
         );
 
         if function_definition.contains(&Token::View) {
@@ -500,6 +501,7 @@ fn extract_function_arms(
     custom_data_types: &Vec<&str>,
     global_variables: &Vec<VariableIdentifier>,
     enums: &Vec<&str>,
+    local_vars: Vec<&VariableIdentifier>,
 ) -> Vec<FunctionArm> {
     let mut arms: Vec<Vec<&Token>> = Vec::new();
     let mut combined: Vec<&Token> = Vec::new();
@@ -610,6 +612,7 @@ fn extract_function_arms(
         custom_data_types,
         enums,
         global_variables,
+        local_vars,
     )
 }
 
@@ -618,6 +621,7 @@ fn extract_function_block(
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
     global_variables: &Vec<VariableIdentifier>,
+    local_vars: Vec<&VariableIdentifier>,
 ) -> Vec<FunctionArm> {
     let mut full_block: Vec<FunctionArm> = Vec::new();
     for block in arms {
@@ -655,6 +659,9 @@ fn extract_function_block(
                         }));
                     } else {
                         let mut local_variables_identifiers: Vec<&String> = Vec::new();
+                        for ___local_var in &local_vars {
+                            local_variables_identifiers.push(&___local_var.name);
+                        }
 
                         for code_block in &full_block {
                             match code_block {
@@ -675,7 +682,9 @@ fn extract_function_block(
                                     _ => (),
                                 }
                             }
-                            let var = local_variable_identifiers
+
+                            let joined = [local_variable_identifiers, local_vars.clone()].concat();
+                            let var = joined
                                 .iter()
                                 .find(|pred| pred.name == _identifier.to_string());
                             if let Some(_var) = var {
@@ -784,7 +793,7 @@ fn extract_function_block(
                                         } else {
                                             tree.elif.push(ElIf {
                                                 arm: Vec::new(),
-                                                condition: condition.clone(),
+                                                condition: condition[1..].to_vec().clone(),
                                             });
                                         }
                                         condition.clear();
@@ -806,11 +815,18 @@ fn extract_function_block(
                                 if !batched.is_empty() {
                                     batched.push(Token::CloseBraces);
                                 }
+                                let mut local_vars: Vec<&VariableIdentifier> = Vec::new();
+                                for __blk in &full_block {
+                                    if let FunctionArm::VariableIdentifier(_identifier) = __blk {
+                                        local_vars.push(_identifier)
+                                    }
+                                }
                                 let __arm: Vec<FunctionArm> = extract_function_arms(
                                     &batched,
                                     custom_data_types,
                                     global_variables,
                                     enums,
+                                    local_vars,
                                 );
                                 conditional_index += 1;
                                 tree.arm = __arm;
@@ -822,17 +838,25 @@ fn extract_function_block(
                                 if !batched.is_empty() {
                                     batched.push(Token::CloseBraces);
                                 }
+                                let mut local_vars: Vec<&VariableIdentifier> = Vec::new();
+                                for __blk in &full_block {
+                                    if let FunctionArm::VariableIdentifier(_identifier) = __blk {
+                                        local_vars.push(_identifier)
+                                    }
+                                }
                                 let __arm: Vec<FunctionArm> = extract_function_arms(
                                     &batched,
                                     custom_data_types,
                                     global_variables,
                                     enums,
+                                    local_vars,
                                 );
 
                                 let last_len = tree.elif.len();
                                 if last_len > 0 {
                                     tree.elif[last_len - 1].arm = __arm;
                                 }
+                                batched.clear();
                             }
 
                             ConditionalType::El => {
@@ -840,14 +864,24 @@ fn extract_function_block(
                                     batched.push(Token::CloseBraces);
                                 }
 
+                                let mut local_vars: Vec<&VariableIdentifier> = Vec::new();
+                                for __blk in &full_block {
+                                    if let FunctionArm::VariableIdentifier(_identifier) = __blk {
+                                        local_vars.push(_identifier)
+                                    }
+                                }
+
                                 let __arm: Vec<FunctionArm> = extract_function_arms(
                                     &batched,
                                     custom_data_types,
                                     global_variables,
                                     enums,
+                                    local_vars,
                                 );
-
+                                // println!("{:?}", batched);
                                 tree.el = Some(__arm);
+                                batched.clear();
+
                                 // println!("sdfasd here {:?}", batched);
                             }
                             _ => (),
@@ -1059,7 +1093,96 @@ fn extract_function_block(
                     },
                 }))
             }
-            Token::For => {}
+            Token::For => {
+                let open_brace_index = block.iter().position(|pred| pred == &&Token::OpenBraces);
+                let mut _value: Option<String> = None;
+                let mut __identifier: String = String::new();
+                let mut _condition = String::new();
+                let mut _operation = String::new();
+                if let Some(_open_brace_index) = open_brace_index {
+                    let condition_block = &block[2.._open_brace_index - 1];
+                    let splitted = condition_block
+                        .split(|pred| pred == &&Token::SemiColon)
+                        .collect::<Vec<_>>();
+
+                    if splitted.len() != 3 {
+                        print_error("Unprocessible entity for loop");
+                    } else {
+                        if let Token::Uint | Token::Int = &splitted[0][0] {
+                            match splitted[0][1] {
+                                Token::Identifier(_id) => __identifier = _id.to_string(),
+                                _ => {
+                                    print_error("Unprocessible entity for loop");
+                                }
+                            }
+
+                            if let Token::Equals = splitted[0][2] {
+                                //
+                            } else {
+                                print_error("Identifier needs assignment");
+                            }
+                            match splitted[0][3] {
+                                Token::Identifier(_id) => _value = Some(_id.to_string()),
+                                _ => {
+                                    print_error("Unprocessible entity for loop");
+                                }
+                            }
+                        } else {
+                            print_error("Identifier type can only be uint or int");
+                        }
+                    }
+
+                    match splitted[1][0] {
+                        Token::Identifier(_id) => {
+                            if _id != &__identifier {
+                                print_error("Mismatched identifier");
+                            } else {
+                                for __condition in splitted[1] {
+                                    _condition.push_str(&detokenize(__condition));
+                                }
+                            }
+                        }
+                        _ => {
+                            print_error("Unprocessible entity for loop");
+                        }
+                    }
+
+                    for __op in splitted[2] {
+                        _operation.push_str(&detokenize(__op));
+                    }
+
+                    // panic!("{:?}", _operation);
+                    let mut batched: Vec<Token> = Vec::new();
+                    for _batch in &block[_open_brace_index..] {
+                        batched.push(_batch.clone().clone());
+                    }
+                    let mut local_vars: Vec<&VariableIdentifier> = Vec::new();
+                    for __blk in &full_block {
+                        if let FunctionArm::VariableIdentifier(_identifier) = __blk {
+                            local_vars.push(_identifier)
+                        }
+                    }
+                    let __arms = extract_function_arms(
+                        &batched,
+                        custom_data_types,
+                        global_variables,
+                        enums,
+                        local_vars,
+                    );
+
+                    let structured = FunctionArm::Loop(Loop {
+                        arms: __arms,
+                        condition: _condition,
+                        identifier: Some(__identifier),
+                        op: Some(_operation),
+                        value: _value,
+                        r#type: LoopType::For,
+                    });
+                    full_block.push(structured);
+                } else {
+                    print_error("Unprocessible Entity for for loop");
+                }
+            }
             Token::Return => {
                 match block[block.len() - 1] {
                     Token::SemiColon => (),

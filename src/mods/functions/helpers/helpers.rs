@@ -31,6 +31,8 @@ pub fn lex_to_token(input: &str) -> Token {
         "cron" => Token::Cron,
         "enum" => Token::Enum,
         "gasless" => Token::Gasless,
+        "true" => Token::True,
+        "false" => Token::False,
         "address" => Token::Address,
         "error" => Token::Error,
         "private" => Token::Private,
@@ -98,6 +100,8 @@ pub fn detokenize(input: &Token) -> String {
     let token: String = match input {
         Token::Contract => "contract".to_string(),
         Token::Storage => "storage".to_string(),
+        Token::True => "true".to_string(),
+        Token::False => "false".to_string(),
         Token::Push => "push".to_string(),
         Token::Pop => "pop".to_string(),
         Token::Error => "error".to_string(),
