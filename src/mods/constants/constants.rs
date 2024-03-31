@@ -29,12 +29,13 @@ pub const DATA_TYPES: [&str; 28] = [
     "address[]",
 ];
 
-pub const KEYWORDS: [&str; 40] = [
+pub const KEYWORDS: [&str; 41] = [
     "contract",
     "mapping",
     "error",
     "push",
     "pop",
+    "while",
     "immutable",
     "mutable",
     "constant",

@@ -14,6 +14,7 @@ pub fn print_error(msg: &str) {
 
 pub fn lex_to_token(input: &str) -> Token {
     let token = match input {
+        "while" => Token::While,
         "contract" => Token::Contract,
         "mapping" => Token::Mapping,
         "storage" => Token::Storage,
@@ -100,6 +101,7 @@ pub fn detokenize(input: &Token) -> String {
     let token: String = match input {
         Token::Contract => "contract".to_string(),
         Token::Storage => "storage".to_string(),
+        Token::While => "while".to_string(),
         Token::True => "true".to_string(),
         Token::False => "false".to_string(),
         Token::Push => "push".to_string(),

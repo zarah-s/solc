@@ -216,6 +216,10 @@ contract MyTodo {
         Todo[] memory todos_ = new Todo[](todos.length - deleted);
         uint _count;
         uint _def;
+
+        while (true) {
+            _def++;
+        }
         Status _ppd;
         for (uint i = 0; i < todos.length; i++) {
             // if (todos[i].timestamp != 0) {

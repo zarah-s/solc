@@ -721,6 +721,48 @@ fn extract_function_block(
                     }
                 }
             }
+            Token::While => {
+                let open_brace_index = block.iter().position(|pred| pred == &&Token::OpenBraces);
+                let mut _condition = String::new();
+                if let Some(_open_brace_index) = open_brace_index {
+                    let condition_block = &block[2.._open_brace_index - 1];
+                    for cond in condition_block {
+                        _condition.push_str(&detokenize(cond));
+                    }
+
+                    let mut batched: Vec<Token> = Vec::new();
+                    for _batch in &block[_open_brace_index..] {
+                        batched.push(_batch.clone().clone());
+                    }
+                    let mut local_vars: Vec<&VariableIdentifier> = Vec::new();
+                    for __blk in &full_block {
+                        if let FunctionArm::VariableIdentifier(_identifier) = __blk {
+                            local_vars.push(_identifier)
+                        }
+                    }
+
+                    let __arms = extract_function_arms(
+                        &batched,
+                        custom_data_types,
+                        global_variables,
+                        enums,
+                        local_vars,
+                    );
+
+                    let structured = FunctionArm::Loop(Loop {
+                        arms: __arms,
+                        condition: _condition,
+                        identifier: None,
+                        op: None,
+                        value: None,
+                        r#type: LoopType::While,
+                    });
+
+                    // panic!("{:#?}", structured);
+                    full_block.push(structured);
+                }
+                // panic!("{:?}", block);
+            }
             Token::If => {
                 let mut conditional_index = 0;
                 let mut opened_paren_condition = 0;
@@ -1101,6 +1143,7 @@ fn extract_function_block(
                 let mut _operation = String::new();
                 if let Some(_open_brace_index) = open_brace_index {
                     let condition_block = &block[2.._open_brace_index - 1];
+
                     let splitted = condition_block
                         .split(|pred| pred == &&Token::SemiColon)
                         .collect::<Vec<_>>();

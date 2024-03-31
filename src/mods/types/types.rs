@@ -10,6 +10,7 @@ pub enum Token {
     Override,
     Push,
     Pop,
+    While,
     Delete,
     Enum,
     Immutable,
