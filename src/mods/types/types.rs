@@ -207,6 +207,13 @@ pub struct Mapping {
 }
 
 #[derive(Debug)]
+pub struct MappingIdentifier {
+    pub name: String,
+    pub map: Mapping,
+    pub visibility: Token,
+}
+
+#[derive(Debug)]
 pub struct Delete {
     pub identifier: String,
     pub type_: VariableAssignType,

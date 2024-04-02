@@ -12,8 +12,9 @@ use crate::mods::{
     types::types::{
         Argument, ConditionalType, Conditionals, Delete, ElIf, FunctionArm, FunctionArmType,
         FunctionCall, FunctionIdentifier, FunctionMutability, LineDescriptions, Loop, LoopType,
-        OpenedBraceType, Require, Return, ReturnType, Token, TuppleAssignment, VariableAssign,
-        VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
+        MappingIdentifier, OpenedBraceType, Require, Return, ReturnType, Token, TuppleAssignment,
+        VariableAssign, VariableAssignOperation, VariableAssignType, VariableIdentifier,
+        VariableType,
     },
 };
 
@@ -1288,8 +1289,11 @@ fn extract_function_block(
                             text: "}".to_string(),
                             line: 0,
                         });
-                        let (__variables, _): (Vec<VariableIdentifier>, Vec<String>) =
-                            extract_global_variables(&line_descriptors, custom_data_types, enums);
+                        let (__variables, _, _): (
+                            Vec<VariableIdentifier>,
+                            Vec<String>,
+                            Vec<MappingIdentifier>,
+                        ) = extract_global_variables(&line_descriptors, custom_data_types, enums);
                         full_block.push(FunctionArm::TuppleAssignment(TuppleAssignment {
                             value: value.unwrap(),
                             variables: __variables,

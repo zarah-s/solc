@@ -48,7 +48,7 @@ async fn main() -> Result<(), io::Error> {
     let custom_data_types_identifiers: Vec<&str> =
         [enum_identifiers.clone(), struct_identifiers].concat();
 
-    let (global_variables, custom_errors) = extract_global_variables(
+    let (global_variables, custom_errors, mappings) = extract_global_variables(
         &structured_stripped_compilable_contents,
         &custom_data_types_identifiers,
         &enum_identifiers,
@@ -61,8 +61,8 @@ async fn main() -> Result<(), io::Error> {
     );
 
     println!(
-        "===> STRUCT ===>\n{:#?}\n\n ===> GLOBAL_VARIABLES ===>\n{:#?}\n\n ===> ENUMS ===>\n{:#?}\n\n ===>> CUSTOM_ERRORS ==>>\n{:#?}\n\n ===>> FUNCTIONS ==>>\n{:#?}",
-        structs_tree, global_variables, extracted_enums, custom_errors,functions
+        "===> STRUCT ===>\n{:#?}\n\n ===> GLOBAL_VARIABLES ===>\n{:#?}\n\n ===> MAPPINGS ===>\n{:#?}\n\n ===> ENUMS ===>\n{:#?}\n\n ===>> CUSTOM_ERRORS ==>>\n{:#?}\n\n ===>> FUNCTIONS ==>>\n{:#?}",
+        structs_tree, global_variables,mappings, extracted_enums, custom_errors,functions
     );
 
     let end_time = time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);

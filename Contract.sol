@@ -15,10 +15,10 @@ contract MyTodo {
     address public oi = (address(0));
     Tod tod;
     address ford;
-    mapping(address => uint) balanceOf;
+    mapping(address => uint) private balanceOf;
 
     string public str = string("sdf");
-    mapping(address => mapping(address => mapping(string => uint))) name;
+    mapping(address => mapping(address => mapping(string => uint))) public name;
     Todo[] todos;
     uint[] javis = [1, 2];
     uint public deleted;
@@ -29,7 +29,6 @@ contract MyTodo {
 
     function rtdfdf2() private view returns (bool, string[1] memory) {
         (bool name, string memory janet) = tupple(5);
-
         Tod storage __todd = tod;
         uint newNum = 10;
         delete newNum;

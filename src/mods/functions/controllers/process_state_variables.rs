@@ -1,16 +1,18 @@
 use crate::mods::{
     constants::constants::SYMBOLS,
     functions::helpers::helpers::validate_variable,
-    types::types::{LineDescriptions, OpenedBraceType, VariableIdentifier},
+    types::types::{LineDescriptions, MappingIdentifier, OpenedBraceType, VariableIdentifier},
 };
 
 pub fn extract_global_variables(
     data: &Vec<LineDescriptions>,
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
-) -> (Vec<VariableIdentifier>, Vec<String>) {
-    let mut global_variables = Vec::new();
+) -> (Vec<VariableIdentifier>, Vec<String>, Vec<MappingIdentifier>) {
+    let mut global_variables: Vec<VariableIdentifier> = Vec::new();
     let mut custom_errors: Vec<String> = Vec::new();
+    let mut mappings: Vec<MappingIdentifier> = Vec::new();
+
     let mut opened_braces = 0;
     let mut opened_brace_type = OpenedBraceType::None;
     let mut variables: Vec<LineDescriptions> = Vec::new();
@@ -54,7 +56,6 @@ pub fn extract_global_variables(
                     && !sst.text.contains("receive")
                     && !sst.text.contains("cron")
                     && !sst.text.contains("function")
-                // && !sst.text.contains("mapping")
                 {
                     if !SYMBOLS.contains(&sst.text.as_str()) {
                         if !sst.text.starts_with("contract") {
@@ -81,8 +82,10 @@ pub fn extract_global_variables(
             global_variables.push(_raw);
         } else if let Some(_custom_err) = validated.1 {
             custom_errors.push(_custom_err)
+        } else if let Some(_mapping) = validated.2 {
+            mappings.push(_mapping)
         }
     }
 
-    (global_variables, custom_errors)
+    (global_variables, custom_errors, mappings)
 }

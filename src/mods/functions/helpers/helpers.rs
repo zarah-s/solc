@@ -1,6 +1,6 @@
 use crate::{
     mods::types::types::{
-        Mapping, MappingValue, OpenedBraceType, VariableIdentifier, VariableType,
+        Mapping, MappingIdentifier, MappingValue, OpenedBraceType, VariableIdentifier, VariableType,
     },
     LineDescriptions, Token,
 };
@@ -494,7 +494,11 @@ pub fn validate_variable(
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
     is_function_variable: bool,
-) -> (Option<VariableIdentifier>, Option<String>) {
+) -> (
+    Option<VariableIdentifier>,
+    Option<String>,
+    Option<MappingIdentifier>,
+) {
     let mut is_array = false;
     let mut size: Option<String> = None;
     let mut data_type: Option<Token> = None;
@@ -546,7 +550,41 @@ pub fn validate_variable(
                 }
             }
         }
-        println!("{:#?}", mapping);
+
+        let mut identifier: String = String::new();
+        let mut visibility: Option<Token> = None;
+        match &tokens[tokens.len() - 2] {
+            Token::Identifier(_id) => {
+                identifier = _id.to_owned();
+            }
+            _ => {
+                print_error("Unprocessible entity on mapping");
+            }
+        }
+
+        if let Token::CloseParenthesis = tokens[tokens.len() - 3] {
+            visibility = Some(Token::Internal);
+        } else {
+            if let Token::Private | Token::Public | Token::External | Token::Internal =
+                tokens[tokens.len() - 3]
+            {
+                if let Token::External = tokens[tokens.len() - 3] {
+                    print_error("Mapping can not be set to external");
+                } else {
+                    visibility = Some(tokens[tokens.len() - 3].to_owned())
+                }
+            } else {
+                print_error("Unprocessible entity on mapping");
+            }
+        }
+
+        let structured_mapping = MappingIdentifier {
+            map: mapping,
+            name: identifier,
+            visibility: visibility.unwrap(),
+        };
+
+        return (None, None, Some(structured_mapping));
     } else {
         if let Token::Identifier(_identifier) = &tokens[0] {
             for custom_data_type in custom_data_types {
@@ -673,7 +711,7 @@ pub fn validate_variable(
         }
 
         if is_custom_error {
-            return (None, Some(text.text));
+            return (None, Some(text.text), None);
         }
         let structured = VariableIdentifier {
             data_type: data_type.unwrap(),
@@ -687,8 +725,8 @@ pub fn validate_variable(
             storage_location: storage,
         };
 
-        return (Some(structured), None);
+        return (Some(structured), None, None);
     }
 
-    (None, None)
+    // (None, None, None)
 }
