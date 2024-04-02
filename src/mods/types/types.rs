@@ -4,6 +4,8 @@
 pub enum Token {
     Identifier(String),
     Contract,
+    Revert,
+    Assert,
     Require,
     Storage,
     Error,
@@ -111,7 +113,7 @@ pub struct ReturnType {
 pub enum VariableType {
     Variable,
     Struct,
-    Contract,
+    // Contract,
     Enum,
 }
 
@@ -121,10 +123,21 @@ pub struct StructIdentifier {
     pub types: Vec<StructTypes>,
 }
 #[derive(Debug)]
-
 pub struct EnumIdentifier {
     pub identifier: String,
     pub variants: Vec<String>,
+}
+
+#[derive(Debug)]
+pub enum RevertType {
+    Default,
+    Custom,
+}
+
+#[derive(Debug)]
+pub struct Revert {
+    pub r#type: RevertType,
+    pub msg: String,
 }
 
 #[derive(Debug, Clone)]
@@ -275,7 +288,14 @@ pub enum FunctionArm {
     Conditionals(Conditionals),
     Return(Return),
     Delete(Delete),
+    Revert(Revert),
+    Assert(Assert),
     Loop(Loop),
+}
+
+#[derive(Debug)]
+pub struct Assert {
+    pub assert: String,
 }
 
 #[derive(Debug)]
@@ -305,6 +325,6 @@ pub enum FunctionArmType {
     VariableAssign,
     Conditional,
     Require,
-    Loop,
+    // Loop,
     None,
 }

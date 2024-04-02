@@ -24,6 +24,9 @@ contract MyTodo {
     uint public deleted;
 
     function tupple2(uint num) private view returns (bool, string memory) {
+        // revert("INSUFFICIENT_BALANCE");
+        assert(true == true);
+        revert INSUFFICIENT_BALANCE();
         return (true, "hello");
     }
 
@@ -229,7 +232,7 @@ contract MyTodo {
         return todos_;
     }
 
-    function deleteTodo(uint _id)  view returns(uint) gasless {
+    function deleteTodo(uint _id) view returns (uint) {
         require(_id > 0, "Invalid id");
         require(_id - 1 < todos.length, "Invalid id");
         delete todos[_id - 1 * (2 - 1)];

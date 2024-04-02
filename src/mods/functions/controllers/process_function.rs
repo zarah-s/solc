@@ -10,11 +10,11 @@ use crate::mods::{
         },
     },
     types::types::{
-        Argument, ConditionalType, Conditionals, Delete, ElIf, FunctionArm, FunctionArmType,
-        FunctionCall, FunctionIdentifier, FunctionMutability, LineDescriptions, Loop, LoopType,
-        MappingIdentifier, OpenedBraceType, Require, Return, ReturnType, Token, TuppleAssignment,
-        VariableAssign, VariableAssignOperation, VariableAssignType, VariableIdentifier,
-        VariableType,
+        Argument, Assert, ConditionalType, Conditionals, Delete, ElIf, FunctionArm,
+        FunctionArmType, FunctionCall, FunctionIdentifier, FunctionMutability, LineDescriptions,
+        Loop, LoopType, MappingIdentifier, OpenedBraceType, Require, Return, ReturnType, Revert,
+        RevertType, Token, TuppleAssignment, VariableAssign, VariableAssignOperation,
+        VariableAssignType, VariableIdentifier, VariableType,
     },
 };
 
@@ -733,7 +733,7 @@ fn extract_function_block(
 
                     let mut batched: Vec<Token> = Vec::new();
                     for _batch in &block[_open_brace_index..] {
-                        batched.push(_batch.clone().clone());
+                        batched.push(_batch.to_owned().clone());
                     }
                     let mut local_vars: Vec<&VariableIdentifier> = Vec::new();
                     for __blk in &full_block {
@@ -765,7 +765,7 @@ fn extract_function_block(
                 // panic!("{:?}", block);
             }
             Token::If => {
-                let mut conditional_index = 0;
+                // let mut conditional_index = 0;
                 let mut opened_paren_condition = 0;
 
                 let mut tree = Conditionals::new(Vec::new());
@@ -817,7 +817,7 @@ fn extract_function_block(
                         match conditional_type {
                             ConditionalType::If | ConditionalType::ElIf => {
                                 if index > 1 {
-                                    condition.push(blk.clone().clone());
+                                    condition.push(blk.to_owned().clone());
                                 }
                                 if let Token::OpenParenthesis = blk {
                                     opened_paren_condition += 1;
@@ -849,7 +849,7 @@ fn extract_function_block(
                     }
 
                     if opened_braces > 0 {
-                        batched.push(blk.clone().clone());
+                        batched.push(blk.to_owned().clone());
                     }
 
                     if opened_braces == 0 && index > 0 {
@@ -871,7 +871,7 @@ fn extract_function_block(
                                     enums,
                                     local_vars,
                                 );
-                                conditional_index += 1;
+                                // conditional_index += 1;
                                 tree.arm = __arm;
 
                                 batched.clear();
@@ -897,7 +897,10 @@ fn extract_function_block(
 
                                 let last_len = tree.elif.len();
                                 if last_len > 0 {
-                                    tree.elif[last_len - 1].arm = __arm;
+                                    if !__arm.is_empty() {
+                                        tree.elif[last_len - 1].arm = __arm;
+                                        // println!("{:?}", tree.elif);
+                                    }
                                 }
                                 batched.clear();
                             }
@@ -921,20 +924,16 @@ fn extract_function_block(
                                     enums,
                                     local_vars,
                                 );
-                                // println!("{:?}", batched);
                                 tree.el = Some(__arm);
                                 batched.clear();
-
-                                // println!("sdfasd here {:?}", batched);
                             }
                             _ => (),
                         }
                     }
                 }
-
-                if conditional_index > 0 {
-                    conditional_index -= 1;
-                }
+                // if conditional_index > 0 {
+                //     conditional_index -= 1;
+                // }
 
                 let structure = FunctionArm::Conditionals(tree);
 
@@ -1198,7 +1197,7 @@ fn extract_function_block(
                     // panic!("{:?}", _operation);
                     let mut batched: Vec<Token> = Vec::new();
                     for _batch in &block[_open_brace_index..] {
-                        batched.push(_batch.clone().clone());
+                        batched.push(_batch.to_owned().clone());
                     }
                     let mut local_vars: Vec<&VariableIdentifier> = Vec::new();
                     for __blk in &full_block {
@@ -1226,6 +1225,64 @@ fn extract_function_block(
                 } else {
                     print_error("Unprocessible Entity for for loop");
                 }
+            }
+            Token::Assert => {
+                let mut msg: String = String::new();
+                let mut opened_count = 0;
+                for __blk in block {
+                    if opened_count > 0 {
+                        if let Token::CloseParenthesis = __blk {
+                            //
+                        } else {
+                            msg.push_str(&detokenize(__blk))
+                        }
+                    }
+                    if let Token::OpenParenthesis = __blk {
+                        opened_count += 1;
+                    }
+                    if let Token::CloseParenthesis = __blk {
+                        opened_count -= 1;
+                    }
+                }
+
+                let structured = Assert { assert: msg };
+                full_block.push(FunctionArm::Assert(structured));
+                // panic!("Assert {:?}", structured);
+            }
+            Token::Revert => {
+                let mut msg: String = String::new();
+                let mut _type: Option<RevertType> = None;
+                if let Token::Identifier(_) = block[1] {
+                    _type = Some(RevertType::Custom);
+
+                    for __blk in &block[1..block.len() - 1] {
+                        msg.push_str(&detokenize(__blk))
+                    }
+                } else {
+                    _type = Some(RevertType::Default);
+                    let mut opened_count = 0;
+                    for __blk in block {
+                        if opened_count > 0 {
+                            if let Token::CloseParenthesis = __blk {
+                                //
+                            } else {
+                                msg.push_str(&detokenize(__blk))
+                            }
+                        }
+                        if let Token::OpenParenthesis = __blk {
+                            opened_count += 1;
+                        }
+                        if let Token::CloseParenthesis = __blk {
+                            opened_count -= 1;
+                        }
+                    }
+                }
+
+                let structured = Revert {
+                    msg,
+                    r#type: _type.unwrap(),
+                };
+                full_block.push(FunctionArm::Revert(structured));
             }
             Token::Return => {
                 match block[block.len() - 1] {
@@ -1257,14 +1314,14 @@ fn extract_function_block(
                         .position(|pred| pred == &&Token::CloseParenthesis);
                     if let Some(_index) = end_index {
                         let vars_ = &block[1.._index];
-                        let mut value: Option<String> = None;
+                        let mut _value: Option<String> = None;
 
                         {
                             let mut __value = String::new();
                             for __val in &block[_index + 2..block.len() - 1] {
                                 __value.push_str(&detokenize(__val))
                             }
-                            value = Some(__value);
+                            _value = Some(__value);
                         }
 
                         let splited = vars_
@@ -1295,7 +1352,7 @@ fn extract_function_block(
                             Vec<MappingIdentifier>,
                         ) = extract_global_variables(&line_descriptors, custom_data_types, enums);
                         full_block.push(FunctionArm::TuppleAssignment(TuppleAssignment {
-                            value: value.unwrap(),
+                            value: _value.unwrap(),
                             variables: __variables,
                         }))
                         // println!("{:?}", &line_descriptors);

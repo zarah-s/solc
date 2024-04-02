@@ -29,6 +29,7 @@ async fn main() -> Result<(), io::Error> {
     let _ = process_file_contents(args, &mut file_contents).await?;
 
     structure_to_line_descriptors(&file_contents, &mut lines_);
+
     strip_comments(&lines_, &mut stripped_comments);
     let structured_stripped_compilable_contents: Vec<LineDescriptions> =
         LineDescriptions::to_struct(stripped_comments);
