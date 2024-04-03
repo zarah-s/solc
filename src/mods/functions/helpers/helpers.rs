@@ -17,6 +17,8 @@ pub fn lex_to_token(input: &str) -> Token {
         "revert" => Token::Revert,
         "assert" => Token::Assert,
         "bytes" => Token::Bytes,
+        "wei" => Token::Wei,
+        "ether" => Token::Ether,
         "while" => Token::While,
         "contract" => Token::Contract,
         "mapping" => Token::Mapping,
@@ -104,6 +106,8 @@ pub fn detokenize(input: &Token) -> String {
     let token: String = match input {
         Token::Contract => "contract".to_string(),
         Token::Assert => "assert".to_string(),
+        Token::Ether => "ether".to_string(),
+        Token::Wei => "wei".to_string(),
         Token::Bytes => "bytes".to_string(),
         Token::Revert => "revert".to_string(),
         Token::Storage => "storage".to_string(),
