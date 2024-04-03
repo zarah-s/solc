@@ -606,7 +606,6 @@ fn extract_function_arms(
             joined_conditionals.push(arm.to_owned());
         }
     }
-    // println!("{:#?} \n\n\n\n\n", joined_conditionals);
 
     extract_function_block(
         &joined_conditionals,
@@ -1459,47 +1458,84 @@ fn extract_function_scope_variable(
         let equals_index = block.iter().position(|pred| pred == &&Token::Equals);
         if let Some(_position) = equals_index {
             let mut value = String::new();
-            for val in &block[_position + 1..block.len() - 1] {
-                value.push_str(&detokenize(val));
+            let mut stringified = String::new();
+            for val in &block[1..block.len() - 1] {
+                stringified.push_str(&detokenize(val));
             }
-            if let VariableType::Enum = _var.type_ {
-                Some(FunctionArm::VariableAssign(VariableAssign {
-                    identifier: _identifier.to_string(),
-                    operation: VariableAssignOperation::Assign,
-                    variant: None,
-                    type_: VariableAssignType::Enum,
-                    value,
-                }))
-            } else if let VariableType::Struct = _var.type_ {
-                if let Token::Dot = block[1] {
+            if stringified.starts_with("+=") {
+                let other_val_index = stringified.find("=");
+                if let Some(_index) = other_val_index {
+                    value = format!("{}+{}", _identifier, &stringified[_index + 1..]);
                     Some(FunctionArm::VariableAssign(VariableAssign {
                         identifier: _identifier.to_string(),
                         operation: VariableAssignOperation::Assign,
-                        variant: Some(detokenize(block[2])),
-                        type_: VariableAssignType::Struct,
+                        variant: None,
+                        type_: VariableAssignType::Enum,
                         value,
                     }))
+                } else {
+                    print_error(&format!("Missing value identifier {}", stringified));
+                    process::exit(1);
+                }
+            } else if stringified.starts_with("-=") {
+                let other_val_index = stringified.find("=");
+                if let Some(_index) = other_val_index {
+                    value = format!("{}-{}", _identifier, &stringified[_index + 1..]);
+                    Some(FunctionArm::VariableAssign(VariableAssign {
+                        identifier: _identifier.to_string(),
+                        operation: VariableAssignOperation::Assign,
+                        variant: None,
+                        type_: VariableAssignType::Enum,
+                        value,
+                    }))
+                } else {
+                    print_error(&format!("Missing value identifier {}", stringified));
+                    process::exit(1);
+                }
+            } else {
+                for val in &block[_position + 1..block.len() - 1] {
+                    value.push_str(&detokenize(val));
+                }
+                if let VariableType::Enum = _var.type_ {
+                    Some(FunctionArm::VariableAssign(VariableAssign {
+                        identifier: _identifier.to_string(),
+                        operation: VariableAssignOperation::Assign,
+                        variant: None,
+                        type_: VariableAssignType::Enum,
+                        value,
+                    }))
+                } else if let VariableType::Struct = _var.type_ {
+                    if let Token::Dot = block[1] {
+                        Some(FunctionArm::VariableAssign(VariableAssign {
+                            identifier: _identifier.to_string(),
+                            operation: VariableAssignOperation::Assign,
+                            variant: Some(detokenize(block[2])),
+                            type_: VariableAssignType::Struct,
+                            value,
+                        }))
+                    } else {
+                        Some(FunctionArm::VariableAssign(VariableAssign {
+                            identifier: _identifier.to_string(),
+                            operation: VariableAssignOperation::Assign,
+                            variant: None,
+                            type_: VariableAssignType::Struct,
+                            value,
+                        }))
+                    }
                 } else {
                     Some(FunctionArm::VariableAssign(VariableAssign {
                         identifier: _identifier.to_string(),
                         operation: VariableAssignOperation::Assign,
                         variant: None,
-                        type_: VariableAssignType::Struct,
+                        type_: VariableAssignType::Expression,
                         value,
                     }))
                 }
-            } else {
-                Some(FunctionArm::VariableAssign(VariableAssign {
-                    identifier: _identifier.to_string(),
-                    operation: VariableAssignOperation::Assign,
-                    variant: None,
-                    type_: VariableAssignType::Expression,
-                    value,
-                }))
             }
         } else if let Some(_) = extract_integer_types_from_token(&_var.data_type) {
             let mut stringified = String::new();
             let mut value = String::new();
+            // panic!("sdfasd");
             for val in &block[1..block.len() - 1] {
                 stringified.push_str(&detokenize(val));
             }
@@ -1507,20 +1543,6 @@ fn extract_function_scope_variable(
                 value = format!("{}+1", _identifier)
             } else if stringified == "--" {
                 value = format!("{}-1", _identifier)
-            } else if stringified.starts_with("+=") {
-                let other_val_index = stringified.find("=");
-                if let Some(_index) = other_val_index {
-                    value = format!("{}+{}", _identifier, &stringified[_index + 1..])
-                } else {
-                    print_error(&format!("Missing value identifier {}", stringified));
-                }
-            } else if stringified.starts_with("-=") {
-                let other_val_index = stringified.find("=");
-                if let Some(_index) = other_val_index {
-                    value = format!("{}-{}", _identifier, &stringified[_index + 1..])
-                } else {
-                    print_error(&format!("Missing value identifier {}", stringified));
-                }
             } else {
                 print_error(&format!("Unprocessible entiry {}", stringified));
             }
