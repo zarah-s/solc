@@ -21,10 +21,17 @@ pub fn strip_comments(lines_: &Vec<LineDescriptions>, _stripped_comments: &mut S
             })
         } else {
             if let Some(index_value) = doc_str_index {
-                stripped_inline_comments.push(LineDescriptions {
-                    text: stripped_comment.text[..index_value].trim().to_string(),
-                    ..**stripped_comment
-                })
+                if stripped_comment.text.trim() == "/*" {
+                    stripped_inline_comments.push(LineDescriptions {
+                        text: stripped_comment.text.trim().to_string(),
+                        ..**stripped_comment
+                    })
+                } else {
+                    stripped_inline_comments.push(LineDescriptions {
+                        text: stripped_comment.text[..index_value].trim().to_string(),
+                        ..**stripped_comment
+                    });
+                }
             } else {
                 stripped_inline_comments.push(LineDescriptions {
                     text: stripped_comment.text.trim().to_string(),
@@ -40,7 +47,7 @@ pub fn strip_comments(lines_: &Vec<LineDescriptions>, _stripped_comments: &mut S
         .map(|f| f.to_owned().to_string())
         .collect();
 
-    for sst in joined_stripped_vec {
+    for sst in &joined_stripped_vec {
         _stripped_comments.push_str(sst.as_str());
     }
 
