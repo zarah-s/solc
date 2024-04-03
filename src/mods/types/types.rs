@@ -101,6 +101,7 @@ pub struct Argument {
     pub location: Option<Token>,
     pub size: Option<String>,
     pub is_array: bool,
+    pub payable_address: bool,
 }
 
 #[derive(Debug)]

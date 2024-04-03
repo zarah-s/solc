@@ -251,6 +251,7 @@ fn extract_function_params(
             let mut type_: Option<String> = None;
             let mut name_: Option<String> = None;
             let mut location_: Option<Token> = None;
+            let mut payable_address: bool = false;
             let mut is_array = false;
             let mut is_primitive = true;
             let mut size: Option<String> = None;
@@ -320,6 +321,15 @@ fn extract_function_params(
                     if validate_identifier_regex(&_identifier, 0) {
                         name_ = Some(_identifier.to_owned());
                     }
+                } else if let Token::Payable = &splited_param[1] {
+                    if let Token::Address = &splited_param[0] {
+                        payable_address = true;
+                    } else {
+                        print_error(&format!(
+                            "Invalid function argument. Payable for a non address type {}",
+                            vec_.join(" ")
+                        ))
+                    }
                 } else {
                     print_error(&format!("Invalid function argument {}", vec_.join(" ")))
                 }
@@ -371,6 +381,7 @@ fn extract_function_params(
                 type_: type_.unwrap(),
                 is_array,
                 size,
+                payable_address,
             };
 
             function_arguments.push(structured);
@@ -1359,6 +1370,8 @@ fn extract_function_block(
                     } else {
                         print_error(&format!("Expecting \")\"",))
                     }
+                } else if let Token::CloseBraces = _token {
+                    //
                 } else {
                     print_error(&format!("Unexpected identifier \"{}\"", detokenize(_token)))
                 }
