@@ -1470,7 +1470,7 @@ fn extract_function_scope_variable(
                         identifier: _identifier.to_string(),
                         operation: VariableAssignOperation::Assign,
                         variant: None,
-                        type_: VariableAssignType::Enum,
+                        type_: VariableAssignType::Expression,
                         value,
                     }))
                 } else {
@@ -1485,7 +1485,7 @@ fn extract_function_scope_variable(
                         identifier: _identifier.to_string(),
                         operation: VariableAssignOperation::Assign,
                         variant: None,
-                        type_: VariableAssignType::Enum,
+                        type_: VariableAssignType::Expression,
                         value,
                     }))
                 } else {
