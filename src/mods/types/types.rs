@@ -5,6 +5,7 @@ pub enum Token {
     Identifier(String),
     Contract,
     Revert,
+    Bytes,
     Assert,
     Require,
     Storage,
