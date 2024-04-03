@@ -373,7 +373,6 @@ fn evaluate_expression(expression: &String, text: LineDescriptions) -> Option<St
 
 pub fn validate_identifier_regex(identifer: &str, line: i32) -> bool {
     let identifier_regex = Regex::new(r"[a-zA-Z_]\w*").unwrap();
-
     if identifer.is_empty() {
         print_error(&format!(
             "Expecting identifier \"{}\" on line {}",

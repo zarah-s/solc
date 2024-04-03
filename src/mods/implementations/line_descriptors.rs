@@ -47,7 +47,7 @@ impl LineDescriptions {
             }
             if character.is_whitespace() && !combined_char.trim().is_empty() {
                 if opened_quotations > 0 {
-                    combined_char.push_str(character.to_string().as_str())
+                    combined_char.push(character)
                 } else {
                     lex.push(combined_char.trim().to_string());
                     combined_char.clear();
@@ -58,7 +58,7 @@ impl LineDescriptions {
             {
                 if !combined_char.trim().is_empty() {
                     if opened_quotations > 0 {
-                        combined_char.push_str(character.to_string().as_str())
+                        combined_char.push(character)
                     } else {
                         lex.push(combined_char.trim().to_string());
                         combined_char.clear();
@@ -70,13 +70,25 @@ impl LineDescriptions {
                 .iter()
                 .find(|pred| pred == &&combined_char.as_str().trim())
             {
+                let mut contains = false;
+                for data_type in DATA_TYPES {
+                    if !data_type.contains(&format!("{}{}", combined_char, character).as_str()) {
+                        contains = true;
+                        break;
+                    }
+                }
+
+                if contains {
+                    combined_char.push(character);
+                    continue;
+                }
+
                 if let Some(_) = identifier_regex.find(character.to_string().as_str()) {
-                    combined_char.push_str(character.to_string().as_str());
+                    combined_char.push(character);
                 } else {
                     lex.push(combined_char.trim().to_string());
                     combined_char.clear();
                 }
-                // }
             } else {
                 combined_char.push_str(character.to_string().as_str());
                 if index == input.len() - 1 {
@@ -88,6 +100,8 @@ impl LineDescriptions {
         for lexed in lex {
             lexems.push(lex_to_token(&lexed));
         }
+
+        // panic!("{:#?}", lexems);
         lexems
     }
 }
