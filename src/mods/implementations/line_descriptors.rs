@@ -101,7 +101,6 @@ impl LineDescriptions {
             lexems.push(lex_to_token(&lexed));
         }
 
-        // panic!("{:#?}", lexems);
         lexems
     }
 }

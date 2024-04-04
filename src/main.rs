@@ -5,7 +5,6 @@ use std::{
 mod mods;
 
 use mods::{
-    // constants::constants::{DATA_TYPES, KEYWORDS, SYMBOLS},
     functions::controllers::{
         process_enum::extract_enum, process_file_contents::process_file_contents,
         process_function::extract_functions, process_state_variables::extract_global_variables,
@@ -59,6 +58,7 @@ async fn main() -> Result<(), io::Error> {
         &custom_data_types_identifiers,
         &global_variables,
         &enum_identifiers,
+        &mappings,
     );
 
     println!(
