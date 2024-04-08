@@ -689,7 +689,7 @@ pub fn validate_variable(
                 }
 
                 if let None = variable_name {
-                    print_error(&format!("Unprocessibledd entity {}", text.text))
+                    print_error(&format!("Unprocessible entity {}", text.text))
                 }
             }
         }

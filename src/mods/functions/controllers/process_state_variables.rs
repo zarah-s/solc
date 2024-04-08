@@ -40,6 +40,9 @@ pub fn extract_global_variables(
         }
 
         if sst.text.contains("}") {
+            if sst.text.contains("{") {
+                continue;
+            }
             for llm in sst.text.chars() {
                 if llm == '}' {
                     opened_braces -= 1;
@@ -60,7 +63,6 @@ pub fn extract_global_variables(
                     if !SYMBOLS.contains(&sst.text.as_str()) {
                         if !sst.text.starts_with("contract") {
                             let splited: Vec<&str> = sst.text.split(";").collect();
-
                             for spl in splited {
                                 if !spl.trim().is_empty() {
                                     variables.push(LineDescriptions {

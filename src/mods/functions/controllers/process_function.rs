@@ -1,7 +1,7 @@
 use std::process;
 
 use crate::mods::{
-    constants::constants::DATA_TYPES,
+    constants::constants::{DATA_TYPES, KEYWORDS},
     functions::{
         controllers::process_state_variables::extract_global_variables,
         helpers::helpers::{
@@ -72,7 +72,11 @@ pub fn extract_functions(
     for processed in processed_data {
         let mut combined = String::new();
         for prr in processed {
-            combined.push_str(&prr.text);
+            if KEYWORDS.contains(&prr.text.as_str()) {
+                combined.push_str(&format!("{} ", &prr.text));
+            } else {
+                combined.push_str(&prr.text);
+            }
         }
 
         stringified.push(combined.clone());
@@ -81,6 +85,7 @@ pub fn extract_functions(
 
     for single_stringified in stringified {
         let tokens = LineDescriptions::to_token(single_stringified.as_str());
+
         if let Token::OpenParenthesis = &tokens[2] {
         } else {
             print_error(&format!(
@@ -100,6 +105,23 @@ pub fn extract_functions(
                 let validated = validate_identifier_regex(_val, 0);
                 if validated {
                     _val
+                } else {
+                    process::exit(1)
+                }
+            }
+            Token::Push => {
+                let validated = validate_identifier_regex("push", 0);
+                if validated {
+                    "push"
+                } else {
+                    process::exit(1)
+                }
+            }
+
+            Token::Pop => {
+                let validated = validate_identifier_regex("pop", 0);
+                if validated {
+                    "pop"
                 } else {
                     process::exit(1)
                 }
@@ -188,15 +210,18 @@ pub fn extract_functions(
                 splited_returns_block,
                 function_definition,
                 custom_data_types,
+                enums,
             ));
         }
 
         let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+
         if let None = function_body_start_index {
             print_error(&format!("Unprocessible entity",));
         }
 
         let function_body = &tokens[function_body_start_index.unwrap()..];
+
         let arms: Vec<FunctionArm> = extract_function_arms(
             &function_body.to_vec(),
             custom_data_types,
@@ -271,7 +296,7 @@ fn extract_function_params(
                         &LineDescriptions::from_token_to_string(&splited_param[0]).as_str(),
                     )
                 {
-                    if let Token::String = splited_param[0] {
+                    if let Token::String | Token::Bytes = splited_param[0] {
                         is_primitive = false;
                     }
                     type_ = Some(format!(
@@ -396,6 +421,7 @@ fn extract_return_types(
     splited_params_block: Vec<&[Token]>,
     function_definition: &[Token],
     custom_data_types: &Vec<&str>,
+    enums: &Vec<&str>,
 ) -> Vec<ReturnType> {
     let mut function_arguments: Vec<ReturnType> = Vec::new();
 
@@ -415,7 +441,7 @@ fn extract_return_types(
             if DATA_TYPES
                 .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
             {
-                if let Token::String = splited_param[0] {
+                if let Token::String | Token::Bytes = splited_param[0] {
                     is_primitive = false;
                 }
                 type_ = Some(format!(
@@ -426,7 +452,9 @@ fn extract_return_types(
                 if custom_data_types
                     .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
                 {
-                    is_primitive = false;
+                    if !enums.contains(&detokenize(&splited_param[0]).as_str()) {
+                        is_primitive = false;
+                    }
                     type_ = Some(format!(
                         "{}",
                         LineDescriptions::from_token_to_string(&splited_param[0],)
@@ -656,14 +684,33 @@ fn extract_function_block(
                 } else {
                     if let Token::OpenParenthesis = &block[1] {
                         let mut args: Vec<String> = Vec::new();
-
-                        for arg in &block[2..block.len() - 2] {
+                        let tkns = &block[2..block.len() - 2];
+                        let mut skip = 0;
+                        for (index, arg) in tkns.iter().enumerate() {
+                            if skip > index {
+                                continue;
+                            }
                             match arg {
                                 Token::Identifier(_id) => {
                                     args.push(_id.to_string());
                                 }
                                 Token::Coma => (),
-                                _ => print_error(&format!("Invalid function call")),
+                                Token::OpenBraces => {
+                                    print_error("Named arguments not supported");
+                                }
+                                _ => {
+                                    let mut comb = String::new();
+                                    let coma_index = &tkns[index..]
+                                        .iter()
+                                        .position(|pred| pred == &&Token::Coma);
+                                    if let Some(_index) = coma_index {
+                                        for cmb in &tkns[index..index + *_index] {
+                                            comb.push_str(&detokenize(cmb))
+                                        }
+                                        skip = index + *_index;
+                                    }
+                                    args.push(comb);
+                                }
                             }
                         }
 
@@ -1633,7 +1680,7 @@ fn extract_function_scope_variable(
                 } else if stringified == "--" {
                     value = format!("{}-1", _identifier)
                 } else {
-                    print_error(&format!("Unprocessible entiry {}", stringified));
+                    print_error(&format!("Unprocessible entity {}", stringified));
                 }
                 Some(FunctionArm::VariableAssign(VariableAssign {
                     identifier: _identifier.to_string(),

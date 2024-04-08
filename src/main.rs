@@ -53,6 +53,7 @@ async fn main() -> Result<(), io::Error> {
         &custom_data_types_identifiers,
         &enum_identifiers,
     );
+
     let functions = extract_functions(
         &structured_stripped_compilable_contents,
         &custom_data_types_identifiers,
