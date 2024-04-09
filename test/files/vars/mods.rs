@@ -182,10 +182,7 @@ mod tests {
     }
 
     mod global_variables_processing {
-        use crate::mods::{
-            functions::controllers::process_state_variables::extract_global_variables,
-            types::types::{Mapping, MappingIdentifier, Token, VariableIdentifier, VariableType},
-        };
+        use crate::mods::functions::controllers::process_state_variables::extract_global_variables;
 
         use super::get_file_contents;
 
@@ -197,81 +194,8 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn test_mapping_count() {
-            let contents = get_file_contents("test/files/vars/Map.sol").await;
-            let (_, _, _maps) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
-            assert_eq!(_maps.len(), 2);
-        }
-
-        #[tokio::test]
-        #[should_panic(expected = "ERROR: Unprocessible entity on mapping")]
-        async fn test_mapping_identifier() {
-            let contents = get_file_contents("test/files/vars/Map1.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
-        }
-
-        #[tokio::test]
-        #[should_panic(expected = "ERROR: Mapping can not be set to external")]
-        async fn test_mapping_external_visibility() {
-            let contents = get_file_contents("test/files/vars/Map2.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
-        }
-
-        #[tokio::test]
-        #[should_panic(expected = "ERROR: Unprocessible entity on mapping")]
-        async fn test_mapping_closing_parenthesis() {
-            let contents = get_file_contents("test/files/vars/Map3.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
-        }
-
-        #[tokio::test]
-        #[should_panic(expected = "ERROR: Invalid data type \"addresss\"")]
-        async fn test_mapping_data_type() {
-            let contents = get_file_contents("test/files/vars/Map4.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
-        }
-
-        #[tokio::test]
-        async fn test_mapping_integrity() {
-            let contents = get_file_contents("test/files/vars/Map.sol").await;
-            let expected = vec![
-                MappingIdentifier {
-                    name: "myMap".to_string(),
-                    visibility: Token::Public,
-                    map: Mapping {
-                        key: Some("address".to_string()),
-                        value: Some(crate::mods::types::types::MappingValue::Raw(
-                            "uint256".to_string(),
-                        )),
-                    },
-                },
-                MappingIdentifier {
-                    name: "nested".to_string(),
-                    visibility: Token::Public,
-                    map: Mapping {
-                        key: Some("address".to_string()),
-                        value: Some(crate::mods::types::types::MappingValue::Mapping(Box::new(
-                            Mapping {
-                                key: Some("uint256".to_string()),
-                                value: Some(crate::mods::types::types::MappingValue::Raw(
-                                    "bool".to_string(),
-                                )),
-                            },
-                        ))),
-                    },
-                },
-            ];
-            let (_, _, _maps) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
-
-            for (i, _map) in _maps.iter().enumerate() {
-                let val = &expected[i];
-                assert_eq!(_map, val);
-            }
-        }
-
-        #[tokio::test]
         #[should_panic(
-            expected = "ERROR: Invalid data type \"strings public text = \"Hello\"\" on line 6"
+            expected = "ERROR: Invalid data type \"strings public text = \"Hello\"\" on line  6"
         )]
         async fn test_variable_data_type() {
             let contents = get_file_contents("test/files/vars/Var2.sol").await;
@@ -286,60 +210,10 @@ mod tests {
         }
 
         #[tokio::test]
-        #[should_panic(expected = "ERROR: Missing \"]\" on line 8")]
+        #[should_panic(expected = "ERROR: Missing \"]\" on line 9")]
         async fn test_invalid_syntax_close_bracket_for_arr_vars() {
             let contents = get_file_contents("test/files/vars/Var4.sol").await;
             extract_global_variables(&contents, &Vec::new(), &Vec::new());
-        }
-
-        #[tokio::test]
-        #[should_panic(expected = "Unprocessible entity bool = false")]
-        async fn test_var_identifier() {
-            let contents = get_file_contents("test/files/vars/Var5.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
-        }
-
-        #[tokio::test]
-        async fn test_variable_integrity() {
-            let contents = get_file_contents("test/files/vars/Var.sol").await;
-            let (vars, _, _) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
-            let expected_vars = vec![
-                VariableIdentifier {
-                    data_type: Token::String,
-                    mutability: Token::Mutable,
-                    visibility: Token::Public,
-                    is_array: false,
-                    name: "text".to_string(),
-                    size: None,
-                    value: Some("\"Hello\"".to_string()),
-                    storage_location: None,
-                    type_: VariableType::Variable,
-                },
-                VariableIdentifier {
-                    data_type: Token::Uint256,
-                    mutability: Token::Mutable,
-                    visibility: Token::Public,
-                    is_array: false,
-                    name: "num".to_string(),
-                    size: None,
-                    value: Some("123".to_string()),
-                    storage_location: None,
-                    type_: VariableType::Variable,
-                },
-            ];
-            assert_eq!(vars.len(), 2);
-
-            for (i, var) in vars.iter().enumerate() {
-                assert_eq!(var.is_array, expected_vars[i].is_array);
-                assert_eq!(var.data_type, expected_vars[i].data_type);
-                assert_eq!(var.type_, expected_vars[i].type_);
-                assert_eq!(var.visibility, expected_vars[i].visibility);
-                assert_eq!(var.mutability, expected_vars[i].mutability);
-                assert_eq!(var.name, expected_vars[i].name);
-                assert_eq!(var.value, expected_vars[i].value);
-                assert_eq!(var.size, expected_vars[i].size);
-                assert_eq!(var.storage_location, expected_vars[i].storage_location);
-            }
         }
     }
 

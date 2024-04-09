@@ -504,7 +504,7 @@ pub fn validate_variable(
     let mut data_type: Option<Token> = None;
     let mut is_custom_error = false;
     let mut variable_name: Option<String> = None;
-    let mut visibility = Token::Private;
+    let mut visibility = Token::Internal;
     let mut mutability = Token::Mutable;
     let mut value: Option<String> = None;
     let mut type_ = VariableType::Variable;
@@ -617,7 +617,7 @@ pub fn validate_variable(
         if !is_custom_error {
             if let None = data_type {
                 print_error(&format!(
-                    "Invalid data type \"{}\" on line  {}",
+                    "Invalid data type \"{}\" on line {}",
                     text.text, text.line
                 ));
             }
@@ -633,11 +633,11 @@ pub fn validate_variable(
                 .position(|pred| pred == &Token::CloseSquareBracket);
 
             if let None = close_bracket_index {
-                print_error(&format!("Missing \"]\" on line  {}", text.line));
+                print_error(&format!("Missing \"]\" on line {}", text.line));
             } else {
                 let slice = &tokens[2..close_bracket_index.unwrap()];
                 if slice.contains(&Token::Equals) {
-                    print_error(&format!("Missing \"]\" on line  {}", text.line));
+                    print_error(&format!("Missing \"]\" on line {}", text.line));
                 } else {
                     if close_bracket_index.unwrap() - 1 > 1 {
                         let mut expression = String::new();

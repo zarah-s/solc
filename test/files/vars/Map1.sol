@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 contract Mapping {
     // Mapping from address to uint
-    mapping(address => uint256) myMap;
+    mapping(address => uint256);
     mapping(address => mapping(uint256 => bool)) public nested;
 
     function get(address _addr) public view returns (uint256) {

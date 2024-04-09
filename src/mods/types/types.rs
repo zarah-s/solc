@@ -111,7 +111,7 @@ pub struct ReturnType {
     pub is_array: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 
 pub enum VariableType {
     Variable,
@@ -219,20 +219,19 @@ pub struct MappingAssign {
     pub type_: VariableAssignType,
 }
 
-#[derive(Debug)]
-
+#[derive(Debug, PartialEq)]
 pub enum MappingValue {
     Mapping(Box<Mapping>),
     Raw(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Mapping {
     pub key: Option<String>,
     pub value: Option<MappingValue>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct MappingIdentifier {
     pub name: String,
     pub map: Mapping,
