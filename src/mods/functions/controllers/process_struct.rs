@@ -21,7 +21,6 @@ pub fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
         let stripped = &struct_inst[3..struct_inst.len() - 1];
         let splited: Vec<&[Token]> = stripped.split(|pred| pred == &Token::SemiColon).collect();
         let mut combined_types: Vec<StructTypes> = Vec::new();
-        // println!("{:?}", splited);
         for splited_param in splited.iter().filter(|pred| !pred.is_empty()) {
             let mut type_: Option<String> = None;
             let mut name_: Option<String> = None;
@@ -29,7 +28,7 @@ pub fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
             let mut size: Option<String> = None;
             if !splited_param.is_empty() {
                 if splited_param.len() < 2 {
-                    print_error(&format!("Invalid Struct params ",))
+                    print_error(&format!("Invalid Struct variants",))
                 }
 
                 type_ = Some(format!(
@@ -82,7 +81,6 @@ pub fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
                             if splited_param.len() != 4 {
                                 print_error(&format!("Syntax error on struct"));
                             }
-                            // panic!("sdf");
                             match &splited_param[3] {
                                 Token::Identifier(_val) => name_ = Some(_val.to_owned()),
 

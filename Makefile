@@ -19,6 +19,9 @@ build:
 clean:
 	cargo clean && rm -rf ./solc
 
+test_:
+	cargo test
+
 copy:
 	cp ./target/release/solc .
 

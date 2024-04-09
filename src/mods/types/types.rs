@@ -1,4 +1,3 @@
-// #[derive(Debug, Clone)]
 #[derive(Debug, Clone, PartialEq)]
 
 pub enum Token {
@@ -199,6 +198,7 @@ pub enum VariableAssignType {
     Expression,
     Struct,
     Enum,
+    Mapping,
     Array(Option<String>),
 }
 #[derive(Debug)]
@@ -206,6 +206,15 @@ pub struct VariableAssign {
     pub identifier: String,
     pub value: String,
     pub variant: Option<String>,
+    pub operation: VariableAssignOperation,
+    pub type_: VariableAssignType,
+}
+
+#[derive(Debug)]
+pub struct MappingAssign {
+    pub identifier: String,
+    pub value: String,
+    pub variants: Vec<String>,
     pub operation: VariableAssignOperation,
     pub type_: VariableAssignType,
 }
@@ -234,7 +243,7 @@ pub struct MappingIdentifier {
 pub struct Delete {
     pub identifier: String,
     pub type_: VariableAssignType,
-    pub variant: Option<String>,
+    pub variants: Option<Vec<String>>,
     pub data_type: Token,
 }
 
@@ -286,6 +295,7 @@ pub struct Conditionals {
 pub enum FunctionArm {
     VariableIdentifier(VariableIdentifier),
     VariableAssign(VariableAssign),
+    MappingAssign(MappingAssign),
     TuppleAssignment(TuppleAssignment),
     FunctionCall(FunctionCall),
     Require(Require),
@@ -329,6 +339,5 @@ pub enum FunctionArmType {
     VariableAssign,
     Conditional,
     Require,
-    // Loop,
     None,
 }

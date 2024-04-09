@@ -1,5 +1,3 @@
-// use std::{fs, process};
-
 use tokio::{fs, io};
 
 use crate::mods::functions::helpers::helpers::print_error;
@@ -9,6 +7,7 @@ pub async fn process_file_contents(
     file_contents: &mut String,
 ) -> Result<(), io::Error> {
     /* CHECK FOR VALID ARGUMENTS */
+
     if args.len() < 2 {
         print_error("Mising file path... Run cargo run <file-path>")
     }

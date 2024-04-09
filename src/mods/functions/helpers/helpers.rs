@@ -6,10 +6,10 @@ use crate::{
 };
 use eval::eval;
 use regex::Regex;
-use std::process;
+// use std::process;
 pub fn print_error(msg: &str) {
-    eprintln!("ERROR: {}", msg);
-    process::exit(1);
+    panic!("ERROR: {}", msg);
+    // process::exit(1);
 }
 
 pub fn lex_to_token(input: &str) -> Token {
@@ -425,9 +425,7 @@ pub fn extract_custom_data_types_tokens(
         match token {
             Token::OpenBraces => {
                 opened_braces += 1;
-                // if let OpenedBraceType::Struct = opened_brace_type {
-                //     combined.push(token)
-                // }
+
                 if let Token::Struct = _type {
                     if let OpenedBraceType::Struct = opened_brace_type {
                         combined.push(token)
@@ -440,9 +438,6 @@ pub fn extract_custom_data_types_tokens(
             }
 
             Token::CloseBraces => {
-                // if let OpenedBraceType::Struct = opened_brace_type {
-                //     combined.push(token)
-                // }
                 if let Token::Struct = _type {
                     if let OpenedBraceType::Struct = opened_brace_type {
                         combined.push(token)
@@ -466,15 +461,11 @@ pub fn extract_custom_data_types_tokens(
                     opened_brace_type = OpenedBraceType::Struct;
                     combined.push(token)
                 } else {
-                    // opened_brace_type = OpenedBraceType::Enum;
-                    // combined.push(token)
                 }
             }
 
             Token::Enum => {
                 if let Token::Struct = _type {
-                    // opened_brace_type = OpenedBraceType::Struct;
-                    // combined.push(token)
                 } else {
                     opened_brace_type = OpenedBraceType::Enum;
                     combined.push(token)
@@ -698,7 +689,7 @@ pub fn validate_variable(
                 }
 
                 if let None = variable_name {
-                    print_error(&format!("Unprocessibledd entity {}", text.text))
+                    print_error(&format!("Unprocessible entity {}", text.text))
                 }
             }
         }
@@ -736,6 +727,4 @@ pub fn validate_variable(
 
         return (Some(structured), None, None);
     }
-
-    // (None, None, None)
 }
