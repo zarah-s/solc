@@ -336,15 +336,9 @@ fn evaluate_expression(expression: &String, text: LineDescriptions) -> Option<St
                     }
                     Ok(_dec) => {
                         let fractional_part = _dec.fract();
+
                         if fractional_part == 0.0 {
-                            if fractional_part < 1.0 {
-                                print_error(&format!(
-                                    "Uprocessible entity for array size \"0\". {}... ",
-                                    text.text
-                                ));
-                            } else {
-                                size = Some(_dec.trunc().to_string());
-                            }
+                            size = Some(_dec.trunc().to_string());
                         } else {
                             print_error(&format!(
                                 "Uprocessible entity for array size. {}... size cannot be fraction",

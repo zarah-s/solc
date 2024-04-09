@@ -19,7 +19,7 @@ build:
 clean:
 	cargo clean && rm -rf ./solc
 
-test_:
+t:
 	cargo test
 
 copy:
