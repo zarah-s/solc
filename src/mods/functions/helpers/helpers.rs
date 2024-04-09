@@ -6,10 +6,10 @@ use crate::{
 };
 use eval::eval;
 use regex::Regex;
-use std::process;
+// use std::process;
 pub fn print_error(msg: &str) {
-    eprintln!("ERROR: {}", msg);
-    process::exit(1);
+    panic!("ERROR: {}", msg);
+    // process::exit(1);
 }
 
 pub fn lex_to_token(input: &str) -> Token {

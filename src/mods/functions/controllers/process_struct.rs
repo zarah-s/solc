@@ -28,7 +28,7 @@ pub fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
             let mut size: Option<String> = None;
             if !splited_param.is_empty() {
                 if splited_param.len() < 2 {
-                    print_error(&format!("Invalid Struct params ",))
+                    print_error(&format!("Invalid Struct variants",))
                 }
 
                 type_ = Some(format!(
