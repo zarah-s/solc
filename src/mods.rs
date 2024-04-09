@@ -197,6 +197,23 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn test_custom_error_count() {
+            let contents = get_file_contents("test/files/vars/Error.sol").await;
+            let (_, _errs, _) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            assert_eq!(_errs.len(), 1);
+        }
+
+        #[tokio::test]
+        async fn test_custom_error_intergrity() {
+            let contents = get_file_contents("test/files/vars/Error.sol").await;
+            let (_, _errs, _) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            assert_eq!(
+                _errs[0],
+                "error InsufficientBalance(uint256 balance, uint256 withdrawAmount)"
+            );
+        }
+
+        #[tokio::test]
         async fn test_mapping_count() {
             let contents = get_file_contents("test/files/vars/Map.sol").await;
             let (_, _, _maps) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
