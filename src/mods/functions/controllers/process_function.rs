@@ -33,6 +33,10 @@ pub fn extract_functions(
     for line in data {
         let raw = &line.text;
 
+        if raw.starts_with("function") {
+            opened_braces_type = OpenedBraceType::Function;
+        }
+
         if raw.contains("{") {
             for character in raw.chars() {
                 if character == '{' {
@@ -56,10 +60,6 @@ pub fn extract_functions(
                     }
                 }
             }
-        }
-
-        if raw.starts_with("function") {
-            opened_braces_type = OpenedBraceType::Function;
         }
 
         if let OpenedBraceType::Function = opened_braces_type {
@@ -215,7 +215,6 @@ pub fn extract_functions(
         }
 
         let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
-
         if let None = function_body_start_index {
             print_error(&format!("Unprocessible entity",));
         }
@@ -312,7 +311,7 @@ fn extract_function_params(
 
                 if let Token::OpenSquareBracket = &splited_param[1] {
                     is_array = true;
-
+                    is_primitive = false;
                     let close_index = splited_param
                         .iter()
                         .position(|pred| pred == &Token::CloseSquareBracket);
@@ -377,7 +376,7 @@ fn extract_function_params(
                 ))
             }
 
-            if is_array {
+            if is_array || !is_primitive {
                 if splited_param.contains(&Token::Memory) {
                     location_ = Some(Token::Memory);
                 } else if splited_param.contains(&Token::Calldata) {
@@ -390,14 +389,9 @@ fn extract_function_params(
                 }
             }
 
-            if !is_primitive {
-                if splited_param.contains(&Token::Memory)
-                    && splited_param.contains(&Token::Calldata)
-                {
-                    print_error(&format!(
-                        "Expecting \"memory\" or \"calldata\". {} ",
-                        vec_.join(" "),
-                    ))
+            if is_primitive {
+                if location_.is_some() {
+                    print_error("Cannot declare \"memory\" or \"calldata\" to a primitive type")
                 }
             }
 
@@ -520,6 +514,12 @@ fn extract_return_types(
                         "Expecting \"memory\" or \"calldata\". {} ",
                         vec_.join(" "),
                     ))
+                }
+            }
+
+            if is_primitive {
+                if location_.is_some() {
+                    print_error("Cannot declare \"memory\" or \"calldata\" to a primitive type")
                 }
             }
 

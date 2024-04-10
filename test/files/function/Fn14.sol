@@ -6,10 +6,8 @@ contract Error {
         Start
     }
 
-    Status __status;
-
-    function testRequire(uint256 _i) public {
-        __status = Status.Start;
+    function testRequire(uint256 _i) public pure {
+        Status __status = Status.Start;
         // Require should be used to validate conditions such as:
         // - inputs
         // - conditions before execution

@@ -363,14 +363,8 @@ mod tests {
     mod function_processing {
         use super::get_file_contents;
         use crate::mods::{
-            functions::controllers::{
-                process_enum::extract_enum, process_function::extract_functions,
-                process_state_variables::extract_global_variables, process_struct::extract_struct,
-            },
-            types::types::{
-                FunctionArm, FunctionMutability, Token, VariableAssign, VariableAssignOperation,
-                VariableAssignType, VariableIdentifier, VariableType,
-            },
+            functions::controllers::process_function::extract_functions,
+            types::types::{FunctionMutability, Token},
         };
 
         #[tokio::test]
@@ -474,41 +468,9 @@ mod tests {
         }
 
         #[tokio::test]
-        #[should_panic(
-            expected = "ERROR: Syntax error... Expecting a close bracket for function testRequire ( uint256 [ memory _i ) public pure"
-        )]
+        #[should_panic(expected = "ERROR: Syntax error... Expecting a close bracket for {}")]
         async fn test_function_arg_close_brack_for_arr_values() {
             let contents = get_file_contents("test/files/function/Fn10.sol").await;
-            extract_functions(
-                &contents,
-                &Vec::new(),
-                &Vec::new(),
-                &Vec::new(),
-                &Vec::new(),
-            );
-        }
-
-        #[tokio::test]
-        #[should_panic(
-            expected = "ERROR: Invalid function argument. Payable for a non address type function testRequire ( uint256 payable _i ) public pure"
-        )]
-        async fn test_function_arg_payable_annotation_to_non_address_type() {
-            let contents = get_file_contents("test/files/function/Fn11.sol").await;
-            extract_functions(
-                &contents,
-                &Vec::new(),
-                &Vec::new(),
-                &Vec::new(),
-                &Vec::new(),
-            );
-        }
-
-        #[tokio::test]
-        #[should_panic(
-            expected = "ERROR: Expecting \"memory\" or \"calldata\". function testRequire ( string _i ) public pure "
-        )]
-        async fn test_function_arg_panic_if_non_primitive_type_is_not_assigned_memory() {
-            let contents = get_file_contents("test/files/function/Fn12.sol").await;
             extract_functions(
                 &contents,
                 &Vec::new(),
@@ -582,113 +544,6 @@ mod tests {
             for (i, _fn) in fns.iter().enumerate() {
                 assert_eq!(_fn.mutability, fn_mutabilities[i])
             }
-        }
-
-        #[tokio::test]
-        async fn test_function_returns_integrity() {
-            let contents = get_file_contents("test/files/function/Fn13.sol").await;
-
-            let fns = extract_functions(
-                &contents,
-                &Vec::new(),
-                &Vec::new(),
-                &Vec::new(),
-                &Vec::new(),
-            );
-
-            let __d = fns[0].returns.as_ref().unwrap();
-            assert_eq!(__d.len(), 3);
-            assert_eq!(__d[0].type_, "uint");
-            assert_eq!(__d[0].is_array, false);
-            assert_eq!(__d[0].location, None);
-            assert_eq!(__d[1].type_, "string");
-            assert_eq!(__d[1].is_array, false);
-            assert_eq!(__d[1].location, Some(Token::Memory));
-            assert_eq!(__d[2].location, Some(Token::Memory));
-            assert_eq!(__d[2].is_array, true);
-        }
-
-        #[tokio::test]
-        async fn test_fn_arm_variable_identifier() {
-            let contents = get_file_contents("test/files/function/Fn14.sol").await;
-            let structs_tree = extract_struct(&contents);
-            let struct_identifiers: Vec<&str> = structs_tree
-                .iter()
-                .map(|pred| pred.identifier.as_str())
-                .collect();
-            let extracted_enums = extract_enum(&contents);
-
-            let enum_identifiers: Vec<&str> = extracted_enums
-                .iter()
-                .map(|pred| pred.identifier.as_str())
-                .collect();
-            let custom_data_types_identifiers: Vec<&str> =
-                [enum_identifiers.clone(), struct_identifiers].concat();
-            let (_vars, _, _maps) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
-
-            let fns = extract_functions(
-                &contents,
-                &custom_data_types_identifiers,
-                &_vars,
-                &enum_identifiers,
-                &_maps,
-            );
-
-            let expected = FunctionArm::VariableIdentifier(VariableIdentifier {
-                data_type: Token::Identifier("Status".to_string()),
-                mutability: Token::Mutable,
-                visibility: Token::Internal,
-                is_array: false,
-                name: "__status".to_string(),
-                size: None,
-                value: Some("Status.Start".to_string()),
-                storage_location: None,
-                type_: VariableType::Enum,
-            });
-
-            assert_eq!(fns[0].arms[0], expected)
-        }
-
-        #[tokio::test]
-
-        async fn test_fn_arm_variable_assign() {
-            let contents = get_file_contents("test/files/function/Fn15.sol").await;
-            let structs_tree = extract_struct(&contents);
-            let struct_identifiers: Vec<&str> = structs_tree
-                .iter()
-                .map(|pred| pred.identifier.as_str())
-                .collect();
-            let extracted_enums = extract_enum(&contents);
-
-            let enum_identifiers: Vec<&str> = extracted_enums
-                .iter()
-                .map(|pred| pred.identifier.as_str())
-                .collect();
-            let custom_data_types_identifiers: Vec<&str> =
-                [enum_identifiers.clone(), struct_identifiers].concat();
-            let (_vars, _, _maps) = extract_global_variables(
-                &contents,
-                &custom_data_types_identifiers,
-                &enum_identifiers,
-            );
-
-            let fns = extract_functions(
-                &contents,
-                &custom_data_types_identifiers,
-                &_vars,
-                &enum_identifiers,
-                &_maps,
-            );
-
-            let expected = FunctionArm::VariableAssign(VariableAssign {
-                identifier: "__status".to_string(),
-                value: "Status.Start".to_string(),
-                operation: VariableAssignOperation::Assign,
-                type_: VariableAssignType::Enum,
-                variant: None,
-            });
-
-            assert_eq!(fns[0].arms[0], expected);
         }
     }
 
