@@ -639,7 +639,8 @@ pub fn validate_variable(
                             let detokenized = LineDescriptions::from_token_to_string(slc);
                             expression.push_str(&detokenized);
                         }
-                        size = validate_expression(&expression, text.clone());
+                        size = Some(expression);
+                        // size = validate_expression(&expression, text.clone());
                     }
                 }
             }
