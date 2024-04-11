@@ -2,7 +2,7 @@ use regex::Regex;
 
 use crate::mods::{
     functions::helpers::helpers::{
-        extract_custom_data_types_tokens, print_error, validate_identifier_regex,
+        detokenize, extract_custom_data_types_tokens, print_error, validate_identifier_regex,
     },
     types::types::{LineDescriptions, StructIdentifier, StructTypes, Token},
 };
@@ -21,7 +21,11 @@ pub fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
         let stripped = &struct_inst[3..struct_inst.len() - 1];
         let splited: Vec<&[Token]> = stripped.split(|pred| pred == &Token::SemiColon).collect();
         let mut combined_types: Vec<StructTypes> = Vec::new();
-        for splited_param in splited.iter().filter(|pred| !pred.is_empty()) {
+        let mut skip = 0;
+        for (index, splited_param) in splited.iter().filter(|pred| !pred.is_empty()).enumerate() {
+            if skip > index {
+                continue;
+            }
             let mut type_: Option<String> = None;
             let mut name_: Option<String> = None;
             let mut is_array = false;
@@ -48,10 +52,6 @@ pub fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
                         ))
                     } else {
                         if close_index.unwrap() - 1 != 1 {
-                            if splited_param.len() != 5 {
-                                print_error(&format!("Syntax error on struct"))
-                            }
-
                             match &splited_param[2] {
                                 Token::Identifier(_val) => {
                                     if let Some(_dd) = Regex::new(r"^\d+$").unwrap().find(_val) {
@@ -63,13 +63,27 @@ pub fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
                                         print_error(&format!("Invalid array size {}", _val))
                                     }
                                 }
-                                _ => print_error(&format!(
-                                    "Unprocessible entity.. Expecting a size of uint but found {}",
-                                    LineDescriptions::from_token_to_string(&splited_param[2])
-                                )),
+                                _ => {
+                                    let mut _opened_count = 1;
+                                    let mut combo = String::new();
+                                    for __spl in &splited_param[2..] {
+                                        skip = index + 1 + skip;
+                                        if let Token::OpenSquareBracket = __spl {
+                                            _opened_count += 1;
+                                        } else if let Token::CloseSquareBracket = __spl {
+                                            _opened_count -= 1;
+                                            if _opened_count == 0 {
+                                                break;
+                                            }
+                                        } else {
+                                            combo.push_str(&detokenize(__spl));
+                                        }
+                                    }
+                                    size = Some(combo);
+                                }
                             }
 
-                            match &splited_param[4] {
+                            match &splited_param[skip + 2] {
                                 Token::Identifier(_val) => name_ = Some(_val.to_owned()),
 
                                 _ => print_error(&format!(
