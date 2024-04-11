@@ -1532,7 +1532,7 @@ fn extract_function_scope_variable(
             if let Token::Dot = block[1] {
                 if let Some(_size) = &_var.size {
                     print_error(&format!(
-                        "Cannot push to a fixed size array \"{}\"",
+                        "Cannot call a method on a fixed size array \"{}\"",
                         _identifier
                     ))
                 }
