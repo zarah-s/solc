@@ -81,7 +81,6 @@ mod tests {
                 &mut lines_,
             );
             strip_comments::strip_comments(&lines_, &mut stripped_comments);
-            println!("{:?} stripped", stripped_comments);
             assert!(!stripped_comments.contains("//"));
             assert!(!stripped_comments.contains("/*"));
             assert!(!stripped_comments.contains("*/"));

@@ -1702,35 +1702,7 @@ fn extract_function_scope_variable(
             for val in &block[1..block.len() - 1] {
                 stringified.push_str(&detokenize(val));
             }
-            let mut variants: Vec<String> = Vec::new();
-            for (index, __variant) in block[1.._position].iter().enumerate() {
-                if let Token::OpenSquareBracket = __variant {
-                } else if let Token::CloseSquareBracket = __variant {
-                } else {
-                    match __variant {
-                        Token::Identifier(_id) => {
-                            if index > 2 {
-                                let backward_token = block[1.._position].get(index - 2);
-                                if let Some(__s) = backward_token {
-                                    match __s {
-                                        Token::Msg => {
-                                            variants.push(format!("msg.{}", _id.to_owned()));
-                                        }
-                                        _ => {
-                                            variants.push(_id.to_owned());
-                                        }
-                                    }
-                                } else {
-                                    variants.push(_id.to_owned());
-                                }
-                            } else {
-                                variants.push(_id.to_owned());
-                            }
-                        }
-                        _ => (),
-                    }
-                }
-            }
+            let variants = extract_mapping_variants(_position, block);
             if stringified.contains("+=") {
                 let other_val_index = stringified.find("=");
                 if let Some(_index) = other_val_index {
@@ -1777,6 +1749,23 @@ fn extract_function_scope_variable(
         } else {
             let mut stringified = String::new();
             let mut value = String::new();
+            let mut operation = VariableAssignOperation::Assign;
+            let mut _open_square_bracket = 1;
+            for (index, __brac) in block[2..].iter().enumerate() {
+                if let Token::CloseSquareBracket = __brac {
+                    let next_val = &block[2..].get(index + 1);
+                    if let Some(_next) = next_val {
+                        if let Token::OpenSquareBracket = _next {
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                _open_square_bracket += 1;
+            }
+
+            let variants = extract_mapping_variants(_open_square_bracket + 2, block);
+
             for val in &block[1..block.len() - 1] {
                 stringified.push_str(&detokenize(val));
             }
@@ -1784,13 +1773,29 @@ fn extract_function_scope_variable(
                 value = format!("{}+1", _identifier)
             } else if stringified == "--" {
                 value = format!("{}-1", _identifier)
+            } else if stringified.contains("push") || stringified.contains("pop") {
+                if stringified.contains("push") {
+                    operation = VariableAssignOperation::Push;
+                } else {
+                    operation = VariableAssignOperation::Pop;
+                }
+                let _open_bracket_index = stringified.find("(");
+                if let Some(_index) = _open_bracket_index {
+                    let _close_bracket_index = stringified.find(")");
+                    if _close_bracket_index.is_none() {
+                        print_error(&format!("Unprocessible entity {}", stringified));
+                    }
+                    let val = &stringified[_index + 1.._close_bracket_index.unwrap()];
+                    value = val.to_string();
+                }
             } else {
                 print_error(&format!("Unprocessible entity {}", stringified));
             }
-            return Some(FunctionArm::VariableAssign(VariableAssign {
+
+            return Some(FunctionArm::MappingAssign(MappingAssign {
                 identifier: _identifier.to_string(),
-                operation: VariableAssignOperation::Assign,
-                variant: None,
+                operation,
+                variants,
                 type_: VariableAssignType::Mapping,
                 value,
             }));
@@ -1798,4 +1803,27 @@ fn extract_function_scope_variable(
     } else {
         None
     }
+}
+
+fn extract_mapping_variants(_position: usize, block: &Vec<&Token>) -> Vec<String> {
+    let mut variants: Vec<String> = Vec::new();
+    let mut combo = String::new();
+    let mut opened_brackets = 0;
+    for __variant in &block[1.._position] {
+        if let Token::CloseSquareBracket = __variant {
+            opened_brackets -= 1;
+            variants.push(combo.clone());
+            combo.clear();
+        } else if let Token::OpenSquareBracket = __variant {
+            if opened_brackets > 0 {
+                combo.push_str(&detokenize(&__variant));
+            } else {
+                opened_brackets += 1;
+            }
+        } else {
+            combo.push_str(&detokenize(&__variant));
+        }
+    }
+
+    variants
 }

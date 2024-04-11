@@ -81,7 +81,6 @@ mod tests {
                 &mut lines_,
             );
             strip_comments::strip_comments(&lines_, &mut stripped_comments);
-            println!("{:?} stripped", stripped_comments);
             assert!(!stripped_comments.contains("//"));
             assert!(!stripped_comments.contains("/*"));
             assert!(!stripped_comments.contains("*/"));
@@ -368,8 +367,8 @@ mod tests {
                 process_state_variables::extract_global_variables, process_struct::extract_struct,
             },
             types::types::{
-                FunctionArm, FunctionMutability, Token, VariableAssign, VariableAssignOperation,
-                VariableAssignType, VariableIdentifier, VariableType,
+                FunctionArm, FunctionMutability, MappingAssign, Token, VariableAssign,
+                VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
             },
         };
 
@@ -650,7 +649,6 @@ mod tests {
         }
 
         #[tokio::test]
-
         async fn test_fn_arm_variable_assign() {
             let contents = get_file_contents("test/files/function/Fn15.sol").await;
             let structs_tree = extract_struct(&contents);
@@ -689,6 +687,56 @@ mod tests {
             });
 
             assert_eq!(fns[0].arms[0], expected);
+        }
+
+        #[tokio::test]
+        async fn test_fn_arm_mapping_assign() {
+            let contents = get_file_contents("test/files/function/Fn16.sol").await;
+            let structs_tree = extract_struct(&contents);
+            let struct_identifiers: Vec<&str> = structs_tree
+                .iter()
+                .map(|pred| pred.identifier.as_str())
+                .collect();
+            let extracted_enums = extract_enum(&contents);
+
+            let enum_identifiers: Vec<&str> = extracted_enums
+                .iter()
+                .map(|pred| pred.identifier.as_str())
+                .collect();
+            let custom_data_types_identifiers: Vec<&str> =
+                [enum_identifiers.clone(), struct_identifiers].concat();
+            let (_vars, _, _maps) = extract_global_variables(
+                &contents,
+                &custom_data_types_identifiers,
+                &enum_identifiers,
+            );
+
+            let fns = extract_functions(
+                &contents,
+                &custom_data_types_identifiers,
+                &_vars,
+                &enum_identifiers,
+                &_maps,
+            );
+
+            let expected = FunctionArm::MappingAssign(MappingAssign {
+                identifier: "name".to_string(),
+                value: "2".to_string(),
+                operation: VariableAssignOperation::Assign,
+                type_: VariableAssignType::Mapping,
+                variants: vec!["msg.sender".to_string()],
+            });
+
+            let expected_second = FunctionArm::MappingAssign(MappingAssign {
+                identifier: "names".to_string(),
+                value: "3".to_string(),
+                operation: VariableAssignOperation::Push,
+                type_: VariableAssignType::Mapping,
+                variants: vec!["msg.sender".to_string()],
+            });
+
+            assert_eq!(fns[0].arms[0], expected);
+            assert_eq!(fns[0].arms[1], expected_second);
         }
     }
 
