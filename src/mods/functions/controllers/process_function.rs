@@ -1541,6 +1541,12 @@ fn extract_function_scope_variable(
                     value.push_str(&detokenize(val))
                 }
 
+                if let Token::Pop = block[2] {
+                    if !value.trim().is_empty() {
+                        print_error(&format!("Pop method cannot be assigned value"));
+                    }
+                }
+
                 return Some(FunctionArm::VariableAssign(VariableAssign {
                     identifier: _identifier.to_string(),
                     operation: if let Token::Push = block[2] {
@@ -1682,6 +1688,7 @@ fn extract_function_scope_variable(
                 } else {
                     print_error(&format!("Unprocessible entity {}", stringified));
                 }
+
                 Some(FunctionArm::VariableAssign(VariableAssign {
                     identifier: _identifier.to_string(),
                     operation: VariableAssignOperation::Assign,
@@ -1786,6 +1793,11 @@ fn extract_function_scope_variable(
                         print_error(&format!("Unprocessible entity {}", stringified));
                     }
                     let val = &stringified[_index + 1.._close_bracket_index.unwrap()];
+                    if let VariableAssignOperation::Pop = operation {
+                        if !val.trim().is_empty() {
+                            print_error(&format!("Pop method cannot be assigned value"));
+                        }
+                    }
                     value = val.to_string();
                 }
             } else {
