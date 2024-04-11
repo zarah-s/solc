@@ -526,10 +526,18 @@ pub fn validate_variable(
                                 mapping.insert(Some(detokenize(&tokens[n + 5])), None);
                                 pad = n + 5;
                             } else {
-                                mapping.insert(
-                                    None,
-                                    Some(MappingValue::Raw(detokenize(_accross_to_value))),
-                                )
+                                let _end = &tokens[pad..]
+                                    .iter()
+                                    .position(|pred| pred == &Token::CloseParenthesis);
+                                if _end.is_none() {
+                                    print_error("Unprocessible entity");
+                                }
+
+                                let mut combo = String::new();
+                                for _token in &tokens[pad..pad + _end.unwrap()] {
+                                    combo.push_str(&detokenize(_token))
+                                }
+                                mapping.insert(None, Some(MappingValue::Raw(combo)))
                             }
                         }
                     }
