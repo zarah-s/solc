@@ -530,7 +530,7 @@ pub fn validate_variable(
                                     .iter()
                                     .position(|pred| pred == &Token::CloseParenthesis);
                                 if _end.is_none() {
-                                    print_error("Unprocessible entity");
+                                    print_error("Unprocessible entity on mapping");
                                 }
 
                                 let mut combo = String::new();
