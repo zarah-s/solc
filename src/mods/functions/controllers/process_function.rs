@@ -759,7 +759,7 @@ fn extract_function_block(
                                     full_block.push(function_scope_variable.unwrap())
                                 }
                             } else {
-                                print_error(&format!("Unidentified variable {}", _identifier))
+                                print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                             }
                         } else {
                             let global_variables_identifiers: Vec<&String> =
@@ -782,7 +782,10 @@ fn extract_function_block(
                                         full_block.push(function_scope_variable.unwrap());
                                     }
                                 } else {
-                                    print_error(&format!("Unidentified variable {}", _identifier))
+                                    print_error(&format!(
+                                        "Unidentifined variable \"{}\"",
+                                        _identifier
+                                    ))
                                 }
                             } else if global_mappings.contains(_identifier) {
                                 let var = mappings
@@ -800,7 +803,7 @@ fn extract_function_block(
                                     }
                                 }
                             } else {
-                                print_error(&format!("Unidentified variable {}", _identifier))
+                                print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                             }
                         }
                     }
@@ -1112,7 +1115,7 @@ fn extract_function_block(
                                 }))
                             }
                         } else {
-                            print_error(&format!("Unidentified variable {}", _identifier))
+                            print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                         }
                     } else {
                         let global_variables_identifiers: Vec<&String> =
@@ -1187,7 +1190,7 @@ fn extract_function_block(
                                     }))
                                 }
                             } else {
-                                print_error(&format!("Unidentified variable {}", _identifier))
+                                print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                             }
                         } else if global_mappings.contains(_identifier) {
                             let mut variants: Vec<String> = Vec::new();
@@ -1231,7 +1234,7 @@ fn extract_function_block(
                                 data_type: Token::Identifier("mapping".to_owned()),
                             }));
                         } else {
-                            print_error(&format!("Unidentified variable {}", _identifier))
+                            print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                         }
                     }
                 }
@@ -1781,6 +1784,30 @@ fn extract_function_scope_variable(
             } else if stringified == "--" {
                 value = format!("{}-1", _identifier)
             } else if stringified.contains("push") || stringified.contains("pop") {
+                let map = mappings.iter().find(|pred| &pred.name == _identifier);
+                if let Some(_ret) = map {
+                    let map_return = _ret.map.get_return_type();
+
+                    if let Some(_return) = map_return {
+                        if _return.contains("[") {
+                            let _open_bracket_index = _return.find("[");
+                            let _close_bracket_index = _return.find("]");
+                            if let Some(_close) = _close_bracket_index {
+                                if _close - _open_bracket_index.unwrap() > 0 {
+                                    print_error(&format!(
+                                        "Cannot call a method on a fixed size array \"{_identifier}\""
+                                    ))
+                                }
+                            } else {
+                                print_error("Unprocessible entity");
+                            }
+                        }
+                    } else {
+                        print_error("Unprocessible entity");
+                    }
+                } else {
+                    print_error(&format!("Undefined variable \"{_identifier}\""));
+                }
                 if stringified.contains("push") {
                     operation = VariableAssignOperation::Push;
                 } else {
