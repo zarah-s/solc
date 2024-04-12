@@ -11,6 +11,16 @@ impl Mapping {
         }
     }
 
+    pub fn get_return_type(&self) -> Option<&String> {
+        if let Some(ref _val) = self.value {
+            match _val {
+                MappingValue::Mapping(_map) => _map.get_return_type(),
+                MappingValue::Raw(_return) => return Some(_return),
+            };
+        }
+        None
+    }
+
     pub fn insert(&mut self, key: Option<String>, value: Option<MappingValue>) {
         if self.key.is_none() {
             if let Some(_key) = &key {

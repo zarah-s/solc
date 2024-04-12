@@ -33,6 +33,10 @@ pub fn extract_functions(
     for line in data {
         let raw = &line.text;
 
+        if raw.starts_with("function") {
+            opened_braces_type = OpenedBraceType::Function;
+        }
+
         if raw.contains("{") {
             for character in raw.chars() {
                 if character == '{' {
@@ -56,10 +60,6 @@ pub fn extract_functions(
                     }
                 }
             }
-        }
-
-        if raw.starts_with("function") {
-            opened_braces_type = OpenedBraceType::Function;
         }
 
         if let OpenedBraceType::Function = opened_braces_type {
@@ -215,7 +215,6 @@ pub fn extract_functions(
         }
 
         let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
-
         if let None = function_body_start_index {
             print_error(&format!("Unprocessible entity",));
         }
@@ -312,7 +311,7 @@ fn extract_function_params(
 
                 if let Token::OpenSquareBracket = &splited_param[1] {
                     is_array = true;
-
+                    is_primitive = false;
                     let close_index = splited_param
                         .iter()
                         .position(|pred| pred == &Token::CloseSquareBracket);
@@ -377,7 +376,7 @@ fn extract_function_params(
                 ))
             }
 
-            if is_array {
+            if is_array || !is_primitive {
                 if splited_param.contains(&Token::Memory) {
                     location_ = Some(Token::Memory);
                 } else if splited_param.contains(&Token::Calldata) {
@@ -390,14 +389,9 @@ fn extract_function_params(
                 }
             }
 
-            if !is_primitive {
-                if splited_param.contains(&Token::Memory)
-                    && splited_param.contains(&Token::Calldata)
-                {
-                    print_error(&format!(
-                        "Expecting \"memory\" or \"calldata\". {} ",
-                        vec_.join(" "),
-                    ))
+            if is_primitive {
+                if location_.is_some() {
+                    print_error("Cannot declare \"memory\" or \"calldata\" to a primitive type")
                 }
             }
 
@@ -520,6 +514,12 @@ fn extract_return_types(
                         "Expecting \"memory\" or \"calldata\". {} ",
                         vec_.join(" "),
                     ))
+                }
+            }
+
+            if is_primitive {
+                if location_.is_some() {
+                    print_error("Cannot declare \"memory\" or \"calldata\" to a primitive type")
                 }
             }
 
@@ -759,7 +759,7 @@ fn extract_function_block(
                                     full_block.push(function_scope_variable.unwrap())
                                 }
                             } else {
-                                print_error(&format!("Unidentified variable {}", _identifier))
+                                print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                             }
                         } else {
                             let global_variables_identifiers: Vec<&String> =
@@ -782,7 +782,10 @@ fn extract_function_block(
                                         full_block.push(function_scope_variable.unwrap());
                                     }
                                 } else {
-                                    print_error(&format!("Unidentified variable {}", _identifier))
+                                    print_error(&format!(
+                                        "Unidentifined variable \"{}\"",
+                                        _identifier
+                                    ))
                                 }
                             } else if global_mappings.contains(_identifier) {
                                 let var = mappings
@@ -800,7 +803,7 @@ fn extract_function_block(
                                     }
                                 }
                             } else {
-                                print_error(&format!("Unidentified variable {}", _identifier))
+                                print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                             }
                         }
                     }
@@ -1112,7 +1115,7 @@ fn extract_function_block(
                                 }))
                             }
                         } else {
-                            print_error(&format!("Unidentified variable {}", _identifier))
+                            print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                         }
                     } else {
                         let global_variables_identifiers: Vec<&String> =
@@ -1187,7 +1190,7 @@ fn extract_function_block(
                                     }))
                                 }
                             } else {
-                                print_error(&format!("Unidentified variable {}", _identifier))
+                                print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                             }
                         } else if global_mappings.contains(_identifier) {
                             let mut variants: Vec<String> = Vec::new();
@@ -1231,7 +1234,7 @@ fn extract_function_block(
                                 data_type: Token::Identifier("mapping".to_owned()),
                             }));
                         } else {
-                            print_error(&format!("Unidentified variable {}", _identifier))
+                            print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                         }
                     }
                 }
@@ -1532,13 +1535,19 @@ fn extract_function_scope_variable(
             if let Token::Dot = block[1] {
                 if let Some(_size) = &_var.size {
                     print_error(&format!(
-                        "Cannot push to a fixed size array \"{}\"",
+                        "Cannot call a method on a fixed size array \"{}\"",
                         _identifier
                     ))
                 }
                 let mut value = String::new();
                 for val in &block[4..block.len() - 2] {
                     value.push_str(&detokenize(val))
+                }
+
+                if let Token::Pop = block[2] {
+                    if !value.trim().is_empty() {
+                        print_error(&format!("Pop method cannot be assigned value"));
+                    }
                 }
 
                 return Some(FunctionArm::VariableAssign(VariableAssign {
@@ -1682,6 +1691,7 @@ fn extract_function_scope_variable(
                 } else {
                     print_error(&format!("Unprocessible entity {}", stringified));
                 }
+
                 Some(FunctionArm::VariableAssign(VariableAssign {
                     identifier: _identifier.to_string(),
                     operation: VariableAssignOperation::Assign,
@@ -1702,35 +1712,7 @@ fn extract_function_scope_variable(
             for val in &block[1..block.len() - 1] {
                 stringified.push_str(&detokenize(val));
             }
-            let mut variants: Vec<String> = Vec::new();
-            for (index, __variant) in block[1.._position].iter().enumerate() {
-                if let Token::OpenSquareBracket = __variant {
-                } else if let Token::CloseSquareBracket = __variant {
-                } else {
-                    match __variant {
-                        Token::Identifier(_id) => {
-                            if index > 2 {
-                                let backward_token = block[1.._position].get(index - 2);
-                                if let Some(__s) = backward_token {
-                                    match __s {
-                                        Token::Msg => {
-                                            variants.push(format!("msg.{}", _id.to_owned()));
-                                        }
-                                        _ => {
-                                            variants.push(_id.to_owned());
-                                        }
-                                    }
-                                } else {
-                                    variants.push(_id.to_owned());
-                                }
-                            } else {
-                                variants.push(_id.to_owned());
-                            }
-                        }
-                        _ => (),
-                    }
-                }
-            }
+            let variants = extract_mapping_variants(_position, block);
             if stringified.contains("+=") {
                 let other_val_index = stringified.find("=");
                 if let Some(_index) = other_val_index {
@@ -1777,6 +1759,23 @@ fn extract_function_scope_variable(
         } else {
             let mut stringified = String::new();
             let mut value = String::new();
+            let mut operation = VariableAssignOperation::Assign;
+            let mut _open_square_bracket = 1;
+            for (index, __brac) in block[2..].iter().enumerate() {
+                if let Token::CloseSquareBracket = __brac {
+                    let next_val = &block[2..].get(index + 1);
+                    if let Some(_next) = next_val {
+                        if let Token::OpenSquareBracket = _next {
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                _open_square_bracket += 1;
+            }
+
+            let variants = extract_mapping_variants(_open_square_bracket + 2, block);
+
             for val in &block[1..block.len() - 1] {
                 stringified.push_str(&detokenize(val));
             }
@@ -1784,13 +1783,58 @@ fn extract_function_scope_variable(
                 value = format!("{}+1", _identifier)
             } else if stringified == "--" {
                 value = format!("{}-1", _identifier)
+            } else if stringified.contains("push") || stringified.contains("pop") {
+                let map = mappings.iter().find(|pred| &pred.name == _identifier);
+                if let Some(_ret) = map {
+                    let map_return = _ret.map.get_return_type();
+
+                    if let Some(_return) = map_return {
+                        if _return.contains("[") {
+                            let _open_bracket_index = _return.find("[");
+                            let _close_bracket_index = _return.find("]");
+                            if let Some(_close) = _close_bracket_index {
+                                if _close - _open_bracket_index.unwrap() > 1 {
+                                    print_error(&format!(
+                                        "Cannot call a method on a fixed size array \"{_identifier}\""
+                                    ))
+                                }
+                            } else {
+                                print_error("Unprocessible entity");
+                            }
+                        }
+                    } else {
+                        print_error("Unprocessible entity");
+                    }
+                } else {
+                    print_error(&format!("Undefined variable \"{_identifier}\""));
+                }
+                if stringified.contains("push") {
+                    operation = VariableAssignOperation::Push;
+                } else {
+                    operation = VariableAssignOperation::Pop;
+                }
+                let _open_bracket_index = stringified.find("(");
+                if let Some(_index) = _open_bracket_index {
+                    let _close_bracket_index = stringified.find(")");
+                    if _close_bracket_index.is_none() {
+                        print_error(&format!("Unprocessible entity {}", stringified));
+                    }
+                    let val = &stringified[_index + 1.._close_bracket_index.unwrap()];
+                    if let VariableAssignOperation::Pop = operation {
+                        if !val.trim().is_empty() {
+                            print_error(&format!("Pop method cannot be assigned value"));
+                        }
+                    }
+                    value = val.to_string();
+                }
             } else {
                 print_error(&format!("Unprocessible entity {}", stringified));
             }
-            return Some(FunctionArm::VariableAssign(VariableAssign {
+
+            return Some(FunctionArm::MappingAssign(MappingAssign {
                 identifier: _identifier.to_string(),
-                operation: VariableAssignOperation::Assign,
-                variant: None,
+                operation,
+                variants,
                 type_: VariableAssignType::Mapping,
                 value,
             }));
@@ -1798,4 +1842,27 @@ fn extract_function_scope_variable(
     } else {
         None
     }
+}
+
+fn extract_mapping_variants(_position: usize, block: &Vec<&Token>) -> Vec<String> {
+    let mut variants: Vec<String> = Vec::new();
+    let mut combo = String::new();
+    let mut opened_brackets = 0;
+    for __variant in &block[1.._position] {
+        if let Token::CloseSquareBracket = __variant {
+            opened_brackets -= 1;
+            variants.push(combo.clone());
+            combo.clear();
+        } else if let Token::OpenSquareBracket = __variant {
+            if opened_brackets > 0 {
+                combo.push_str(&detokenize(&__variant));
+            } else {
+                opened_brackets += 1;
+            }
+        } else {
+            combo.push_str(&detokenize(&__variant));
+        }
+    }
+
+    variants
 }

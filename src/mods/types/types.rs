@@ -131,19 +131,19 @@ pub struct EnumIdentifier {
     pub variants: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum RevertType {
     Default,
     Custom,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Revert {
     pub r#type: RevertType,
     pub msg: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 
 pub struct VariableIdentifier {
     pub data_type: Token,
@@ -173,7 +173,7 @@ pub struct LineDescriptions {
     pub line: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum FunctionMutability {
     View,
     Pure,
@@ -193,7 +193,7 @@ pub struct FunctionIdentifier {
     pub arms: Vec<FunctionArm>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum VariableAssignType {
     Expression,
     Struct,
@@ -201,7 +201,7 @@ pub enum VariableAssignType {
     Mapping,
     Array(Option<String>),
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct VariableAssign {
     pub identifier: String,
     pub value: String,
@@ -210,7 +210,7 @@ pub struct VariableAssign {
     pub type_: VariableAssignType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct MappingAssign {
     pub identifier: String,
     pub value: String,
@@ -238,7 +238,7 @@ pub struct MappingIdentifier {
     pub visibility: Token,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Delete {
     pub identifier: String,
     pub type_: VariableAssignType,
@@ -246,30 +246,30 @@ pub struct Delete {
     pub data_type: Token,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum VariableAssignOperation {
     Push,
     Pop,
     Assign,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Return {
     pub value: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct FunctionCall {
     pub identifier: String,
     pub arguments: Vec<String>,
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Require {
     pub condition: String,
     pub message: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ConditionalType {
     If,
     ElIf,
@@ -277,12 +277,12 @@ pub enum ConditionalType {
     None,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ElIf {
     pub condition: Vec<Token>,
     pub arm: Vec<FunctionArm>,
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Conditionals {
     pub condition: Vec<Token>,
     pub arm: Vec<FunctionArm>,
@@ -290,7 +290,7 @@ pub struct Conditionals {
     pub el: Option<Vec<FunctionArm>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum FunctionArm {
     VariableIdentifier(VariableIdentifier),
     VariableAssign(VariableAssign),
@@ -306,18 +306,18 @@ pub enum FunctionArm {
     Loop(Loop),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Assert {
     pub assert: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TuppleAssignment {
     pub variables: Vec<VariableIdentifier>,
     pub value: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Loop {
     pub identifier: Option<String>,
     pub value: Option<String>,
@@ -327,7 +327,7 @@ pub struct Loop {
     pub r#type: LoopType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum LoopType {
     For,
     While,
