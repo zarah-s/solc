@@ -1,19 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-contract Error {
-    mapping(address => uint) name;
-    mapping(address => uint[]) names;
-    mapping(address => uint[2]) _dd;
+contract Variables {
+    mapping(address => uint[]) name;
+    mapping(address => mapping(address => Todo[])) todos;
+    uint[] arr;
+    struct Todo {
+        string[] text;
+        bool completed;
+    }
 
-    function testRequire(uint256 _i) public {
-        name[msg.sender] = 2;
-        names[msg.sender].pop();
-        _dd[address(0)][0] = 1;
-        // Require should be used to validate conditions such as:
-        // - inputs
-        // - conditions before execution
-        // - return values from calls to other functions
-        require(_i > 10, "Input must be greater than 10");
+    struct Todos {
+        string[(10 * 5)] text;
+        bool completed;
+    }
+
+    function test() external {
+        name[msg.sender].pop();
+        name[address(0)][0] = 5;
+        arr[0] = 10;
     }
 }

@@ -33,10 +33,11 @@ pub mod implementations {
 mod tests {
     use super::{
         functions::controllers::{
-            process_file_contents, strip_comments,
-            structure_to_line_descriptors::{self},
+            process_enum::extract_enum, process_file_contents, process_function::extract_functions,
+            process_state_variables::extract_global_variables, process_struct::extract_struct,
+            strip_comments, structure_to_line_descriptors,
         },
-        types::types::LineDescriptions,
+        types::types::{FunctionIdentifier, LineDescriptions},
     };
 
     mod file_processing {
@@ -155,6 +156,29 @@ mod tests {
         #[should_panic(expected = "ERROR: Missing struct identifier!!")]
         async fn test_struct_identifier() {
             let contents = get_file_contents("test/files/struct/Struct2.sol").await;
+            extract_struct(&contents);
+        }
+
+        #[tokio::test]
+        async fn test_struct_with_dynamic_arr() {
+            let contents = get_file_contents("test/files/struct/Struct4.sol").await;
+            let strs = extract_struct(&contents);
+            assert_eq!(strs[0].types[0].is_array, true);
+            assert_eq!(strs[0].types[0].size, None);
+        }
+
+        #[tokio::test]
+        async fn test_struct_with_fixed_arr() {
+            let contents = get_file_contents("test/files/struct/Struct4.sol").await;
+            let strs = extract_struct(&contents);
+            assert_eq!(strs[1].types[0].is_array, true);
+            assert_eq!(strs[1].types[0].size, Some("(10*5)/num".to_string()));
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Invalid array size 0")]
+        async fn test_struct_with_fixed_arr_panic_if_size_is_zero() {
+            let contents = get_file_contents("test/files/struct/Struct6.sol").await;
             extract_struct(&contents);
         }
 
@@ -302,6 +326,22 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn test_variable_dynamic_arr() {
+            let contents = get_file_contents("test/files/vars/Var6.sol").await;
+            let (_vars, _, _) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            assert_eq!(_vars[0].is_array, true);
+            assert_eq!(_vars[0].size, None);
+        }
+
+        #[tokio::test]
+        async fn test_variable_fixed_arr() {
+            let contents = get_file_contents("test/files/vars/Var6.sol").await;
+            let (_vars, _, _) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            assert_eq!(_vars[1].is_array, true);
+            assert_eq!(_vars[1].size, Some("10*10".to_string()));
+        }
+
+        #[tokio::test]
         #[should_panic(expected = "ERROR: Missing \"]\" on line 8")]
         async fn test_invalid_syntax_close_bracket_for_arr_vars() {
             let contents = get_file_contents("test/files/vars/Var4.sol").await;
@@ -360,12 +400,9 @@ mod tests {
     }
 
     mod function_processing {
-        use super::get_file_contents;
+        use super::{get_file_contents, get_fns};
         use crate::mods::{
-            functions::controllers::{
-                process_enum::extract_enum, process_function::extract_functions,
-                process_state_variables::extract_global_variables, process_struct::extract_struct,
-            },
+            functions::controllers::process_function::extract_functions,
             types::types::{
                 FunctionArm, FunctionMutability, MappingAssign, Token, VariableAssign,
                 VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
@@ -609,29 +646,7 @@ mod tests {
 
         #[tokio::test]
         async fn test_fn_arm_variable_identifier() {
-            let contents = get_file_contents("test/files/function/Fn14.sol").await;
-            let structs_tree = extract_struct(&contents);
-            let struct_identifiers: Vec<&str> = structs_tree
-                .iter()
-                .map(|pred| pred.identifier.as_str())
-                .collect();
-            let extracted_enums = extract_enum(&contents);
-
-            let enum_identifiers: Vec<&str> = extracted_enums
-                .iter()
-                .map(|pred| pred.identifier.as_str())
-                .collect();
-            let custom_data_types_identifiers: Vec<&str> =
-                [enum_identifiers.clone(), struct_identifiers].concat();
-            let (_vars, _, _maps) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
-
-            let fns = extract_functions(
-                &contents,
-                &custom_data_types_identifiers,
-                &_vars,
-                &enum_identifiers,
-                &_maps,
-            );
+            let fns = get_fns("test/files/function/Fn14.sol").await;
 
             let expected = FunctionArm::VariableIdentifier(VariableIdentifier {
                 data_type: Token::Identifier("Status".to_string()),
@@ -650,34 +665,7 @@ mod tests {
 
         #[tokio::test]
         async fn test_fn_arm_variable_assign() {
-            let contents = get_file_contents("test/files/function/Fn15.sol").await;
-            let structs_tree = extract_struct(&contents);
-            let struct_identifiers: Vec<&str> = structs_tree
-                .iter()
-                .map(|pred| pred.identifier.as_str())
-                .collect();
-            let extracted_enums = extract_enum(&contents);
-
-            let enum_identifiers: Vec<&str> = extracted_enums
-                .iter()
-                .map(|pred| pred.identifier.as_str())
-                .collect();
-            let custom_data_types_identifiers: Vec<&str> =
-                [enum_identifiers.clone(), struct_identifiers].concat();
-            let (_vars, _, _maps) = extract_global_variables(
-                &contents,
-                &custom_data_types_identifiers,
-                &enum_identifiers,
-            );
-
-            let fns = extract_functions(
-                &contents,
-                &custom_data_types_identifiers,
-                &_vars,
-                &enum_identifiers,
-                &_maps,
-            );
-
+            let fns = get_fns("test/files/function/Fn15.sol").await;
             let expected = FunctionArm::VariableAssign(VariableAssign {
                 identifier: "__status".to_string(),
                 value: "Status.Start".to_string(),
@@ -690,35 +678,48 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn test_fn_arm_variable_push() {
+            let fns = get_fns("test/files/function/Fn16.sol").await;
+            let expected = FunctionArm::VariableAssign(VariableAssign {
+                identifier: "__arr".to_string(),
+                value: "2".to_string(),
+                operation: VariableAssignOperation::Push,
+                type_: VariableAssignType::Array(None),
+                variant: None,
+            });
+
+            assert_eq!(fns[0].arms[4], expected);
+        }
+
+        #[tokio::test]
+        async fn test_fn_arm_variable_pop() {
+            let fns = get_fns("test/files/function/Fn16.sol").await;
+            let expected = FunctionArm::VariableAssign(VariableAssign {
+                identifier: "__arr".to_string(),
+                value: "".to_string(),
+                operation: VariableAssignOperation::Pop,
+                type_: VariableAssignType::Array(None),
+                variant: None,
+            });
+
+            assert_eq!(fns[0].arms[5], expected);
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Pop method cannot be assigned value")]
+        async fn test_fn_arm_panic_variable_pop_if_val_is_passed() {
+            get_fns("test/files/function/Fn18.sol").await;
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Cannot call a method on a fixed size array \"__arr\"")]
+        async fn test_fn_arm_panic_variable_if_method_is_called_on_fixed_array_var() {
+            get_fns("test/files/function/Fn19.sol").await;
+        }
+
+        #[tokio::test]
         async fn test_fn_arm_mapping_assign() {
-            let contents = get_file_contents("test/files/function/Fn16.sol").await;
-            let structs_tree = extract_struct(&contents);
-            let struct_identifiers: Vec<&str> = structs_tree
-                .iter()
-                .map(|pred| pred.identifier.as_str())
-                .collect();
-            let extracted_enums = extract_enum(&contents);
-
-            let enum_identifiers: Vec<&str> = extracted_enums
-                .iter()
-                .map(|pred| pred.identifier.as_str())
-                .collect();
-            let custom_data_types_identifiers: Vec<&str> =
-                [enum_identifiers.clone(), struct_identifiers].concat();
-            let (_vars, _, _maps) = extract_global_variables(
-                &contents,
-                &custom_data_types_identifiers,
-                &enum_identifiers,
-            );
-
-            let fns = extract_functions(
-                &contents,
-                &custom_data_types_identifiers,
-                &_vars,
-                &enum_identifiers,
-                &_maps,
-            );
-
+            let fns = get_fns("test/files/function/Fn16.sol").await;
             let expected = FunctionArm::MappingAssign(MappingAssign {
                 identifier: "name".to_string(),
                 value: "2".to_string(),
@@ -727,7 +728,14 @@ mod tests {
                 variants: vec!["msg.sender".to_string()],
             });
 
-            let expected_second = FunctionArm::MappingAssign(MappingAssign {
+            assert_eq!(fns[0].arms[0], expected);
+        }
+
+        #[tokio::test]
+        async fn test_fn_arm_mapping_push() {
+            let fns = get_fns("test/files/function/Fn16.sol").await;
+
+            let expected = FunctionArm::MappingAssign(MappingAssign {
                 identifier: "names".to_string(),
                 value: "3".to_string(),
                 operation: VariableAssignOperation::Push,
@@ -735,12 +743,85 @@ mod tests {
                 variants: vec!["msg.sender".to_string()],
             });
 
-            assert_eq!(fns[0].arms[0], expected);
-            assert_eq!(fns[0].arms[1], expected_second);
+            assert_eq!(fns[0].arms[1], expected);
+        }
+
+        #[tokio::test]
+        async fn test_fn_arm_mapping_pop() {
+            let fns = get_fns("test/files/function/Fn16.sol").await;
+
+            let expected = FunctionArm::MappingAssign(MappingAssign {
+                identifier: "names".to_string(),
+                value: "".to_string(),
+                operation: VariableAssignOperation::Pop,
+                type_: VariableAssignType::Mapping,
+                variants: vec!["msg.sender".to_string()],
+            });
+
+            assert_eq!(fns[0].arms[2], expected);
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Pop method cannot be assigned value")]
+        async fn test_fn_arm_panic_mapping_pop_if_val_is_passed() {
+            get_fns("test/files/function/Fn17.sol").await;
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Cannot call a method on a fixed size array \"names\"")]
+        async fn test_fn_arm_panic_mapping_if_method_is_called_on_fixed_array_var() {
+            get_fns("test/files/function/Fn20.sol").await;
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Invalid data type \"addressd\"")]
+        async fn test_fn_arm_panic_mapping_invalid_key_type() {
+            get_fns("test/files/function/Fn21.sol").await;
+        }
+
+        #[tokio::test]
+        async fn test_fn_arm_mapping_variants_integrity() {
+            let expected = vec!["address(0)", "0"];
+            let fns = get_fns("test/files/function/Fn16.sol").await;
+            match fns[0].arms[3] {
+                FunctionArm::MappingAssign(ref _d) => {
+                    assert_eq!(_d.variants, expected)
+                }
+                _ => (),
+            }
+            // assert_eq!(fns[0], expected);
         }
     }
 
     //******************************** HELPER FUNCTIONS***************** */
+    async fn get_fns(path: &str) -> Vec<FunctionIdentifier> {
+        let contents = get_file_contents(path).await;
+        let structs_tree = extract_struct(&contents);
+        let struct_identifiers: Vec<&str> = structs_tree
+            .iter()
+            .map(|pred| pred.identifier.as_str())
+            .collect();
+        let extracted_enums = extract_enum(&contents);
+
+        let enum_identifiers: Vec<&str> = extracted_enums
+            .iter()
+            .map(|pred| pred.identifier.as_str())
+            .collect();
+        let custom_data_types_identifiers: Vec<&str> =
+            [enum_identifiers.clone(), struct_identifiers].concat();
+        let (_vars, _, _maps) =
+            extract_global_variables(&contents, &custom_data_types_identifiers, &enum_identifiers);
+
+        let fns = extract_functions(
+            &contents,
+            &custom_data_types_identifiers,
+            &_vars,
+            &enum_identifiers,
+            &_maps,
+        );
+        fns
+    }
+
     async fn get_file_contents(path: &str) -> Vec<LineDescriptions> {
         let mut file_contents = String::new();
         let _ = process_file_contents::process_file_contents(
