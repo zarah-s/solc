@@ -1793,7 +1793,7 @@ fn extract_function_scope_variable(
                             let _open_bracket_index = _return.find("[");
                             let _close_bracket_index = _return.find("]");
                             if let Some(_close) = _close_bracket_index {
-                                if _close - _open_bracket_index.unwrap() > 0 {
+                                if _close - _open_bracket_index.unwrap() > 1 {
                                     print_error(&format!(
                                         "Cannot call a method on a fixed size array \"{_identifier}\""
                                     ))
