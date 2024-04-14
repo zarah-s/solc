@@ -4,6 +4,14 @@ pragma solidity ^0.8.24;
 contract Mapping {
     // Mapping from address to uint
     mapping(address => uint256) public myMap;
+    address immutable owner;
+    string message;
+
+    constructor(string memory blah) {
+        owner = msg.sender;
+        message = blah;
+        get(msg.sender);
+    }
 
     function get(address _addr) public view returns (uint256) {
         // Mapping always returns a value.
@@ -20,25 +28,8 @@ contract Mapping {
         // Reset the value to the default value.
         delete myMap[_addr];
     }
-}
 
-contract NestedMapping {
-    // Nested mapping (mapping from address to another mapping)
-    mapping(address => mapping(uint256 => bool)) public nested;
-    mapping(address => uint[]) test;
-
-    function get(address _addr1, uint256 _i) public view returns (bool) {
-        // You can get values from a nested mapping
-        // even when it is not initialized
-        return nested[_addr1][_i];
-    }
-
-    function set(address _addr1, uint256 _i, bool _boo) public {
-        // test = ;
-        nested[_addr1][_i] = _boo;
-    }
-
-    function remove(address _addr1, uint256 _i) public {
-        delete nested[_addr1][_i];
+    receive() external payable {
+        remove(address(0));
     }
 }

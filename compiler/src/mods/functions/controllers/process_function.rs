@@ -10,11 +10,12 @@ use crate::mods::{
         },
     },
     types::types::{
-        Argument, Assert, ConditionalType, Conditionals, Delete, ElIf, FunctionArm,
-        FunctionArmType, FunctionCall, FunctionIdentifier, FunctionMutability, LineDescriptions,
-        Loop, LoopType, MappingAssign, MappingIdentifier, OpenedBraceType, Require, Return,
-        ReturnType, Revert, RevertType, Token, TuppleAssignment, VariableAssign,
-        VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
+        Argument, Assert, ConditionalType, Conditionals, ConstructorIdentifier, Delete, ElIf,
+        FunctionArm, FunctionArmType, FunctionCall, FunctionIdentifier, FunctionMutability,
+        FunctionsIdentifier, LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier,
+        OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType, Revert, RevertType, Token,
+        TuppleAssignment, VariableAssign, VariableAssignOperation, VariableAssignType,
+        VariableIdentifier, VariableType,
     },
 };
 
@@ -24,17 +25,21 @@ pub fn extract_functions(
     global_variables: &Vec<VariableIdentifier>,
     enums: &Vec<&str>,
     mappings: &Vec<MappingIdentifier>,
-) -> Vec<FunctionIdentifier> {
+) -> Vec<FunctionsIdentifier> {
     let mut opened_braces = 0;
     let mut opened_braces_type = OpenedBraceType::None;
     let mut processed_data: Vec<Vec<LineDescriptions>> = Vec::new();
     let mut combined = Vec::new();
-    let mut function_identifiers: Vec<FunctionIdentifier> = Vec::new();
+    let mut function_identifiers: Vec<FunctionsIdentifier> = Vec::new();
     for line in data {
         let raw = &line.text;
 
         if raw.starts_with("function") {
             opened_braces_type = OpenedBraceType::Function;
+        } else if raw.starts_with("constructor") {
+            opened_braces_type = OpenedBraceType::Constructor;
+        } else if raw.starts_with("receive") {
+            opened_braces_type = OpenedBraceType::Receive;
         }
 
         if raw.contains("{") {
@@ -50,7 +55,10 @@ pub fn extract_functions(
                 if character == '}' {
                     opened_braces -= 1;
                     if opened_braces == 1 {
-                        if let OpenedBraceType::Function = opened_braces_type {
+                        if let OpenedBraceType::Function
+                        | OpenedBraceType::Constructor
+                        | OpenedBraceType::Receive = opened_braces_type
+                        {
                             opened_braces_type = OpenedBraceType::Contract;
                             combined.push(line.clone());
 
@@ -62,7 +70,9 @@ pub fn extract_functions(
             }
         }
 
-        if let OpenedBraceType::Function = opened_braces_type {
+        if let OpenedBraceType::Function | OpenedBraceType::Constructor | OpenedBraceType::Receive =
+            opened_braces_type
+        {
             combined.push(line.clone())
         }
     }
@@ -83,185 +93,279 @@ pub fn extract_functions(
         combined.clear();
     }
 
+    // println!("{:?}", stringified);
+
     for single_stringified in stringified {
         let tokens = LineDescriptions::to_token(single_stringified.as_str());
 
-        if let Token::OpenParenthesis = &tokens[2] {
-        } else {
-            print_error(&format!(
-                "Unprocessible function name \"{}\"",
-                [
-                    LineDescriptions::from_token_to_string(&tokens[1]),
-                    LineDescriptions::from_token_to_string(&tokens[2])
-                ]
-                .join("")
-            ))
-        }
-
-        let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
-        let function_definition: &[Token] = &tokens[..start_index.unwrap()];
-        let function_name = match &tokens[1] {
-            Token::Identifier(_val) => {
-                let validated = validate_identifier_regex(_val, 0);
-                if validated {
-                    _val
-                } else {
-                    process::exit(1)
-                }
-            }
-            Token::Push => {
-                let validated = validate_identifier_regex("push", 0);
-                if validated {
-                    "push"
-                } else {
-                    process::exit(1)
-                }
-            }
-
-            Token::Pop => {
-                let validated = validate_identifier_regex("pop", 0);
-                if validated {
-                    "pop"
-                } else {
-                    process::exit(1)
-                }
-            }
-            _ => {
-                print_error(&format!(
-                    "Unsupported function name \"{}\"",
-                    LineDescriptions::from_token_to_string(&tokens[1])
-                ));
-                process::exit(1);
-            }
-        };
-        let mut function_override: bool = false;
-        let mut function_virtual: bool = false;
-        let mut gasless: bool = false;
-        let mut function_mutability = FunctionMutability::Mutable;
-        let mut function_visibility = Token::Internal;
-        let mut function_returns: Option<Vec<ReturnType>> = None;
-        let start_params = function_definition
-            .iter()
-            .position(|pred| pred == &Token::OpenParenthesis);
-
-        let mut open_paren_count = 1;
-        let mut pad = 0;
-        for check in &function_definition[start_params.unwrap() + 1..] {
-            if open_paren_count == 0 {
-                break;
-            }
-            if let Token::OpenParenthesis = check {
-                open_paren_count += 1;
-            }
-            if let Token::CloseParenthesis = check {
-                open_paren_count -= 1;
-            }
-            pad += 1;
-        }
-        let params_block =
-            &function_definition[start_params.unwrap() + 1..start_params.unwrap() + pad];
-        let splited_params_block: Vec<&[Token]> =
-            params_block.split(|pred| pred == &Token::Coma).collect();
-
-        let function_arguments =
-            extract_function_params(splited_params_block, function_definition, custom_data_types);
-        for visibility in [
-            Token::Internal,
-            Token::External,
-            Token::Public,
-            Token::Private,
-        ] {
-            if function_definition.contains(&visibility) {
-                function_visibility = visibility;
-            }
-        }
-
-        let returns_start_index = function_definition
-            .iter()
-            .position(|pred| pred == &Token::Returns);
-
-        if let Some(_returns_start_index) = returns_start_index {
-            let returns_definition = &function_definition[_returns_start_index..];
-            let end_index = returns_definition
-                .iter()
-                .position(|pred| pred == &Token::CloseParenthesis);
-            if let None = end_index {
-                let msg: Vec<String> = returns_definition
-                    .iter()
-                    .map(|pred| LineDescriptions::from_token_to_string(pred))
-                    .collect();
-                let stringified_function_identifier: Vec<String> = function_definition
-                    .iter()
-                    .map(|pred| LineDescriptions::from_token_to_string(pred))
-                    .collect();
-
-                print_error(&format!(
-                    "Unprocessible entity {:?} on {}",
-                    msg.join(" "),
-                    stringified_function_identifier.join(" ")
-                ))
-            }
-
-            let splited_returns_block: Vec<&[Token]> = function_definition
-                [_returns_start_index + 2..end_index.unwrap() + _returns_start_index]
-                .split(|pred| pred == &Token::Coma)
-                .collect();
-            function_returns = Some(extract_return_types(
-                splited_returns_block,
-                function_definition,
+        match tokens[0] {
+            Token::Function => extract_full_function(
                 custom_data_types,
+                global_variables,
                 enums,
-            ));
+                mappings,
+                &tokens,
+                &mut function_identifiers,
+            ),
+            Token::Constructor => {
+                let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+
+                let function_definition: &[Token] = &tokens[..start_index.unwrap()];
+                let arguments =
+                    prepare_and_get_function_args(function_definition, custom_data_types);
+
+                let function_body_start_index =
+                    tokens.iter().position(|pred| pred == &Token::OpenBraces);
+                if let None = function_body_start_index {
+                    print_error(&format!("Unprocessible entity",));
+                }
+
+                let function_body = &tokens[function_body_start_index.unwrap()..];
+
+                let arms: Vec<FunctionArm> = extract_function_arms(
+                    &function_body.to_vec(),
+                    custom_data_types,
+                    global_variables,
+                    enums,
+                    Vec::new(),
+                    mappings,
+                );
+
+                let structured = ConstructorIdentifier { arguments, arms };
+                function_identifiers.push(FunctionsIdentifier::ConstructorIdentifier(structured))
+            }
+            Token::Receive => {
+                let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+                let function_definition: &[Token] = &tokens[..start_index.unwrap()];
+                let arguments =
+                    prepare_and_get_function_args(function_definition, custom_data_types);
+                if !arguments.is_empty() {
+                    print_error("Unprocessible entity for receive function. \"function does not support argument\"")
+                }
+
+                if !function_definition.contains(&Token::External) {
+                    print_error("Expecting \"external\" for receive function")
+                }
+                if !function_definition.contains(&Token::Payable) {
+                    print_error("Expecting \"payable\" for receive function")
+                }
+
+                let function_body_start_index =
+                    tokens.iter().position(|pred| pred == &Token::OpenBraces);
+                if let None = function_body_start_index {
+                    print_error(&format!("Unprocessible entity",));
+                }
+
+                let function_body = &tokens[function_body_start_index.unwrap()..];
+
+                let arms: Vec<FunctionArm> = extract_function_arms(
+                    &function_body.to_vec(),
+                    custom_data_types,
+                    global_variables,
+                    enums,
+                    Vec::new(),
+                    mappings,
+                );
+
+                let structured = ReceiveIdentifier { arms };
+
+                function_identifiers.push(FunctionsIdentifier::ReceiveIdentifier(structured))
+            }
+            _ => (),
         }
-
-        let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
-        if let None = function_body_start_index {
-            print_error(&format!("Unprocessible entity",));
-        }
-
-        let function_body = &tokens[function_body_start_index.unwrap()..];
-
-        let arms: Vec<FunctionArm> = extract_function_arms(
-            &function_body.to_vec(),
-            custom_data_types,
-            global_variables,
-            enums,
-            Vec::new(),
-            mappings,
-        );
-
-        if function_definition.contains(&Token::View) {
-            function_mutability = FunctionMutability::View;
-        } else if function_definition.contains(&Token::Pure) {
-            function_mutability = FunctionMutability::Pure;
-        }
-
-        if function_definition.contains(&Token::Override) {
-            function_override = true;
-        }
-
-        if function_definition.contains(&Token::Virtual) {
-            function_virtual = true;
-        }
-
-        if function_definition.contains(&Token::Gasless) {
-            gasless = true;
-        }
-        let structure: FunctionIdentifier = FunctionIdentifier {
-            arguments: function_arguments,
-            arms,
-            mutability: function_mutability,
-            gasless,
-            name: function_name.to_string(),
-            r#override: function_override,
-            returns: function_returns,
-            r#virtual: function_virtual,
-            visibility: function_visibility,
-        };
-        function_identifiers.push(structure);
     }
 
     function_identifiers
+}
+
+fn prepare_and_get_function_args(
+    function_definition: &[Token],
+    custom_data_types: &Vec<&str>,
+) -> Vec<Argument> {
+    let start_params = function_definition
+        .iter()
+        .position(|pred| pred == &Token::OpenParenthesis);
+
+    let mut open_paren_count = 1;
+    let mut pad = 0;
+    for check in &function_definition[start_params.unwrap() + 1..] {
+        if open_paren_count == 0 {
+            break;
+        }
+        if let Token::OpenParenthesis = check {
+            open_paren_count += 1;
+        }
+        if let Token::CloseParenthesis = check {
+            open_paren_count -= 1;
+        }
+        pad += 1;
+    }
+    let params_block = &function_definition[start_params.unwrap() + 1..start_params.unwrap() + pad];
+    let splited_params_block: Vec<&[Token]> =
+        params_block.split(|pred| pred == &Token::Coma).collect();
+
+    let function_arguments =
+        extract_function_params(splited_params_block, function_definition, custom_data_types);
+    function_arguments
+}
+
+fn extract_full_function(
+    custom_data_types: &Vec<&str>,
+    global_variables: &Vec<VariableIdentifier>,
+    enums: &Vec<&str>,
+    mappings: &Vec<MappingIdentifier>,
+    tokens: &Vec<Token>,
+    function_identifiers: &mut Vec<FunctionsIdentifier>,
+) {
+    if let Token::OpenParenthesis = &tokens[2] {
+    } else {
+        print_error(&format!(
+            "Unprocessible function name \"{}\"",
+            [
+                LineDescriptions::from_token_to_string(&tokens[1]),
+                LineDescriptions::from_token_to_string(&tokens[2])
+            ]
+            .join("")
+        ))
+    }
+    let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+
+    let function_definition: &[Token] = &tokens[..start_index.unwrap()];
+    let function_name = match &tokens[1] {
+        Token::Identifier(_val) => {
+            let validated = validate_identifier_regex(_val, 0);
+            if validated {
+                _val
+            } else {
+                process::exit(1)
+            }
+        }
+        Token::Push => {
+            let validated = validate_identifier_regex("push", 0);
+            if validated {
+                "push"
+            } else {
+                process::exit(1)
+            }
+        }
+
+        Token::Pop => {
+            let validated = validate_identifier_regex("pop", 0);
+            if validated {
+                "pop"
+            } else {
+                process::exit(1)
+            }
+        }
+        _ => {
+            print_error(&format!(
+                "Unsupported function name \"{}\"",
+                LineDescriptions::from_token_to_string(&tokens[1])
+            ));
+            process::exit(1);
+        }
+    };
+    let mut function_override: bool = false;
+    let mut function_virtual: bool = false;
+    let mut gasless: bool = false;
+    let mut function_mutability = FunctionMutability::Mutable;
+    let mut function_visibility = Token::Internal;
+    let mut function_returns: Option<Vec<ReturnType>> = None;
+    let function_arguments = prepare_and_get_function_args(function_definition, custom_data_types);
+    for visibility in [
+        Token::Internal,
+        Token::External,
+        Token::Public,
+        Token::Private,
+    ] {
+        if function_definition.contains(&visibility) {
+            function_visibility = visibility;
+        }
+    }
+
+    let returns_start_index = function_definition
+        .iter()
+        .position(|pred| pred == &Token::Returns);
+
+    if let Some(_returns_start_index) = returns_start_index {
+        let returns_definition = &function_definition[_returns_start_index..];
+        let end_index = returns_definition
+            .iter()
+            .position(|pred| pred == &Token::CloseParenthesis);
+        if let None = end_index {
+            let msg: Vec<String> = returns_definition
+                .iter()
+                .map(|pred| LineDescriptions::from_token_to_string(pred))
+                .collect();
+            let stringified_function_identifier: Vec<String> = function_definition
+                .iter()
+                .map(|pred| LineDescriptions::from_token_to_string(pred))
+                .collect();
+
+            print_error(&format!(
+                "Unprocessible entity {:?} on {}",
+                msg.join(" "),
+                stringified_function_identifier.join(" ")
+            ))
+        }
+
+        let splited_returns_block: Vec<&[Token]> = function_definition
+            [_returns_start_index + 2..end_index.unwrap() + _returns_start_index]
+            .split(|pred| pred == &Token::Coma)
+            .collect();
+        function_returns = Some(extract_return_types(
+            splited_returns_block,
+            function_definition,
+            custom_data_types,
+            enums,
+        ));
+    }
+
+    let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+    if let None = function_body_start_index {
+        print_error(&format!("Unprocessible entity",));
+    }
+
+    let function_body = &tokens[function_body_start_index.unwrap()..];
+
+    let arms: Vec<FunctionArm> = extract_function_arms(
+        &function_body.to_vec(),
+        custom_data_types,
+        global_variables,
+        enums,
+        Vec::new(),
+        mappings,
+    );
+
+    if function_definition.contains(&Token::View) {
+        function_mutability = FunctionMutability::View;
+    } else if function_definition.contains(&Token::Pure) {
+        function_mutability = FunctionMutability::Pure;
+    }
+
+    if function_definition.contains(&Token::Override) {
+        function_override = true;
+    }
+
+    if function_definition.contains(&Token::Virtual) {
+        function_virtual = true;
+    }
+
+    if function_definition.contains(&Token::Gasless) {
+        gasless = true;
+    }
+    let structure: FunctionIdentifier = FunctionIdentifier {
+        arguments: function_arguments,
+        arms,
+        mutability: function_mutability,
+        gasless,
+        name: function_name.to_string(),
+        r#override: function_override,
+        returns: function_returns,
+        r#virtual: function_virtual,
+        visibility: function_visibility,
+    };
+    function_identifiers.push(FunctionsIdentifier::FunctionIdentifier(structure));
 }
 
 fn extract_function_params(
@@ -684,7 +788,9 @@ fn extract_function_block(
                 } else {
                     if let Token::OpenParenthesis = &block[1] {
                         let mut args: Vec<String> = Vec::new();
-                        let tkns = &block[2..block.len() - 2];
+                        let tkns = &block[2..block.len() - 2].to_vec();
+
+                        println!("{:?}", tkns);
                         let mut skip = 0;
                         for (index, arg) in tkns.iter().enumerate() {
                             if skip > index {
@@ -698,7 +804,7 @@ fn extract_function_block(
                                 Token::OpenBraces => {
                                     print_error("Named arguments not supported");
                                 }
-                                _ => {
+                                __other => {
                                     let mut comb = String::new();
                                     let coma_index = &tkns[index..]
                                         .iter()
@@ -708,8 +814,16 @@ fn extract_function_block(
                                             comb.push_str(&detokenize(cmb))
                                         }
                                         skip = index + *_index;
+                                    } else {
+                                        for cmb in &tkns[index..tkns.len()] {
+                                            comb.push_str(&detokenize(cmb))
+                                        }
+                                        skip = index + tkns.len();
                                     }
-                                    args.push(comb);
+
+                                    if !comb.trim().is_empty() {
+                                        args.push(comb);
+                                    }
                                 }
                             }
                         }
