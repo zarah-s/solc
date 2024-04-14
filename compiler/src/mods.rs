@@ -868,7 +868,26 @@ mod tests {
                 }
                 _ => (),
             }
-            // assert_eq!(fns[0], expected);
+        }
+
+        #[tokio::test]
+        #[should_panic(
+            expected = "ERROR: Unprocessible entity for receive function. \"function does not support argument\""
+        )]
+        async fn test_fn_arm_panic_if_args_is_passed_to_receive_function() {
+            get_fns("test/files/function/Fn24.sol").await;
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Expecting \"external\" for receive function")]
+        async fn test_fn_arm_panic_if_no_external_visibility_annotation_for_receive_function() {
+            get_fns("test/files/function/Fn25.sol").await;
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Expecting \"payable\" for receive function")]
+        async fn test_fn_arm_panic_if_no_payable_annotation_for_receive_function() {
+            get_fns("test/files/function/Fn26.sol").await;
         }
     }
 
