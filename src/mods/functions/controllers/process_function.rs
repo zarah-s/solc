@@ -1227,6 +1227,10 @@ fn extract_function_block(
                                 }
                             }
 
+                            if variants.is_empty() {
+                                print_error(&format!("Missing key for mapping \"{}\"", _identifier))
+                            }
+
                             full_block.push(FunctionArm::Delete(Delete {
                                 identifier: _identifier.to_string(),
                                 type_: VariableAssignType::Mapping,
@@ -1706,12 +1710,22 @@ fn extract_function_scope_variable(
         }
     } else if let Some(_var) = mappings {
         let equals_index = block.iter().position(|pred| pred == &&Token::Equals);
+        let check_open_square_bracket = block
+            .iter()
+            .find(|pred| pred == &&&Token::OpenSquareBracket);
+        if check_open_square_bracket.is_none() {
+            print_error(&format!(
+                "Missing key for mapping assignment. \"{}\"",
+                _identifier
+            ));
+        }
         if let Some(_position) = equals_index {
             let mut value = String::new();
             let mut stringified = String::new();
             for val in &block[1..block.len() - 1] {
                 stringified.push_str(&detokenize(val));
             }
+
             let variants = extract_mapping_variants(_position, block);
             if stringified.contains("+=") {
                 let other_val_index = stringified.find("=");
@@ -1761,6 +1775,15 @@ fn extract_function_scope_variable(
             let mut value = String::new();
             let mut operation = VariableAssignOperation::Assign;
             let mut _open_square_bracket = 1;
+            let check_open_square_bracket = block
+                .iter()
+                .find(|pred| pred == &&&Token::OpenSquareBracket);
+            if check_open_square_bracket.is_none() {
+                print_error(&format!(
+                    "Missing key for mapping assignment. \"{}\"",
+                    _identifier
+                ));
+            }
             for (index, __brac) in block[2..].iter().enumerate() {
                 if let Token::CloseSquareBracket = __brac {
                     let next_val = &block[2..].get(index + 1);

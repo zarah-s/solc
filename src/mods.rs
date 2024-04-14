@@ -732,6 +732,12 @@ mod tests {
         }
 
         #[tokio::test]
+        #[should_panic(expected = "ERROR: Missing key for mapping assignment. \"names\"")]
+        async fn test_fn_arm_panic_mapping_assignment_missing_key() {
+            get_fns("test/files/function/Fn22.sol").await;
+        }
+
+        #[tokio::test]
         async fn test_fn_arm_mapping_push() {
             let fns = get_fns("test/files/function/Fn16.sol").await;
 
