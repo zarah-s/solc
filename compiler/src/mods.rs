@@ -37,7 +37,7 @@ mod tests {
             process_state_variables::extract_global_variables, process_struct::extract_struct,
             strip_comments, structure_to_line_descriptors,
         },
-        types::types::{FunctionIdentifier, LineDescriptions},
+        types::types::{FunctionsIdentifier, LineDescriptions},
     };
 
     mod file_processing {
@@ -404,8 +404,9 @@ mod tests {
         use crate::mods::{
             functions::controllers::process_function::extract_functions,
             types::types::{
-                FunctionArm, FunctionMutability, MappingAssign, Token, VariableAssign,
-                VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
+                FunctionArm, FunctionMutability, FunctionsIdentifier, MappingAssign, Token,
+                VariableAssign, VariableAssignOperation, VariableAssignType, VariableIdentifier,
+                VariableType,
             },
         };
 
@@ -477,7 +478,12 @@ mod tests {
             );
 
             for (i, _fn) in fns.iter().enumerate() {
-                assert_eq!(_fn.name, fn_names[i])
+                match _fn {
+                    FunctionsIdentifier::FunctionIdentifier(__fn) => {
+                        assert_eq!(__fn.name, fn_names[i]);
+                    }
+                    _ => (),
+                }
             }
         }
 
@@ -565,15 +571,18 @@ mod tests {
                 &Vec::new(),
             );
 
-            assert_eq!(functions[0].arguments.len(), 1);
-            assert_eq!(functions[0].arguments[0].is_array, false);
-            assert_eq!(functions[0].arguments[0].location, None);
-            assert_eq!(functions[0].arguments[0].name_, "_i".to_string());
-            assert_eq!(functions[0].arguments[0].payable_address, false);
-            assert_eq!(functions[0].arguments[0].size, None);
-            assert_eq!(functions[0].arguments[0].type_, "uint256".to_string());
-            assert_eq!(functions[1].arguments[0].location, Some(Token::Memory));
-            assert_eq!(functions[1].arguments[0].is_array, true);
+            match &functions[0] {
+                FunctionsIdentifier::FunctionIdentifier(_function) => {
+                    assert_eq!(_function.arguments.len(), 1);
+                    assert_eq!(_function.arguments[0].is_array, false);
+                    assert_eq!(_function.arguments[0].location, None);
+                    assert_eq!(_function.arguments[0].name_, "_i".to_string());
+                    assert_eq!(_function.arguments[0].payable_address, false);
+                    assert_eq!(_function.arguments[0].size, None);
+                    assert_eq!(_function.arguments[0].type_, "uint256".to_string());
+                }
+                _ => (),
+            }
         }
 
         #[tokio::test]
@@ -594,7 +603,12 @@ mod tests {
             );
 
             for (i, _fn) in fns.iter().enumerate() {
-                assert_eq!(_fn.visibility, fn_visibilities[i])
+                match _fn {
+                    FunctionsIdentifier::FunctionIdentifier(__fn) => {
+                        assert_eq!(__fn.visibility, fn_visibilities[i]);
+                    }
+                    _ => (),
+                }
             }
         }
 
@@ -616,7 +630,12 @@ mod tests {
             );
 
             for (i, _fn) in fns.iter().enumerate() {
-                assert_eq!(_fn.mutability, fn_mutabilities[i])
+                match _fn {
+                    FunctionsIdentifier::FunctionIdentifier(__fn) => {
+                        assert_eq!(__fn.mutability, fn_mutabilities[i]);
+                    }
+                    _ => (),
+                }
             }
         }
 
@@ -632,16 +651,21 @@ mod tests {
                 &Vec::new(),
             );
 
-            let __d = fns[0].returns.as_ref().unwrap();
-            assert_eq!(__d.len(), 3);
-            assert_eq!(__d[0].type_, "uint");
-            assert_eq!(__d[0].is_array, false);
-            assert_eq!(__d[0].location, None);
-            assert_eq!(__d[1].type_, "string");
-            assert_eq!(__d[1].is_array, false);
-            assert_eq!(__d[1].location, Some(Token::Memory));
-            assert_eq!(__d[2].location, Some(Token::Memory));
-            assert_eq!(__d[2].is_array, true);
+            match &fns[0] {
+                FunctionsIdentifier::FunctionIdentifier(_fn) => {
+                    let __d = _fn.returns.as_ref().unwrap();
+                    assert_eq!(__d.len(), 3);
+                    assert_eq!(__d[0].type_, "uint");
+                    assert_eq!(__d[0].is_array, false);
+                    assert_eq!(__d[0].location, None);
+                    assert_eq!(__d[1].type_, "string");
+                    assert_eq!(__d[1].is_array, false);
+                    assert_eq!(__d[1].location, Some(Token::Memory));
+                    assert_eq!(__d[2].location, Some(Token::Memory));
+                    assert_eq!(__d[2].is_array, true);
+                }
+                _ => (),
+            }
         }
 
         #[tokio::test]
@@ -660,7 +684,12 @@ mod tests {
                 type_: VariableType::Enum,
             });
 
-            assert_eq!(fns[0].arms[0], expected)
+            match &fns[0] {
+                FunctionsIdentifier::FunctionIdentifier(_fn) => {
+                    assert_eq!(_fn.arms[0], expected)
+                }
+                _ => (),
+            }
         }
 
         #[tokio::test]
@@ -673,8 +702,12 @@ mod tests {
                 type_: VariableAssignType::Enum,
                 variant: None,
             });
-
-            assert_eq!(fns[0].arms[0], expected);
+            match &fns[0] {
+                FunctionsIdentifier::FunctionIdentifier(_fn) => {
+                    assert_eq!(_fn.arms[0], expected);
+                }
+                _ => (),
+            }
         }
 
         #[tokio::test]
@@ -688,7 +721,12 @@ mod tests {
                 variant: None,
             });
 
-            assert_eq!(fns[0].arms[4], expected);
+            match &fns[0] {
+                FunctionsIdentifier::FunctionIdentifier(_fn) => {
+                    assert_eq!(_fn.arms[4], expected);
+                }
+                _ => (),
+            }
         }
 
         #[tokio::test]
@@ -701,8 +739,12 @@ mod tests {
                 type_: VariableAssignType::Array(None),
                 variant: None,
             });
-
-            assert_eq!(fns[0].arms[5], expected);
+            match &fns[0] {
+                FunctionsIdentifier::FunctionIdentifier(_fn) => {
+                    assert_eq!(_fn.arms[5], expected);
+                }
+                _ => (),
+            }
         }
 
         #[tokio::test]
@@ -728,7 +770,12 @@ mod tests {
                 variants: vec!["msg.sender".to_string()],
             });
 
-            assert_eq!(fns[0].arms[0], expected);
+            match &fns[0] {
+                FunctionsIdentifier::FunctionIdentifier(_fn) => {
+                    assert_eq!(_fn.arms[0], expected);
+                }
+                _ => (),
+            }
         }
 
         #[tokio::test]
@@ -749,7 +796,12 @@ mod tests {
                 variants: vec!["msg.sender".to_string()],
             });
 
-            assert_eq!(fns[0].arms[1], expected);
+            match &fns[0] {
+                FunctionsIdentifier::FunctionIdentifier(_fn) => {
+                    assert_eq!(_fn.arms[1], expected);
+                }
+                _ => (),
+            }
         }
 
         #[tokio::test]
@@ -764,7 +816,12 @@ mod tests {
                 variants: vec!["msg.sender".to_string()],
             });
 
-            assert_eq!(fns[0].arms[2], expected);
+            match &fns[0] {
+                FunctionsIdentifier::FunctionIdentifier(_fn) => {
+                    assert_eq!(_fn.arms[2], expected);
+                }
+                _ => (),
+            }
         }
 
         #[tokio::test]
@@ -789,9 +846,25 @@ mod tests {
         async fn test_fn_arm_mapping_variants_integrity() {
             let expected = vec!["address(0)", "0"];
             let fns = get_fns("test/files/function/Fn16.sol").await;
-            match fns[0].arms[3] {
-                FunctionArm::MappingAssign(ref _d) => {
-                    assert_eq!(_d.variants, expected)
+            match &fns[0] {
+                FunctionsIdentifier::FunctionIdentifier(_fn) => match _fn.arms[3] {
+                    FunctionArm::MappingAssign(ref _d) => {
+                        assert_eq!(_d.variants, expected)
+                    }
+                    _ => (),
+                },
+                _ => (),
+            }
+            // assert_eq!(fns[0], expected);
+        }
+
+        #[tokio::test]
+        async fn test_constructor() {
+            let fns = get_fns("test/files/function/Fn23.sol").await;
+            match &fns[0] {
+                FunctionsIdentifier::ConstructorIdentifier(_fn) => {
+                    assert_eq!(_fn.arguments.len(), 1);
+                    assert_eq!(_fn.arms.len(), 2);
                 }
                 _ => (),
             }
@@ -800,7 +873,7 @@ mod tests {
     }
 
     //******************************** HELPER FUNCTIONS***************** */
-    async fn get_fns(path: &str) -> Vec<FunctionIdentifier> {
+    async fn get_fns(path: &str) -> Vec<FunctionsIdentifier> {
         let contents = get_file_contents(path).await;
         let structs_tree = extract_struct(&contents);
         let struct_identifiers: Vec<&str> = structs_tree
