@@ -158,13 +158,33 @@ pub struct VariableIdentifier {
 }
 
 #[derive(Debug)]
+pub struct ConstructorIdentifier {
+    pub arguments: Vec<Argument>,
+    pub arms: Vec<FunctionArm>,
+}
+
+#[derive(Debug)]
+pub struct ReceiveIdentifier {
+    pub arms: Vec<FunctionArm>,
+}
+
+#[derive(Debug)]
+pub enum FunctionsIdentifier {
+    FunctionIdentifier(FunctionIdentifier),
+    ConstructorIdentifier(ConstructorIdentifier),
+    ReceiveIdentifier(ReceiveIdentifier),
+}
+
+#[derive(Debug)]
 pub enum OpenedBraceType {
     None,
     Struct,
     Callback,
     Function,
+    Receive,
     Contract,
     Enum,
+    Constructor,
 }
 
 #[derive(Debug, Clone)]
