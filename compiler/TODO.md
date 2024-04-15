@@ -9,7 +9,7 @@
 
 - [x] parse cron syntax
 
-- [] parse full contract with inheritance
+- [x] parse full contract with inheritance
 
 - [] parse interface
 

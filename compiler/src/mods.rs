@@ -400,7 +400,7 @@ mod tests {
     }
 
     mod function_processing {
-        use super::{get_file_contents, get_fns};
+        use super::{get_contract_definition, get_file_contents, get_fns};
         use crate::mods::{
             functions::controllers::process_function::extract_functions,
             types::types::{
@@ -421,7 +421,7 @@ mod tests {
                 &Vec::new(),
             );
 
-            assert_eq!(functions.len(), 4)
+            assert_eq!(functions.0.len(), 4)
         }
 
         #[tokio::test]
@@ -477,7 +477,7 @@ mod tests {
                 &Vec::new(),
             );
 
-            for (i, _fn) in fns.iter().enumerate() {
+            for (i, _fn) in fns.0.iter().enumerate() {
                 match _fn {
                     FunctionsIdentifier::FunctionIdentifier(__fn) => {
                         assert_eq!(__fn.name, fn_names[i]);
@@ -571,7 +571,7 @@ mod tests {
                 &Vec::new(),
             );
 
-            match &functions[0] {
+            match &functions.0[0] {
                 FunctionsIdentifier::FunctionIdentifier(_function) => {
                     assert_eq!(_function.arguments.len(), 1);
                     assert_eq!(_function.arguments[0].is_array, false);
@@ -602,7 +602,7 @@ mod tests {
                 &Vec::new(),
             );
 
-            for (i, _fn) in fns.iter().enumerate() {
+            for (i, _fn) in fns.0.iter().enumerate() {
                 match _fn {
                     FunctionsIdentifier::FunctionIdentifier(__fn) => {
                         assert_eq!(__fn.visibility, fn_visibilities[i]);
@@ -629,7 +629,7 @@ mod tests {
                 &Vec::new(),
             );
 
-            for (i, _fn) in fns.iter().enumerate() {
+            for (i, _fn) in fns.0.iter().enumerate() {
                 match _fn {
                     FunctionsIdentifier::FunctionIdentifier(__fn) => {
                         assert_eq!(__fn.mutability, fn_mutabilities[i]);
@@ -651,7 +651,7 @@ mod tests {
                 &Vec::new(),
             );
 
-            match &fns[0] {
+            match &fns.0[0] {
                 FunctionsIdentifier::FunctionIdentifier(_fn) => {
                     let __d = _fn.returns.as_ref().unwrap();
                     assert_eq!(__d.len(), 3);
@@ -978,10 +978,44 @@ mod tests {
         async fn test_fn_arm_panic_if_month_out_or_range() {
             get_fns("test/files/function/Fn37.sol").await;
         }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Invalid contract identifier")]
+        async fn test_contract_panic_if_invalid_identifier() {
+            get_fns("test/files/function/Fn38.sol").await;
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Unprocessible entity for contract definition")]
+        async fn test_contract_panic_if_invalid_definition() {
+            get_fns("test/files/function/Fn39.sol").await;
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Unprocessible entity for contract inheritance")]
+        async fn test_contract_panic_if_invalid_inheritance() {
+            get_fns("test/files/function/Fn40.sol").await;
+        }
+
+        #[tokio::test]
+        async fn test_contract_identifier_integrity() {
+            let identifier = get_contract_definition("test/files/function/Fn41.sol").await;
+            assert_eq!(identifier.0, "ERROR");
+        }
+
+        #[tokio::test]
+        async fn test_contract_inheritance_integrity() {
+            let identifier = get_contract_definition("test/files/function/Fn42.sol").await;
+            assert_eq!(identifier.1.len(), 2);
+            let expected = ["Test", "Script"];
+            for (i, _val) in identifier.1.iter().enumerate() {
+                assert_eq!(_val, expected[i])
+            }
+        }
     }
 
     //******************************** HELPER FUNCTIONS***************** */
-    async fn get_fns(path: &str) -> Vec<FunctionsIdentifier> {
+    async fn process_function(path: &str) -> (Vec<FunctionsIdentifier>, String, Vec<String>) {
         let contents = get_file_contents(path).await;
         let structs_tree = extract_struct(&contents);
         let struct_identifiers: Vec<&str> = structs_tree
@@ -1007,6 +1041,16 @@ mod tests {
             &_maps,
         );
         fns
+    }
+
+    async fn get_contract_definition(path: &str) -> (String, Vec<String>) {
+        let fns = process_function(path).await;
+        (fns.1, fns.2)
+    }
+
+    async fn get_fns(path: &str) -> Vec<FunctionsIdentifier> {
+        let fns = process_function(path).await;
+        fns.0
     }
 
     async fn get_file_contents(path: &str) -> Vec<LineDescriptions> {

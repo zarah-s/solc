@@ -27,6 +27,7 @@ pub fn lex_to_token(input: &str) -> Token {
         "push" => Token::Push,
         "pop" => Token::Pop,
         "msg" => Token::Msg,
+        "is" => Token::Is,
         "require" => Token::Require,
         "constructor" => Token::Constructor,
         "receive" => Token::Receive,
@@ -106,6 +107,7 @@ pub fn detokenize(input: &Token) -> String {
     let token: String = match input {
         Token::Contract => "contract".to_string(),
         Token::Assert => "assert".to_string(),
+        Token::Is => "is".to_string(),
         Token::Ether => "ether".to_string(),
         Token::Wei => "wei".to_string(),
         Token::Bytes => "bytes".to_string(),

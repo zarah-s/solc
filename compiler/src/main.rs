@@ -11,7 +11,7 @@ use mods::{
         process_struct::extract_struct, strip_comments::strip_comments,
         structure_to_line_descriptors::structure_to_line_descriptors,
     },
-    types::types::{LineDescriptions, Token},
+    types::types::{ContractIdentifier, LineDescriptions, Token},
 };
 use tokio::io;
 
@@ -54,7 +54,7 @@ async fn main() -> Result<(), io::Error> {
         &enum_identifiers,
     );
 
-    let functions = extract_functions(
+    let (functions, contract_identifier, contract_inheritance) = extract_functions(
         &structured_stripped_compilable_contents,
         &custom_data_types_identifiers,
         &global_variables,
@@ -62,10 +62,27 @@ async fn main() -> Result<(), io::Error> {
         &mappings,
     );
 
-    println!(
-        "===> STRUCT ===>\n{:#?}\n\n ===> GLOBAL_VARIABLES ===>\n{:#?}\n\n ===> MAPPINGS ===>\n{:#?}\n\n ===> ENUMS ===>\n{:#?}\n\n ===>> CUSTOM_ERRORS ==>>\n{:#?}\n\n ===>> FUNCTIONS ==>>\n{:#?}",
-        structs_tree, global_variables,mappings, extracted_enums, custom_errors,functions
-    );
+    let contract_identifier = ContractIdentifier {
+        identifier: contract_identifier,
+        inheritance: if contract_inheritance.is_empty() {
+            None
+        } else {
+            Some(contract_inheritance)
+        },
+        custom_errors,
+        enums: extracted_enums,
+        functions,
+        mappings,
+        global_variables,
+        structs: structs_tree,
+    };
+
+    println!("{:#?}", contract_identifier);
+
+    // println!(
+    //     "===> STRUCT ===>\n{:#?}\n\n ===> GLOBAL_VARIABLES ===>\n{:#?}\n\n ===> MAPPINGS ===>\n{:#?}\n\n ===> ENUMS ===>\n{:#?}\n\n ===>> CUSTOM_ERRORS ==>>\n{:#?}\n\n ===>> FUNCTIONS ==>>\n{:#?}",
+    //     structs_tree, global_variables,mappings, extracted_enums, custom_errors,functions
+    // );
 
     let end_time = time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
     println!(
