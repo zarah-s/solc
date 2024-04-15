@@ -3,6 +3,18 @@
 - [x] identify storage locations for primitive datatypes in function definitions
 - [x] identify view for function
 
-* [] cover for loops
-* [] complete while loops
-* [] complete conditional statements
+- [x] cover for loops
+- [x] complete while loops
+- [x] complete conditional statements
+
+- [] parse cron syntax
+
+- [] parse full contract with inheritance
+
+- [] parse interface
+
+- [] test interface interaction and implementation
+
+- [] test inherited constructor initialization
+
+- [] test contract-variable assign
