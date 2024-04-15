@@ -25,12 +25,15 @@ pub fn extract_functions(
     global_variables: &Vec<VariableIdentifier>,
     enums: &Vec<&str>,
     mappings: &Vec<MappingIdentifier>,
-) -> Vec<FunctionsIdentifier> {
+) -> (Vec<FunctionsIdentifier>, String, Vec<String>) {
     let mut opened_braces = 0;
     let mut opened_braces_type = OpenedBraceType::None;
     let mut processed_data: Vec<Vec<LineDescriptions>> = Vec::new();
     let mut combined = Vec::new();
     let mut function_identifiers: Vec<FunctionsIdentifier> = Vec::new();
+    let mut contract_definition = String::new();
+    let mut contract_name = String::new();
+    let mut contract_inheritance: Vec<String> = Vec::new();
     for line in data {
         let raw = &line.text;
 
@@ -44,11 +47,26 @@ pub fn extract_functions(
             opened_braces_type = OpenedBraceType::Fallback;
         } else if raw.starts_with("cron") {
             opened_braces_type = OpenedBraceType::Cron;
+        } else if raw.starts_with("contract") {
+            opened_braces_type = OpenedBraceType::Contract;
+        }
+
+        if let OpenedBraceType::Contract = opened_braces_type {
+            contract_definition.push_str(&raw);
         }
 
         if raw.contains("{") {
             for character in raw.chars() {
                 if character == '{' {
+                    if let OpenedBraceType::Contract = opened_braces_type {
+                        opened_braces_type = OpenedBraceType::None;
+                        let lexems = LineDescriptions::to_token(raw);
+                        extract_contract_headers(
+                            lexems,
+                            &mut contract_name,
+                            &mut contract_inheritance,
+                        )
+                    }
                     opened_braces += 1;
                 }
             }
@@ -65,7 +83,7 @@ pub fn extract_functions(
                         | OpenedBraceType::Cron
                         | OpenedBraceType::Receive = opened_braces_type
                         {
-                            opened_braces_type = OpenedBraceType::Contract;
+                            opened_braces_type = OpenedBraceType::None;
                             combined.push(line.clone());
 
                             processed_data.push(combined.clone());
@@ -101,8 +119,6 @@ pub fn extract_functions(
         stringified.push(combined.clone());
         combined.clear();
     }
-
-    // println!("{:?}", stringified);
 
     for single_stringified in stringified {
         let tokens = LineDescriptions::to_token(single_stringified.as_str());
@@ -315,7 +331,7 @@ pub fn extract_functions(
         }
     }
 
-    function_identifiers
+    (function_identifiers, contract_name, contract_inheritance)
 }
 
 fn prepare_and_get_function_args(
@@ -347,6 +363,42 @@ fn prepare_and_get_function_args(
     let function_arguments =
         extract_function_params(splited_params_block, function_definition, custom_data_types);
     function_arguments
+}
+
+fn extract_contract_headers(
+    lexems: Vec<Token>,
+    contract_name: &mut String,
+    contract_inheritance: &mut Vec<String>,
+) {
+    match &lexems[1] {
+        Token::Identifier(_identifier) => {
+            *contract_name = _identifier.to_owned();
+        }
+        _ => {
+            print_error("Invalid contract identifier");
+        }
+    }
+
+    if lexems.contains(&Token::Is) {
+        let index_for_is_keyword = lexems.iter().position(|pred| pred == &Token::Is);
+        let yo = &lexems[index_for_is_keyword.unwrap() + 1..&lexems.len() - 1];
+        let splits = yo
+            .split(|pred| pred == &Token::Coma)
+            .collect::<Vec<_>>()
+            .concat();
+        for splited in splits {
+            match splited {
+                Token::Identifier(_identifier) => contract_inheritance.push(_identifier),
+                _ => {
+                    print_error("Unprocessible entity for contract inheritance");
+                }
+            }
+        }
+    } else {
+        if lexems.len() != 3 {
+            print_error("Unprocessible entity for contract definition");
+        }
+    }
 }
 
 fn extract_full_function(

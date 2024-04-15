@@ -31,7 +31,7 @@ pub const DATA_TYPES: [&str; 30] = [
     "address[]",
 ];
 
-pub const KEYWORDS: [&str; 45] = [
+pub const KEYWORDS: [&str; 46] = [
     "contract",
     "mapping",
     "wei",
@@ -39,6 +39,7 @@ pub const KEYWORDS: [&str; 45] = [
     "error",
     "push",
     "pop",
+    "is",
     "assert",
     "revert",
     "while",

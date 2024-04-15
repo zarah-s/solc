@@ -18,6 +18,7 @@ pub enum Token {
     Delete,
     Enum,
     Immutable,
+    Is,
     Mutable,
     Constant,
     Internal,
@@ -191,6 +192,18 @@ pub enum FunctionsIdentifier {
     ReceiveIdentifier(ReceiveIdentifier),
     FallbackIdentifier(FallbackIdentifier),
     CronIdentifier(CronIdentifier),
+}
+
+#[derive(Debug)]
+pub struct ContractIdentifier {
+    pub identifier: String,
+    pub inheritance: Option<Vec<String>>,
+    pub global_variables: Vec<VariableIdentifier>,
+    pub mappings: Vec<MappingIdentifier>,
+    pub enums: Vec<EnumIdentifier>,
+    pub structs: Vec<StructIdentifier>,
+    pub custom_errors: Vec<String>,
+    pub functions: Vec<FunctionsIdentifier>,
 }
 
 #[derive(Debug)]

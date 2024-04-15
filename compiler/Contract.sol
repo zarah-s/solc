@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-contract Mapping {
+contract Mapping is Var, Str, Test, Script {
     // Mapping from address to uint
     mapping(address => uint256) public myMap;
     address immutable owner;

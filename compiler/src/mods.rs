@@ -421,7 +421,7 @@ mod tests {
                 &Vec::new(),
             );
 
-            assert_eq!(functions.len(), 4)
+            assert_eq!(functions.0.len(), 4)
         }
 
         #[tokio::test]
@@ -477,7 +477,7 @@ mod tests {
                 &Vec::new(),
             );
 
-            for (i, _fn) in fns.iter().enumerate() {
+            for (i, _fn) in fns.0.iter().enumerate() {
                 match _fn {
                     FunctionsIdentifier::FunctionIdentifier(__fn) => {
                         assert_eq!(__fn.name, fn_names[i]);
@@ -571,7 +571,7 @@ mod tests {
                 &Vec::new(),
             );
 
-            match &functions[0] {
+            match &functions.0[0] {
                 FunctionsIdentifier::FunctionIdentifier(_function) => {
                     assert_eq!(_function.arguments.len(), 1);
                     assert_eq!(_function.arguments[0].is_array, false);
@@ -602,7 +602,7 @@ mod tests {
                 &Vec::new(),
             );
 
-            for (i, _fn) in fns.iter().enumerate() {
+            for (i, _fn) in fns.0.iter().enumerate() {
                 match _fn {
                     FunctionsIdentifier::FunctionIdentifier(__fn) => {
                         assert_eq!(__fn.visibility, fn_visibilities[i]);
@@ -629,7 +629,7 @@ mod tests {
                 &Vec::new(),
             );
 
-            for (i, _fn) in fns.iter().enumerate() {
+            for (i, _fn) in fns.0.iter().enumerate() {
                 match _fn {
                     FunctionsIdentifier::FunctionIdentifier(__fn) => {
                         assert_eq!(__fn.mutability, fn_mutabilities[i]);
@@ -651,7 +651,7 @@ mod tests {
                 &Vec::new(),
             );
 
-            match &fns[0] {
+            match &fns.0[0] {
                 FunctionsIdentifier::FunctionIdentifier(_fn) => {
                     let __d = _fn.returns.as_ref().unwrap();
                     assert_eq!(__d.len(), 3);
@@ -1006,7 +1006,7 @@ mod tests {
             &enum_identifiers,
             &_maps,
         );
-        fns
+        fns.0
     }
 
     async fn get_file_contents(path: &str) -> Vec<LineDescriptions> {
