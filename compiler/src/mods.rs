@@ -871,6 +871,29 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn test_receive() {
+            let fns = get_fns("test/files/function/Fn27.sol").await;
+            match &fns[0] {
+                FunctionsIdentifier::ReceiveIdentifier(_fn) => {
+                    assert_eq!(_fn.arms.len(), 1);
+                }
+                _ => (),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_fallback() {
+            let fns = get_fns("test/files/function/Fn28.sol").await;
+            match &fns[0] {
+                FunctionsIdentifier::FallbackIdentifier(_fn) => {
+                    assert_eq!(_fn.arms.len(), 1);
+                    assert_eq!(_fn.payable, true);
+                }
+                _ => (),
+            }
+        }
+
+        #[tokio::test]
         #[should_panic(
             expected = "ERROR: Unprocessible entity for receive function. \"function does not support argument\""
         )]
@@ -888,6 +911,20 @@ mod tests {
         #[should_panic(expected = "ERROR: Expecting \"payable\" for receive function")]
         async fn test_fn_arm_panic_if_no_payable_annotation_for_receive_function() {
             get_fns("test/files/function/Fn26.sol").await;
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Expecting \"external\" for fallback function")]
+        async fn test_fn_arm_panic_if_no_external_visibility_annotation_for_fallback_function() {
+            get_fns("test/files/function/Fn29.sol").await;
+        }
+
+        #[tokio::test]
+        #[should_panic(
+            expected = "ERROR: Unprocessible entity for fallback function. \"function does not support argument\""
+        )]
+        async fn test_fn_arm_panic_if_args_is_passed_to_fallback_function() {
+            get_fns("test/files/function/Fn30.sol").await;
         }
     }
 

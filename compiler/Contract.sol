@@ -32,4 +32,9 @@ contract Mapping {
     receive() external payable {
         remove(address(0));
     }
+
+    fallback() external payable {
+        remove(msg.sender);
+        revert("Yo");
+    }
 }

@@ -11,11 +11,11 @@ use crate::mods::{
     },
     types::types::{
         Argument, Assert, ConditionalType, Conditionals, ConstructorIdentifier, Delete, ElIf,
-        FunctionArm, FunctionArmType, FunctionCall, FunctionIdentifier, FunctionMutability,
-        FunctionsIdentifier, LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier,
-        OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType, Revert, RevertType, Token,
-        TuppleAssignment, VariableAssign, VariableAssignOperation, VariableAssignType,
-        VariableIdentifier, VariableType,
+        FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall, FunctionIdentifier,
+        FunctionMutability, FunctionsIdentifier, LineDescriptions, Loop, LoopType, MappingAssign,
+        MappingIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType, Revert,
+        RevertType, Token, TuppleAssignment, VariableAssign, VariableAssignOperation,
+        VariableAssignType, VariableIdentifier, VariableType,
     },
 };
 
@@ -40,6 +40,8 @@ pub fn extract_functions(
             opened_braces_type = OpenedBraceType::Constructor;
         } else if raw.starts_with("receive") {
             opened_braces_type = OpenedBraceType::Receive;
+        } else if raw.starts_with("fallback") {
+            opened_braces_type = OpenedBraceType::Fallback;
         }
 
         if raw.contains("{") {
@@ -57,6 +59,7 @@ pub fn extract_functions(
                     if opened_braces == 1 {
                         if let OpenedBraceType::Function
                         | OpenedBraceType::Constructor
+                        | OpenedBraceType::Fallback
                         | OpenedBraceType::Receive = opened_braces_type
                         {
                             opened_braces_type = OpenedBraceType::Contract;
@@ -70,8 +73,10 @@ pub fn extract_functions(
             }
         }
 
-        if let OpenedBraceType::Function | OpenedBraceType::Constructor | OpenedBraceType::Receive =
-            opened_braces_type
+        if let OpenedBraceType::Function
+        | OpenedBraceType::Constructor
+        | OpenedBraceType::Receive
+        | OpenedBraceType::Fallback = opened_braces_type
         {
             combined.push(line.clone())
         }
@@ -93,7 +98,7 @@ pub fn extract_functions(
         combined.clear();
     }
 
-    // println!("{:?}", stringified);
+    println!("{:?}", stringified);
 
     for single_stringified in stringified {
         let tokens = LineDescriptions::to_token(single_stringified.as_str());
@@ -170,6 +175,45 @@ pub fn extract_functions(
                 let structured = ReceiveIdentifier { arms };
 
                 function_identifiers.push(FunctionsIdentifier::ReceiveIdentifier(structured))
+            }
+
+            Token::Fallback => {
+                let mut payable = false;
+                let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+                let function_definition: &[Token] = &tokens[..start_index.unwrap()];
+                let arguments =
+                    prepare_and_get_function_args(function_definition, custom_data_types);
+                if !arguments.is_empty() {
+                    print_error("Unprocessible entity for fallback function. \"function does not support argument\"")
+                }
+
+                if !function_definition.contains(&Token::External) {
+                    print_error("Expecting \"external\" for fallback function")
+                }
+                if function_definition.contains(&Token::Payable) {
+                    payable = true;
+                }
+
+                let function_body_start_index =
+                    tokens.iter().position(|pred| pred == &Token::OpenBraces);
+                if let None = function_body_start_index {
+                    print_error(&format!("Unprocessible entity",));
+                }
+
+                let function_body = &tokens[function_body_start_index.unwrap()..];
+
+                let arms: Vec<FunctionArm> = extract_function_arms(
+                    &function_body.to_vec(),
+                    custom_data_types,
+                    global_variables,
+                    enums,
+                    Vec::new(),
+                    mappings,
+                );
+
+                let structured = FallbackIdentifier { payable, arms };
+
+                function_identifiers.push(FunctionsIdentifier::FallbackIdentifier(structured))
             }
             _ => (),
         }
@@ -790,7 +834,6 @@ fn extract_function_block(
                         let mut args: Vec<String> = Vec::new();
                         let tkns = &block[2..block.len() - 2].to_vec();
 
-                        println!("{:?}", tkns);
                         let mut skip = 0;
                         for (index, arg) in tkns.iter().enumerate() {
                             if skip > index {
