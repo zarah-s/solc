@@ -10,12 +10,12 @@ use crate::mods::{
         },
     },
     types::types::{
-        Argument, Assert, ConditionalType, Conditionals, ConstructorIdentifier, Delete, ElIf,
-        FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall, FunctionIdentifier,
-        FunctionMutability, FunctionsIdentifier, LineDescriptions, Loop, LoopType, MappingAssign,
-        MappingIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType, Revert,
-        RevertType, Token, TuppleAssignment, VariableAssign, VariableAssignOperation,
-        VariableAssignType, VariableIdentifier, VariableType,
+        Argument, Assert, ConditionalType, Conditionals, ConstructorIdentifier, CronIdentifier,
+        Delete, ElIf, FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall,
+        FunctionIdentifier, FunctionMutability, FunctionsIdentifier, LineDescriptions, Loop,
+        LoopType, MappingAssign, MappingIdentifier, OpenedBraceType, ReceiveIdentifier, Require,
+        Return, ReturnType, Revert, RevertType, Token, TuppleAssignment, VariableAssign,
+        VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
     },
 };
 
@@ -42,6 +42,8 @@ pub fn extract_functions(
             opened_braces_type = OpenedBraceType::Receive;
         } else if raw.starts_with("fallback") {
             opened_braces_type = OpenedBraceType::Fallback;
+        } else if raw.starts_with("cron") {
+            opened_braces_type = OpenedBraceType::Cron;
         }
 
         if raw.contains("{") {
@@ -60,6 +62,7 @@ pub fn extract_functions(
                         if let OpenedBraceType::Function
                         | OpenedBraceType::Constructor
                         | OpenedBraceType::Fallback
+                        | OpenedBraceType::Cron
                         | OpenedBraceType::Receive = opened_braces_type
                         {
                             opened_braces_type = OpenedBraceType::Contract;
@@ -76,6 +79,7 @@ pub fn extract_functions(
         if let OpenedBraceType::Function
         | OpenedBraceType::Constructor
         | OpenedBraceType::Receive
+        | OpenedBraceType::Cron
         | OpenedBraceType::Fallback = opened_braces_type
         {
             combined.push(line.clone())
@@ -197,7 +201,7 @@ pub fn extract_functions(
                 let function_body_start_index =
                     tokens.iter().position(|pred| pred == &Token::OpenBraces);
                 if let None = function_body_start_index {
-                    print_error(&format!("Unprocessible entity",));
+                    print_error(&format!("Unprocessible entity"));
                 }
 
                 let function_body = &tokens[function_body_start_index.unwrap()..];
@@ -214,6 +218,98 @@ pub fn extract_functions(
                 let structured = FallbackIdentifier { payable, arms };
 
                 function_identifiers.push(FunctionsIdentifier::FallbackIdentifier(structured))
+            }
+            Token::Cron => {
+                let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+
+                let function_definition: &[Token] = &tokens[..start_index.unwrap()];
+
+                let args = &function_definition[2..function_definition.len() - 1];
+                if args.len() != 3 {
+                    print_error("Unprocessible parameters for cron-job");
+                }
+
+                let mut min: u8 = 0;
+                let mut hr: u8 = 0;
+                let mut day: u8 = 0;
+                let mut month: u8 = 0;
+                let mut timezone: u8 = 0;
+                for __arg in &args[1..args.len() - 1] {
+                    match __arg {
+                        Token::Identifier(_num) => {
+                            let nums = _num.split(" ").collect::<Vec<_>>();
+                            if nums.len() != 5 {
+                                print_error("Unprocessible parameters for cron-job");
+                            }
+                            for (index, __num) in nums.iter().enumerate() {
+                                let num_value = __num.parse::<u8>();
+                                match num_value {
+                                    Ok(__val) => {
+                                        if index == 0 {
+                                            if __val > 59 {
+                                                print_error("min param ranges from 0-59");
+                                            } else {
+                                                min = __val;
+                                            }
+                                        } else if index == 1 {
+                                            if __val > 23 {
+                                                print_error("hr param ranges from 0-23");
+                                            } else {
+                                                hr = __val;
+                                            }
+                                        } else if index == 2 {
+                                            if __val == 0 || __val > 31 {
+                                                print_error("day param ranges from 1-31");
+                                            } else {
+                                                day = __val;
+                                            }
+                                        } else if index == 3 {
+                                            if __val == 0 || __val > 12 {
+                                                print_error("month param ranges from 1-12");
+                                            } else {
+                                                month = __val;
+                                            }
+                                        } else if index == 4 {
+                                            timezone = __val;
+                                        }
+                                    }
+
+                                    Err(_err) => print_error(&format!("{}. for cron params", _err)),
+                                }
+                            }
+                        }
+                        _other => print_error(&format!(
+                            "Unprocessible cron params {}",
+                            detokenize(_other)
+                        )),
+                    }
+                }
+
+                let function_body_start_index =
+                    tokens.iter().position(|pred| pred == &Token::OpenBraces);
+                if let None = function_body_start_index {
+                    print_error(&format!("Unprocessible entity",));
+                }
+
+                let function_body = &tokens[function_body_start_index.unwrap()..];
+                let arms: Vec<FunctionArm> = extract_function_arms(
+                    &function_body.to_vec(),
+                    custom_data_types,
+                    global_variables,
+                    enums,
+                    Vec::new(),
+                    mappings,
+                );
+
+                let structured = CronIdentifier {
+                    arms,
+                    day,
+                    hr,
+                    min,
+                    month,
+                    timezone,
+                };
+                function_identifiers.push(FunctionsIdentifier::CronIdentifier(structured));
             }
             _ => (),
         }

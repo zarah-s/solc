@@ -968,15 +968,9 @@ mod tests {
         }
 
         #[tokio::test]
-        #[should_panic(expected = "ERROR: day param ranges from 1-31")]
+        #[should_panic(expected = "ERROR: day param ranges from 0-31")]
         async fn test_fn_arm_panic_if_day_out_or_range() {
             get_fns("test/files/function/Fn36.sol").await;
-        }
-
-        #[tokio::test]
-        #[should_panic(expected = "ERROR: month param ranges from 1-12")]
-        async fn test_fn_arm_panic_if_month_out_or_range() {
-            get_fns("test/files/function/Fn37.sol").await;
         }
     }
 

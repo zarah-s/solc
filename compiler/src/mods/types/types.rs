@@ -175,11 +175,22 @@ pub struct FallbackIdentifier {
 }
 
 #[derive(Debug)]
+pub struct CronIdentifier {
+    pub min: u8,
+    pub hr: u8,
+    pub day: u8,
+    pub month: u8,
+    pub timezone: u8,
+    pub arms: Vec<FunctionArm>,
+}
+
+#[derive(Debug)]
 pub enum FunctionsIdentifier {
     FunctionIdentifier(FunctionIdentifier),
     ConstructorIdentifier(ConstructorIdentifier),
     ReceiveIdentifier(ReceiveIdentifier),
     FallbackIdentifier(FallbackIdentifier),
+    CronIdentifier(CronIdentifier),
 }
 
 #[derive(Debug)]
@@ -193,6 +204,7 @@ pub enum OpenedBraceType {
     Contract,
     Enum,
     Constructor,
+    Cron,
 }
 
 #[derive(Debug, Clone)]

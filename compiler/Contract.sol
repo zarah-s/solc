@@ -7,6 +7,10 @@ contract Mapping {
     address immutable owner;
     string message;
 
+    cron("0 8 1 1 0"){
+        set(address(0),2);
+    }
+
     constructor(string memory blah) {
         owner = msg.sender;
         message = blah;
@@ -34,6 +38,8 @@ contract Mapping {
     }
 
     fallback() external payable {
+        // set(address(0),1);
+
         remove(msg.sender);
         revert("Yo");
     }
