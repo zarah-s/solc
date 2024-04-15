@@ -169,10 +169,17 @@ pub struct ReceiveIdentifier {
 }
 
 #[derive(Debug)]
+pub struct FallbackIdentifier {
+    pub payable: bool,
+    pub arms: Vec<FunctionArm>,
+}
+
+#[derive(Debug)]
 pub enum FunctionsIdentifier {
     FunctionIdentifier(FunctionIdentifier),
     ConstructorIdentifier(ConstructorIdentifier),
     ReceiveIdentifier(ReceiveIdentifier),
+    FallbackIdentifier(FallbackIdentifier),
 }
 
 #[derive(Debug)]
@@ -182,6 +189,7 @@ pub enum OpenedBraceType {
     Callback,
     Function,
     Receive,
+    Fallback,
     Contract,
     Enum,
     Constructor,
