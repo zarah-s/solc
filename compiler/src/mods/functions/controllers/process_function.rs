@@ -201,7 +201,7 @@ pub fn extract_functions(
                 let function_body_start_index =
                     tokens.iter().position(|pred| pred == &Token::OpenBraces);
                 if let None = function_body_start_index {
-                    print_error(&format!("Unprocessible entity",));
+                    print_error(&format!("Unprocessible entity"));
                 }
 
                 let function_body = &tokens[function_body_start_index.unwrap()..];

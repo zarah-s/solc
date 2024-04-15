@@ -7,7 +7,7 @@
 - [x] complete while loops
 - [x] complete conditional statements
 
-- [] parse cron syntax
+- [x] parse cron syntax
 
 - [] parse full contract with inheritance
 
