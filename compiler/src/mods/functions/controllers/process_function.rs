@@ -98,7 +98,7 @@ pub fn extract_functions(
         combined.clear();
     }
 
-    println!("{:?}", stringified);
+    // println!("{:?}", stringified);
 
     for single_stringified in stringified {
         let tokens = LineDescriptions::to_token(single_stringified.as_str());
