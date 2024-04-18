@@ -11,6 +11,8 @@
 
 - [x] parse full contract with inheritance
 
+- [] disallow `gasless` keyword if function is a view function
+
 - [] parse interface
 
 - [] test interface interaction and implementation
