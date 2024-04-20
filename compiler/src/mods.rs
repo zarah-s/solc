@@ -34,7 +34,7 @@ mod tests {
     use super::{
         functions::controllers::{
             process_enum::extract_enum, process_file_contents, process_function::extract_functions,
-            process_state_variables::extract_global_variables, process_struct::extract_struct,
+            process_state_variables::extract_global_elements, process_struct::extract_struct,
             strip_comments, structure_to_line_descriptors,
         },
         types::types::{FunctionsIdentifier, LineDescriptions},
@@ -206,7 +206,7 @@ mod tests {
 
     mod global_variables_processing {
         use crate::mods::{
-            functions::controllers::process_state_variables::extract_global_variables,
+            functions::controllers::process_state_variables::extract_global_elements,
             types::types::{Mapping, MappingIdentifier, Token, VariableIdentifier, VariableType},
         };
 
@@ -215,31 +215,31 @@ mod tests {
         #[tokio::test]
         async fn test_variable_count() {
             let contents = get_file_contents("test/files/vars/Var.sol").await;
-            let (_vars, _, _) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            let (_vars, _, _, _) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
             assert_eq!(_vars.len(), 2);
         }
 
         #[tokio::test]
         async fn test_custom_error_count() {
             let contents = get_file_contents("test/files/vars/Error.sol").await;
-            let (_, _errs, _) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            let (_, _errs, _, _) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
             assert_eq!(_errs.len(), 1);
         }
 
         #[tokio::test]
         async fn test_custom_error_intergrity() {
             let contents = get_file_contents("test/files/vars/Error.sol").await;
-            let (_, _errs, _) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            let (_, _errs, _, _) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
             assert_eq!(
                 _errs[0],
-                "error InsufficientBalance(uint256 balance, uint256 withdrawAmount)"
+                "error InsufficientBalance(uint256 balance, uint256 withdrawAmount);"
             );
         }
 
         #[tokio::test]
         async fn test_mapping_count() {
             let contents = get_file_contents("test/files/vars/Map.sol").await;
-            let (_, _, _maps) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            let (_, _, _maps, _) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
             assert_eq!(_maps.len(), 2);
         }
 
@@ -247,28 +247,28 @@ mod tests {
         #[should_panic(expected = "ERROR: Unprocessible entity on mapping")]
         async fn test_mapping_identifier() {
             let contents = get_file_contents("test/files/vars/Map1.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         #[should_panic(expected = "ERROR: Mapping can not be set to external")]
         async fn test_mapping_external_visibility() {
             let contents = get_file_contents("test/files/vars/Map2.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         #[should_panic(expected = "ERROR: Unprocessible entity on mapping")]
         async fn test_mapping_closing_parenthesis() {
             let contents = get_file_contents("test/files/vars/Map3.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         #[should_panic(expected = "ERROR: Invalid data type \"addresss\"")]
         async fn test_mapping_data_type() {
             let contents = get_file_contents("test/files/vars/Map4.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
@@ -301,7 +301,7 @@ mod tests {
                     },
                 },
             ];
-            let (_, _, _maps) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            let (_, _, _maps, _) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
 
             for (i, _map) in _maps.iter().enumerate() {
                 let val = &expected[i];
@@ -311,24 +311,24 @@ mod tests {
 
         #[tokio::test]
         #[should_panic(
-            expected = "ERROR: Invalid data type \"strings public text = \"Hello\"\" on line 6"
+            expected = "ERROR: Invalid data type \"strings public text = \"Hello\";\" on line 6"
         )]
         async fn test_variable_data_type() {
             let contents = get_file_contents("test/files/vars/Var2.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         #[should_panic(expected = "ERROR: Missing \"]\" on line 8")]
         async fn test_variable_missing_close_bracket_for_arr_vars() {
             let contents = get_file_contents("test/files/vars/Var3.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         async fn test_variable_dynamic_arr() {
             let contents = get_file_contents("test/files/vars/Var6.sol").await;
-            let (_vars, _, _) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            let (_vars, _, _, _) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
             assert_eq!(_vars[0].is_array, true);
             assert_eq!(_vars[0].size, None);
         }
@@ -336,7 +336,7 @@ mod tests {
         #[tokio::test]
         async fn test_variable_fixed_arr() {
             let contents = get_file_contents("test/files/vars/Var6.sol").await;
-            let (_vars, _, _) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            let (_vars, _, _, _) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
             assert_eq!(_vars[1].is_array, true);
             assert_eq!(_vars[1].size, Some("10*10".to_string()));
         }
@@ -345,20 +345,20 @@ mod tests {
         #[should_panic(expected = "ERROR: Missing \"]\" on line 8")]
         async fn test_invalid_syntax_close_bracket_for_arr_vars() {
             let contents = get_file_contents("test/files/vars/Var4.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         #[should_panic(expected = "Unprocessible entity bool = false")]
         async fn test_var_identifier() {
             let contents = get_file_contents("test/files/vars/Var5.sol").await;
-            extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         async fn test_variable_integrity() {
             let contents = get_file_contents("test/files/vars/Var.sol").await;
-            let (vars, _, _) = extract_global_variables(&contents, &Vec::new(), &Vec::new());
+            let (vars, _, _, _) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
             let expected_vars = vec![
                 VariableIdentifier {
                     data_type: Token::String,
@@ -1030,8 +1030,8 @@ mod tests {
             .collect();
         let custom_data_types_identifiers: Vec<&str> =
             [enum_identifiers.clone(), struct_identifiers].concat();
-        let (_vars, _, _maps) =
-            extract_global_variables(&contents, &custom_data_types_identifiers, &enum_identifiers);
+        let (_vars, _, _maps, _) =
+            extract_global_elements(&contents, &custom_data_types_identifiers, &enum_identifiers);
 
         let fns = extract_functions(
             &contents,
