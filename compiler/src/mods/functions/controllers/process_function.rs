@@ -3,7 +3,7 @@ use std::process;
 use crate::mods::{
     constants::constants::{DATA_TYPES, KEYWORDS},
     functions::{
-        controllers::process_state_variables::extract_global_variables,
+        controllers::process_state_variables::extract_global_elements,
         helpers::helpers::{
             detokenize, extract_data_location_from_token, extract_integer_types_from_token,
             print_error, validate_expression, validate_identifier_regex, validate_variable,
@@ -1792,11 +1792,12 @@ fn extract_function_block(
                             text: "}".to_string(),
                             line: 0,
                         });
-                        let (__variables, _, _): (
+                        let (__variables, _, _, _): (
                             Vec<VariableIdentifier>,
                             Vec<String>,
                             Vec<MappingIdentifier>,
-                        ) = extract_global_variables(&line_descriptors, custom_data_types, enums);
+                            Vec<String>,
+                        ) = extract_global_elements(&line_descriptors, custom_data_types, enums);
                         full_block.push(FunctionArm::TuppleAssignment(TuppleAssignment {
                             value: _value.unwrap(),
                             variables: __variables,
