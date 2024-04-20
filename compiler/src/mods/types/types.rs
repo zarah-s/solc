@@ -4,6 +4,7 @@ pub enum Token {
     Identifier(String),
     Contract,
     Revert,
+    Event,
     Ether,
     Wei,
     Bytes,
@@ -198,11 +199,12 @@ pub enum FunctionsIdentifier {
 pub struct ContractIdentifier {
     pub identifier: String,
     pub inheritance: Option<Vec<String>>,
-    pub global_variables: Vec<VariableIdentifier>,
+    pub state_variables: Vec<VariableIdentifier>,
     pub mappings: Vec<MappingIdentifier>,
     pub enums: Vec<EnumIdentifier>,
     pub structs: Vec<StructIdentifier>,
     pub custom_errors: Vec<String>,
+    pub events: Vec<String>,
     pub functions: Vec<FunctionsIdentifier>,
 }
 

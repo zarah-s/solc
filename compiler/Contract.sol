@@ -1,21 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-contract Mapping is Var, Str, Test, Script,true {
+contract Mapping {
     // Mapping from address to uint
-    mapping(address => uint256) public myMap;
-    address immutable owner;
-    string message;
 
-    cron("0 8 1 1 0"){
-        set(address(0),2);
-    }
+    error INSUFFICIENT_BALANCE(
+        uint,
+        address,
+        string,
+        string,
+        uint,
+        uint,
+        uint,
+        uint,
+        uint,
+        uint
+    );
+    event BuyShares(
+        address indexed user,
+        uint indexed amount,
+        uint8 indexed shares
+    );
+    string public text = "Hello";
 
-    constructor(string memory blah) {
-        owner = msg.sender;
-        message = blah;
-        get(msg.sender);
-    }
+    mapping(address => uint) public myMap;
 
     function get(address _addr) public view returns (uint256) {
         // Mapping always returns a value.
@@ -32,15 +40,46 @@ contract Mapping is Var, Str, Test, Script,true {
         // Reset the value to the default value.
         delete myMap[_addr];
     }
+}
 
-    receive() external payable {
-        remove(address(0));
+contract NestedMapping {
+    // Nested mapping (mapping from address to another mapping)
+    mapping(address => mapping(uint256 => bool)) public nested;
+
+    function get(address _addr1, uint256 _i) public view returns (bool) {
+        // You can get values from a nested mapping
+        // even when it is not initialized
+        return nested[_addr1][_i];
     }
 
-    fallback() external payable {
-        // set(address(0),1);
+    function set(address _addr1, uint256 _i, bool _boo) public {
+        nested[_addr1][_i] = _boo;
+    }
 
-        remove(msg.sender);
-        revert("Yo");
+    function remove(address _addr1, uint256 _i) public {
+        delete nested[_addr1][_i];
+    }
+}
+
+contract IfElse is Mapping {
+    function foo(uint256 x) public pure returns (uint256) {
+        if (x < 10) {
+            return 0;
+        } else if (x < 20) {
+            return 1;
+        } else {
+            return 2;
+        }
+    }
+
+    function ternary(uint256 _x) public pure returns (uint256) {
+        // if (_x < 10) {
+        //     return 1;
+        // }
+        // return 2;
+
+        // shorthand way to write if / else statement
+        // the "?" operator is called the ternary operator
+        return _x < 10 ? 1 : 2;
     }
 }
