@@ -7,7 +7,7 @@ mod mods;
 use mods::{
     functions::controllers::{
         process_enum::extract_enum, process_file_contents::process_file_contents,
-        process_function::extract_functions, process_state_variables::extract_global_variables,
+        process_function::extract_functions, process_state_variables::extract_global_elements,
         process_struct::extract_struct, strip_comments::strip_comments,
         structure_to_line_descriptors::structure_to_line_descriptors,
     },
@@ -81,13 +81,13 @@ async fn main() -> Result<(), io::Error> {
         let custom_data_types_identifiers: Vec<&str> =
             [enum_identifiers.clone(), struct_identifiers].concat();
 
-        let (global_variables, custom_errors, mappings) =
-            extract_global_variables(&ddd, &custom_data_types_identifiers, &enum_identifiers);
+        let (state_variables, custom_errors, mappings, events) =
+            extract_global_elements(&ddd, &custom_data_types_identifiers, &enum_identifiers);
 
         let (functions, contract_identifier, contract_inheritance) = extract_functions(
             &ddd,
             &custom_data_types_identifiers,
-            &global_variables,
+            &state_variables,
             &enum_identifiers,
             &mappings,
         );
@@ -100,15 +100,16 @@ async fn main() -> Result<(), io::Error> {
             },
             custom_errors,
             enums: extracted_enums,
+            events,
             functions,
             mappings,
-            global_variables: global_variables,
+            state_variables,
             structs: structs_tree,
         };
         contract_construct.push(contract_identifier)
     }
 
-    println!("{:?}", contract_construct);
+    println!("{:#?}", contract_construct);
 
     // println!(
     //     "===> STRUCT ===>\n{:#?}\n\n ===> GLOBAL_VARIABLES ===>\n{:#?}\n\n ===> MAPPINGS ===>\n{:#?}\n\n ===> ENUMS ===>\n{:#?}\n\n ===>> CUSTOM_ERRORS ==>>\n{:#?}\n\n ===>> FUNCTIONS ==>>\n{:#?}",
