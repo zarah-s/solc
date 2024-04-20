@@ -31,10 +31,11 @@ pub const DATA_TYPES: [&str; 30] = [
     "address[]",
 ];
 
-pub const KEYWORDS: [&str; 46] = [
+pub const KEYWORDS: [&str; 47] = [
     "contract",
     "mapping",
     "wei",
+    "event",
     "ether",
     "error",
     "push",
