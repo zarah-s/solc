@@ -3,7 +3,27 @@ pragma solidity ^0.8.24;
 
 contract Mapping {
     // Mapping from address to uint
-    mapping(address => uint256) public myMap;
+
+    error INSUFFICIENT_BALANCE(
+        uint,
+        address,
+        string,
+        string,
+        uint,
+        uint,
+        uint,
+        uint,
+        uint,
+        uint
+    );
+    event BuyShares(
+        address indexed user,
+        uint indexed amount,
+        uint8 indexed shares
+    );
+    string public text = "Hello";
+
+    mapping(address => uint) public myMap;
 
     function get(address _addr) public view returns (uint256) {
         // Mapping always returns a value.

@@ -19,6 +19,7 @@ pub fn lex_to_token(input: &str) -> Token {
         "bytes" => Token::Bytes,
         "wei" => Token::Wei,
         "ether" => Token::Ether,
+        "event" => Token::Event,
         "while" => Token::While,
         "contract" => Token::Contract,
         "mapping" => Token::Mapping,
@@ -108,6 +109,7 @@ pub fn detokenize(input: &Token) -> String {
         Token::Contract => "contract".to_string(),
         Token::Assert => "assert".to_string(),
         Token::Is => "is".to_string(),
+        Token::Event => "event".to_string(),
         Token::Ether => "ether".to_string(),
         Token::Wei => "wei".to_string(),
         Token::Bytes => "bytes".to_string(),
@@ -494,11 +496,13 @@ pub fn validate_variable(
     Option<VariableIdentifier>,
     Option<String>,
     Option<MappingIdentifier>,
+    Option<String>,
 ) {
     let mut is_array = false;
     let mut size: Option<String> = None;
     let mut data_type: Option<Token> = None;
     let mut is_custom_error = false;
+    let mut is_event = false;
     let mut variable_name: Option<String> = None;
     let mut visibility = Token::Internal;
     let mut mutability = Token::Mutable;
@@ -506,7 +510,7 @@ pub fn validate_variable(
     let mut type_ = VariableType::Variable;
     let mut storage: Option<Token> = None;
     let mut is_primitive = true;
-    let tokens = LineDescriptions::to_token(&format!("{};", text.text));
+    let tokens = LineDescriptions::to_token(&format!("{}", text.text));
     let mut mapping = Mapping::new();
     if let Token::Mapping = &tokens[0] {
         let mut pad = 0;
@@ -561,6 +565,7 @@ pub fn validate_variable(
             Token::Identifier(_id) => {
                 identifier = _id.to_owned();
             }
+            Token::SemiColon => (),
             _ => {
                 print_error("Unprocessible entity on mapping");
             }
@@ -588,7 +593,7 @@ pub fn validate_variable(
             visibility: visibility.unwrap(),
         };
 
-        return (None, None, Some(structured_mapping));
+        return (None, None, Some(structured_mapping), None);
     } else {
         if let Token::Identifier(_identifier) = &tokens[0] {
             for custom_data_type in custom_data_types {
@@ -608,6 +613,8 @@ pub fn validate_variable(
         } else {
             if let Token::Error = &tokens[0] {
                 is_custom_error = true;
+            } else if let Token::Event = &tokens[0] {
+                is_event = true;
             } else {
                 if let Token::String = &tokens[0] {
                     if is_function_variable {
@@ -618,7 +625,7 @@ pub fn validate_variable(
             }
         }
 
-        if !is_custom_error {
+        if !is_custom_error && !is_event {
             if let None = data_type {
                 print_error(&format!(
                     "Invalid data type \"{}\" on line {}",
@@ -684,9 +691,10 @@ pub fn validate_variable(
                     _string_value.push_str(&LineDescriptions::from_token_to_string(res))
                 }
             }
+
             value = Some(_string_value);
         } else {
-            if !is_custom_error {
+            if !is_custom_error && !is_event {
                 for token in &tokens {
                     if let Token::Identifier(_val) = token {
                         variable_name = Some(_val.to_owned());
@@ -716,7 +724,10 @@ pub fn validate_variable(
         }
 
         if is_custom_error {
-            return (None, Some(text.text), None);
+            return (None, Some(text.text), None, None);
+        }
+        if is_event {
+            return (None, None, None, Some(text.text));
         }
         let structured = VariableIdentifier {
             data_type: data_type.unwrap(),
@@ -730,6 +741,6 @@ pub fn validate_variable(
             storage_location: storage,
         };
 
-        return (Some(structured), None, None);
+        return (Some(structured), None, None, None);
     }
 }

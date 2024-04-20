@@ -1,21 +1,28 @@
 use crate::mods::{
     constants::constants::SYMBOLS,
-    functions::helpers::helpers::validate_variable,
+    functions::helpers::helpers::{print_error, validate_variable},
     types::types::{LineDescriptions, MappingIdentifier, OpenedBraceType, VariableIdentifier},
 };
 
-pub fn extract_global_variables(
+pub fn extract_global_elements(
     data: &Vec<LineDescriptions>,
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
-) -> (Vec<VariableIdentifier>, Vec<String>, Vec<MappingIdentifier>) {
+) -> (
+    Vec<VariableIdentifier>,
+    Vec<String>,
+    Vec<MappingIdentifier>,
+    Vec<String>,
+) {
     let mut global_variables: Vec<VariableIdentifier> = Vec::new();
     let mut custom_errors: Vec<String> = Vec::new();
+    let mut events: Vec<String> = Vec::new();
     let mut mappings: Vec<MappingIdentifier> = Vec::new();
 
     let mut opened_braces = 0;
     let mut opened_brace_type = OpenedBraceType::None;
     let mut variables: Vec<LineDescriptions> = Vec::new();
+    let mut combo = String::new();
     for sst in data {
         if sst.text.starts_with("contract") {
             opened_brace_type = OpenedBraceType::Contract;
@@ -63,19 +70,59 @@ pub fn extract_global_variables(
                     if !SYMBOLS.contains(&sst.text.as_str()) {
                         if !sst.text.starts_with("contract") {
                             let splited: Vec<&str> = sst.text.split(";").collect();
-                            for spl in splited {
-                                if !spl.trim().is_empty() {
-                                    variables.push(LineDescriptions {
-                                        text: format!("{spl}"),
-                                        line: sst.line,
-                                    })
+                            let mut local_combo = String::new();
+                            if splited[splited.len() - 1].trim().is_empty() {
+                                if !combo.trim().is_empty() {
+                                    local_combo.push_str(&combo);
                                 }
+                                for spl in &splited {
+                                    if !spl.trim().is_empty() {
+                                        local_combo.push_str(spl);
+                                    } else {
+                                        local_combo.push(';');
+                                    }
+                                }
+
+                                variables.push(LineDescriptions {
+                                    text: local_combo,
+                                    line: sst.line,
+                                });
+                                combo.clear();
+                            } else {
+                                combo.push_str(&sst.text);
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    // let mut combined: Vec<LineDescriptions> = Vec::new();
+    // let mut combo = String::new();
+    // for variable in variables {
+    //     if variable.text.ends_with(";") {
+    //         if combo.is_empty() {
+    //             combined.push(variable)
+    //         } else {
+    //             combo.push_str(&variable.text);
+    //             combined.push(LineDescriptions {
+    //                 text: combo.clone(),
+    //                 line: variable.line - 1,
+    //             });
+    //             combo.clear();
+    //         }
+    //     } else {
+    //         combo.push_str(&variable.text);
+    //     }
+    // }
+
+    // println!("{:?}", combo);
+
+    if !combo.trim().is_empty() {
+        print_error(&format!(
+            "Unprocessible entity for {combo}. expecting \";\""
+        ));
     }
 
     for variable in variables {
@@ -86,8 +133,10 @@ pub fn extract_global_variables(
             custom_errors.push(_custom_err)
         } else if let Some(_mapping) = validated.2 {
             mappings.push(_mapping)
+        } else if let Some(_event) = validated.3 {
+            events.push(_event)
         }
     }
 
-    (global_variables, custom_errors, mappings)
+    (global_variables, custom_errors, mappings, events)
 }
