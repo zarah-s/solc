@@ -111,11 +111,6 @@ async fn main() -> Result<(), io::Error> {
 
     println!("{:#?}", contract_construct);
 
-    // println!(
-    //     "===> STRUCT ===>\n{:#?}\n\n ===> GLOBAL_VARIABLES ===>\n{:#?}\n\n ===> MAPPINGS ===>\n{:#?}\n\n ===> ENUMS ===>\n{:#?}\n\n ===>> CUSTOM_ERRORS ==>>\n{:#?}\n\n ===>> FUNCTIONS ==>>\n{:#?}",
-    //     structs_tree, global_variables,mappings, extracted_enums, custom_errors,functions
-    // );
-
     let end_time = time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
     println!(
         "Program completed in \x1b[93m{:?}\x1b[0m",
