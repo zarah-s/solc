@@ -594,7 +594,11 @@ fn extract_full_function(
     }
 
     if function_definition.contains(&Token::Gasless) {
-        gasless = true;
+        if let FunctionMutability::Mutable = function_mutability {
+            gasless = true;
+        } else {
+            print_error("cannot define \"gasless\" for view or pure function");
+        }
     }
     let structure: FunctionIdentifier = FunctionIdentifier {
         arguments: function_arguments,

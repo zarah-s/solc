@@ -578,6 +578,19 @@ mod tests {
         }
 
         #[tokio::test]
+        #[should_panic(expected = "ERROR: cannot define \"gasless\" for view or pure function")]
+        async fn test_function_arg_panic_if_gasless_is_defined_for_non_mutable_function() {
+            let contents = get_file_contents("test/files/function/Fn45.sol").await;
+            extract_functions(
+                &contents,
+                &Vec::new(),
+                &Vec::new(),
+                &Vec::new(),
+                &Vec::new(),
+            );
+        }
+
+        #[tokio::test]
         async fn test_function_args_integrity() {
             let contents = get_file_contents("test/files/function/Fn7.sol").await;
             let functions = extract_functions(

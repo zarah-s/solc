@@ -22,6 +22,11 @@ contract Mapping {
         uint indexed amount,
         uint8 indexed shares
     );
+
+    function testFn() external view returns (uint) {
+        return 112;
+    }
+
     string public text = "Hello";
     address owner;
     modifier OnlyOwner() {
