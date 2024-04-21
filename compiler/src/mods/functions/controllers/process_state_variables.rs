@@ -36,6 +36,8 @@ pub fn extract_global_elements(
             opened_brace_type = OpenedBraceType::Callback;
         } else if sst.text.starts_with("function") {
             opened_brace_type = OpenedBraceType::Function;
+        } else if sst.text.starts_with("modifier") {
+            opened_brace_type = OpenedBraceType::Modifier;
         }
 
         if sst.text.contains("{") {
@@ -47,9 +49,6 @@ pub fn extract_global_elements(
         }
 
         if sst.text.contains("}") {
-            if sst.text.contains("{") {
-                continue;
-            }
             for llm in sst.text.chars() {
                 if llm == '}' {
                     opened_braces -= 1;
@@ -57,6 +56,9 @@ pub fn extract_global_elements(
                         opened_brace_type = OpenedBraceType::Contract;
                     }
                 }
+            }
+            if sst.text.contains("{") {
+                continue;
             }
         }
 
@@ -66,6 +68,7 @@ pub fn extract_global_elements(
                     && !sst.text.contains("receive")
                     && !sst.text.contains("cron")
                     && !sst.text.contains("function")
+                    && !sst.text.contains("modifier")
                 {
                     if !SYMBOLS.contains(&sst.text.as_str()) {
                         if !sst.text.starts_with("contract") {
@@ -97,27 +100,6 @@ pub fn extract_global_elements(
             }
         }
     }
-
-    // let mut combined: Vec<LineDescriptions> = Vec::new();
-    // let mut combo = String::new();
-    // for variable in variables {
-    //     if variable.text.ends_with(";") {
-    //         if combo.is_empty() {
-    //             combined.push(variable)
-    //         } else {
-    //             combo.push_str(&variable.text);
-    //             combined.push(LineDescriptions {
-    //                 text: combo.clone(),
-    //                 line: variable.line - 1,
-    //             });
-    //             combo.clear();
-    //         }
-    //     } else {
-    //         combo.push_str(&variable.text);
-    //     }
-    // }
-
-    // println!("{:?}", combo);
 
     if !combo.trim().is_empty() {
         print_error(&format!(

@@ -13,9 +13,10 @@ use crate::mods::{
         Argument, Assert, ConditionalType, Conditionals, ConstructorIdentifier, CronIdentifier,
         Delete, ElIf, FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall,
         FunctionIdentifier, FunctionMutability, FunctionsIdentifier, LineDescriptions, Loop,
-        LoopType, MappingAssign, MappingIdentifier, OpenedBraceType, ReceiveIdentifier, Require,
-        Return, ReturnType, Revert, RevertType, Token, TuppleAssignment, VariableAssign,
-        VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
+        LoopType, MappingAssign, MappingIdentifier, ModifierIdentifier, OpenedBraceType,
+        ReceiveIdentifier, Require, Return, ReturnType, Revert, RevertType, Token,
+        TuppleAssignment, VariableAssign, VariableAssignOperation, VariableAssignType,
+        VariableIdentifier, VariableType,
     },
 };
 
@@ -49,6 +50,8 @@ pub fn extract_functions(
             opened_braces_type = OpenedBraceType::Cron;
         } else if raw.starts_with("contract") {
             opened_braces_type = OpenedBraceType::Contract;
+        } else if raw.starts_with("modifier") {
+            opened_braces_type = OpenedBraceType::Modifier;
         }
 
         if let OpenedBraceType::Contract = opened_braces_type {
@@ -56,7 +59,8 @@ pub fn extract_functions(
         }
 
         if raw.contains("{") {
-            for character in raw.chars() {
+            let characters = raw.chars();
+            for character in characters {
                 if character == '{' {
                     if let OpenedBraceType::Contract = opened_braces_type {
                         opened_braces_type = OpenedBraceType::None;
@@ -67,6 +71,7 @@ pub fn extract_functions(
                             &mut contract_inheritance,
                         )
                     }
+
                     opened_braces += 1;
                 }
             }
@@ -81,6 +86,7 @@ pub fn extract_functions(
                         | OpenedBraceType::Constructor
                         | OpenedBraceType::Fallback
                         | OpenedBraceType::Cron
+                        | OpenedBraceType::Modifier
                         | OpenedBraceType::Receive = opened_braces_type
                         {
                             opened_braces_type = OpenedBraceType::None;
@@ -98,6 +104,7 @@ pub fn extract_functions(
         | OpenedBraceType::Constructor
         | OpenedBraceType::Receive
         | OpenedBraceType::Cron
+        | OpenedBraceType::Modifier
         | OpenedBraceType::Fallback = opened_braces_type
         {
             combined.push(line.clone())
@@ -132,6 +139,51 @@ pub fn extract_functions(
                 &tokens,
                 &mut function_identifiers,
             ),
+            Token::Modifier => {
+                let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+                let mut arguments: Vec<Argument> = Vec::new();
+                let mut identifier = String::new();
+                let function_definition: &[Token] = &tokens[..start_index.unwrap()];
+
+                match &function_definition[1] {
+                    Token::Identifier(_identifier) => {
+                        identifier = _identifier.to_owned();
+                    }
+                    _ => {
+                        print_error("Unprocessible entity for modifier name");
+                    }
+                }
+                if let Token::OpenParenthesis = &function_definition[2] {
+                    arguments =
+                        prepare_and_get_function_args(function_definition, custom_data_types);
+                }
+
+                let function_body_start_index =
+                    tokens.iter().position(|pred| pred == &Token::OpenBraces);
+                if let None = function_body_start_index {
+                    print_error(&format!("Unprocessible entity",));
+                }
+
+                let function_body = &tokens[function_body_start_index.unwrap()..];
+
+                let arms: Vec<FunctionArm> = extract_function_arms(
+                    &function_body.to_vec(),
+                    custom_data_types,
+                    global_variables,
+                    enums,
+                    Vec::new(),
+                    mappings,
+                );
+
+                let structured = ModifierIdentifier {
+                    arguments,
+                    arms,
+                    name: identifier,
+                };
+                function_identifiers.push(FunctionsIdentifier::ModifierIdentifier(structured));
+
+                // println!("{:?}", function_definition);
+            }
             Token::Constructor => {
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
 
@@ -1106,6 +1158,21 @@ fn extract_function_block(
                                     if let Some(_) = function_scope_variable {
                                         full_block.push(function_scope_variable.unwrap());
                                     }
+                                }
+                            } else if _identifier == "_" {
+                                if let Token::SemiColon = block[1] {
+                                    full_block.push(FunctionArm::FunctionExecution);
+                                } else {
+                                    print_error(&format!(
+                                        "Unidentifined variable \"{}\"",
+                                        _identifier
+                                    ))
+                                }
+                            } else if _identifier == "break" {
+                                if let Token::SemiColon = block[1] {
+                                    full_block.push(FunctionArm::Break);
+                                } else {
+                                    print_error("Expecting \";\" for break");
                                 }
                             } else {
                                 print_error(&format!("Unidentifined variable \"{}\"", _identifier))
