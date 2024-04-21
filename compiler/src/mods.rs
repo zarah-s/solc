@@ -227,12 +227,29 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn test_event_count() {
+            let contents = get_file_contents("test/files/vars/Event.sol").await;
+            let (_, _, _, _events) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
+            assert_eq!(_events.len(), 1);
+        }
+
+        #[tokio::test]
         async fn test_custom_error_intergrity() {
             let contents = get_file_contents("test/files/vars/Error.sol").await;
             let (_, _errs, _, _) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
             assert_eq!(
                 _errs[0],
                 "error InsufficientBalance(uint256 balance, uint256 withdrawAmount);"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_event_intergrity() {
+            let contents = get_file_contents("test/files/vars/Event.sol").await;
+            let (_, _, _, _events) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
+            assert_eq!(
+                _events[0],
+                "event BuyShares(address indexed user,uint indexed amount,uint8 indexed shares);"
             );
         }
 
@@ -855,7 +872,6 @@ mod tests {
                 },
                 _ => (),
             }
-            // assert_eq!(fns[0], expected);
         }
 
         #[tokio::test]
@@ -879,6 +895,45 @@ mod tests {
                 }
                 _ => (),
             }
+        }
+
+        #[tokio::test]
+        async fn test_modifier() {
+            let fns = get_fns("test/files/function/Fn43.sol").await;
+            match &fns[0] {
+                FunctionsIdentifier::ModifierIdentifier(_fn) => {
+                    assert_eq!(_fn.arms.len(), 1);
+                }
+                _ => (),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_modifier_argument() {
+            let fns = get_fns("test/files/function/Fn43.sol").await;
+            match &fns[0] {
+                FunctionsIdentifier::ModifierIdentifier(_fn) => {
+                    assert_eq!(_fn.arguments.len(), 0);
+                }
+                _ => (),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_modifier_name() {
+            let fns = get_fns("test/files/function/Fn43.sol").await;
+            match &fns[0] {
+                FunctionsIdentifier::ModifierIdentifier(_fn) => {
+                    assert_eq!(_fn.name, "OnlyOwner");
+                }
+                _ => (),
+            }
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Unprocessible entity for modifier name")]
+        async fn test_modifier_panic_if_no_name() {
+            get_fns("test/files/function/Fn44.sol").await;
         }
 
         #[tokio::test]
