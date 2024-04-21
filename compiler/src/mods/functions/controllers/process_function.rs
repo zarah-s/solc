@@ -181,8 +181,6 @@ pub fn extract_functions(
                     name: identifier,
                 };
                 function_identifiers.push(FunctionsIdentifier::ModifierIdentifier(structured));
-
-                // println!("{:?}", function_definition);
             }
             Token::Constructor => {
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
