@@ -3,6 +3,7 @@
 pub enum Token {
     Identifier(String),
     Contract,
+    Modifier,
     Revert,
     Event,
     Ether,
@@ -193,6 +194,7 @@ pub enum FunctionsIdentifier {
     ReceiveIdentifier(ReceiveIdentifier),
     FallbackIdentifier(FallbackIdentifier),
     CronIdentifier(CronIdentifier),
+    ModifierIdentifier(ModifierIdentifier),
 }
 
 #[derive(Debug)]
@@ -213,6 +215,7 @@ pub enum OpenedBraceType {
     None,
     Struct,
     Callback,
+    Modifier,
     Function,
     Receive,
     Fallback,
@@ -245,6 +248,13 @@ pub struct FunctionIdentifier {
     pub returns: Option<Vec<ReturnType>>,
     pub r#override: bool,
     pub r#virtual: bool,
+    pub arms: Vec<FunctionArm>,
+}
+
+#[derive(Debug)]
+pub struct ModifierIdentifier {
+    pub name: String,
+    pub arguments: Vec<Argument>,
     pub arms: Vec<FunctionArm>,
 }
 
@@ -352,6 +362,8 @@ pub enum FunctionArm {
     MappingAssign(MappingAssign),
     TuppleAssignment(TuppleAssignment),
     FunctionCall(FunctionCall),
+    FunctionExecution,
+    Break,
     Require(Require),
     Conditionals(Conditionals),
     Return(Return),

@@ -15,6 +15,7 @@ pub fn print_error(msg: &str) {
 pub fn lex_to_token(input: &str) -> Token {
     let token = match input {
         "revert" => Token::Revert,
+        "modifier" => Token::Modifier,
         "assert" => Token::Assert,
         "bytes" => Token::Bytes,
         "wei" => Token::Wei,
@@ -107,6 +108,7 @@ pub fn lex_to_token(input: &str) -> Token {
 pub fn detokenize(input: &Token) -> String {
     let token: String = match input {
         Token::Contract => "contract".to_string(),
+        Token::Modifier => "modifier".to_string(),
         Token::Assert => "assert".to_string(),
         Token::Is => "is".to_string(),
         Token::Event => "event".to_string(),

@@ -16,12 +16,27 @@ contract Mapping {
         uint,
         uint
     );
+
     event BuyShares(
         address indexed user,
         uint indexed amount,
         uint8 indexed shares
     );
     string public text = "Hello";
+    address owner;
+    modifier OnlyOwner() {
+        require(msg.sender == owner, "Not allowed");
+        while (true) {
+            owner = msg.sender;
+            if (owner == address(0)) {
+                owner = msg.sender;
+                break;
+            }
+        }
+        _;
+    }
+
+    function _fn() {}
 
     mapping(address => uint) public myMap;
 
