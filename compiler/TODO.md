@@ -13,7 +13,7 @@
 
 - [x] disallow `gasless` keyword if function is a view function
 
-- [] parse interface
+- [x] parse interface
 
 - [] test interface interaction and implementation
 

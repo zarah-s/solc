@@ -15,10 +15,12 @@ pub fn print_error(msg: &str) {
 pub fn lex_to_token(input: &str) -> Token {
     let token = match input {
         "revert" => Token::Revert,
+        " " => Token::Space,
         "modifier" => Token::Modifier,
         "assert" => Token::Assert,
         "bytes" => Token::Bytes,
         "wei" => Token::Wei,
+        "interface" => Token::Interface,
         "ether" => Token::Ether,
         "event" => Token::Event,
         "while" => Token::While,
@@ -109,9 +111,11 @@ pub fn detokenize(input: &Token) -> String {
     let token: String = match input {
         Token::Contract => "contract".to_string(),
         Token::Modifier => "modifier".to_string(),
+        Token::Space => " ".to_string(),
+        Token::Interface => "interface".to_string(),
         Token::Assert => "assert".to_string(),
         Token::Is => "is".to_string(),
-        Token::Event => "event".to_string(),
+        Token::Event => "event ".to_string(),
         Token::Ether => "ether".to_string(),
         Token::Wei => "wei".to_string(),
         Token::Bytes => "bytes".to_string(),
@@ -122,7 +126,7 @@ pub fn detokenize(input: &Token) -> String {
         Token::False => "false".to_string(),
         Token::Push => "push".to_string(),
         Token::Pop => "pop".to_string(),
-        Token::Error => "error".to_string(),
+        Token::Error => "error ".to_string(),
         Token::Delete => "delete".to_string(),
         Token::Require => "require".to_string(),
         Token::Mutable => "mutable".to_string(),
@@ -135,14 +139,14 @@ pub fn detokenize(input: &Token) -> String {
         Token::Receive => "receive".to_string(),
         Token::Fallback => "fallback".to_string(),
         Token::Cron => "cron".to_string(),
-        Token::Enum => "enum".to_string(),
+        Token::Enum => "enum ".to_string(),
         Token::Virtual => "virtual".to_string(),
         Token::New => "new ".to_string(),
         Token::Override => "override".to_string(),
         Token::Gasless => "gasless".to_string(),
         Token::Address => "address".to_string(),
         Token::Private => "private".to_string(),
-        Token::Struct => "struct".to_string(),
+        Token::Struct => "struct ".to_string(),
         Token::Function => "function".to_string(),
         Token::Public => "public".to_string(),
         Token::View => "view".to_string(),
@@ -417,11 +421,12 @@ pub fn extract_custom_data_types_tokens(
         stringified.push_str(&line_data.text);
     }
     let tokens = LineDescriptions::to_token(&stringified);
+    // println!("\n\n Data=>>>>>>>> \n {:?}\n", tokens);
 
     let mut opened_braces = 0;
     let mut opened_brace_type = OpenedBraceType::None;
 
-    for token in tokens {
+    for token in tokens.clone() {
         match token {
             Token::OpenBraces => {
                 opened_braces += 1;

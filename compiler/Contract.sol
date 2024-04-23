@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-contract Mapping {
-    // Mapping from address to uint
-
+interface IERC20 {
     error INSUFFICIENT_BALANCE(
         uint,
         address,
@@ -16,6 +14,50 @@ contract Mapping {
         uint,
         uint
     );
+
+    enum Statusddd {
+        Pending,
+        Shipped,
+        Accepted,
+        Rejected,
+        Canceled
+    }
+    struct Yo {
+        address owner;
+        string name;
+    }
+
+    event EVN();
+
+    function deposit() external;
+}
+
+contract Mapping {
+    // Mapping from address to uint
+
+    struct Yos {
+        address owner;
+        string name;
+    }
+    error INSUFFICIENT_BALANCE(
+        uint,
+        address,
+        string,
+        string,
+        uint,
+        uint,
+        uint,
+        uint,
+        uint,
+        uint
+    );
+    enum Status {
+        Pending,
+        Shipped,
+        Accepted,
+        Rejected,
+        Canceled
+    }
 
     event BuyShares(
         address indexed user,
@@ -62,44 +104,44 @@ contract Mapping {
     }
 }
 
-contract NestedMapping {
-    // Nested mapping (mapping from address to another mapping)
-    mapping(address => mapping(uint256 => bool)) public nested;
+// contract NestedMapping {
+//     // Nested mapping (mapping from address to another mapping)
+//     mapping(address => mapping(uint256 => bool)) public nested;
 
-    function get(address _addr1, uint256 _i) public view returns (bool) {
-        // You can get values from a nested mapping
-        // even when it is not initialized
-        return nested[_addr1][_i];
-    }
+//     function get(address _addr1, uint256 _i) public view returns (bool) {
+//         // You can get values from a nested mapping
+//         // even when it is not initialized
+//         return nested[_addr1][_i];
+//     }
 
-    function set(address _addr1, uint256 _i, bool _boo) public {
-        nested[_addr1][_i] = _boo;
-    }
+//     function set(address _addr1, uint256 _i, bool _boo) public {
+//         nested[_addr1][_i] = _boo;
+//     }
 
-    function remove(address _addr1, uint256 _i) public {
-        delete nested[_addr1][_i];
-    }
-}
+//     function remove(address _addr1, uint256 _i) public {
+//         delete nested[_addr1][_i];
+//     }
+// }
 
-contract IfElse is Mapping {
-    function foo(uint256 x) public pure returns (uint256) {
-        if (x < 10) {
-            return 0;
-        } else if (x < 20) {
-            return 1;
-        } else {
-            return 2;
-        }
-    }
+// contract IfElse is Mapping {
+//     function foo(uint256 x) public pure returns (uint256) {
+//         if (x < 10) {
+//             return 0;
+//         } else if (x < 20) {
+//             return 1;
+//         } else {
+//             return 2;
+//         }
+//     }
 
-    function ternary(uint256 _x) public pure returns (uint256) {
-        // if (_x < 10) {
-        //     return 1;
-        // }
-        // return 2;
+//     function ternary(uint256 _x) public pure returns (uint256) {
+//         // if (_x < 10) {
+//         //     return 1;
+//         // }
+//         // return 2;
 
-        // shorthand way to write if / else statement
-        // the "?" operator is called the ternary operator
-        return _x < 10 ? 1 : 2;
-    }
-}
+//         // shorthand way to write if / else statement
+//         // the "?" operator is called the ternary operator
+//         return _x < 10 ? 1 : 2;
+//     }
+// }

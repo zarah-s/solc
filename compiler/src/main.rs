@@ -11,7 +11,7 @@ use mods::{
         process_struct::extract_struct, strip_comments::strip_comments,
         structure_to_line_descriptors::structure_to_line_descriptors,
     },
-    types::types::{ContractIdentifier, LineDescriptions, Token},
+    types::types::{ContractIdentifier, InterfaceIdentifier, LineDescriptions, Token},
 };
 use tokio::io;
 
@@ -63,8 +63,10 @@ async fn main() -> Result<(), io::Error> {
     }
 
     let mut contract_construct: Vec<ContractIdentifier> = Vec::new();
+    let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
 
     for ddd in joined {
+        // let extracted_enums: Vec<mods::types::types::EnumIdentifier> = Vec::new();
         let extracted_enums = extract_enum(&ddd);
 
         let structs_tree = extract_struct(&ddd);
@@ -83,33 +85,39 @@ async fn main() -> Result<(), io::Error> {
 
         let (state_variables, custom_errors, mappings, events) =
             extract_global_elements(&ddd, &custom_data_types_identifiers, &enum_identifiers);
-
         let (functions, contract_identifier, contract_inheritance) = extract_functions(
             &ddd,
             &custom_data_types_identifiers,
             &state_variables,
             &enum_identifiers,
             &mappings,
+            &mut interfaces,
         );
-        let contract_identifier = ContractIdentifier {
-            identifier: contract_identifier,
-            inheritance: if contract_inheritance.is_empty() {
-                None
-            } else {
-                Some(contract_inheritance)
-            },
-            custom_errors,
-            enums: extracted_enums,
-            events,
-            functions,
-            mappings,
-            state_variables,
-            structs: structs_tree,
-        };
-        contract_construct.push(contract_identifier)
+
+        if !contract_identifier.trim().is_empty() {
+            let contract_identifier = ContractIdentifier {
+                identifier: contract_identifier,
+                inheritance: if contract_inheritance.is_empty() {
+                    None
+                } else {
+                    Some(contract_inheritance)
+                },
+                custom_errors,
+                enums: extracted_enums,
+                events,
+                functions,
+                mappings,
+                state_variables,
+                structs: structs_tree,
+            };
+            contract_construct.push(contract_identifier)
+        }
     }
 
-    println!("{:#?}", contract_construct);
+    println!(
+        "===>>> INTERFACES ===>>>\n{:#?}\n\n ===>>> CONTRACTS ===>>>\n{:#?}",
+        interfaces, contract_construct
+    );
 
     let end_time = time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
     println!(
