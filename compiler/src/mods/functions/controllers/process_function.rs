@@ -3,7 +3,9 @@ use std::process;
 use crate::mods::{
     constants::constants::{DATA_TYPES, KEYWORDS},
     functions::{
-        controllers::process_state_variables::extract_global_elements,
+        controllers::{
+            process_enum::extract_enum, process_state_variables::extract_global_elements,
+        },
         helpers::helpers::{
             detokenize, extract_data_location_from_token, extract_integer_types_from_token,
             print_error, validate_expression, validate_identifier_regex, validate_variable,
@@ -12,12 +14,15 @@ use crate::mods::{
     types::types::{
         Argument, Assert, ConditionalType, Conditionals, ConstructorIdentifier, CronIdentifier,
         Delete, ElIf, FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall,
-        FunctionIdentifier, FunctionMutability, FunctionsIdentifier, LineDescriptions, Loop,
-        LoopType, MappingAssign, MappingIdentifier, OpenedBraceType, ReceiveIdentifier, Require,
-        Return, ReturnType, Revert, RevertType, Token, TuppleAssignment, VariableAssign,
+        FunctionHeader, FunctionIdentifier, FunctionMutability, FunctionsIdentifier,
+        InterfaceIdentifier, InterfaceVariants, LineDescriptions, Loop, LoopType, MappingAssign,
+        MappingIdentifier, ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return,
+        ReturnType, Revert, RevertType, Token, TuppleAssignment, VariableAssign,
         VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
     },
 };
+
+use super::process_struct::extract_struct;
 
 pub fn extract_functions(
     data: &Vec<LineDescriptions>,
@@ -25,6 +30,7 @@ pub fn extract_functions(
     global_variables: &Vec<VariableIdentifier>,
     enums: &Vec<&str>,
     mappings: &Vec<MappingIdentifier>,
+    interfaces: &mut Vec<InterfaceIdentifier>,
 ) -> (Vec<FunctionsIdentifier>, String, Vec<String>) {
     let mut opened_braces = 0;
     let mut opened_braces_type = OpenedBraceType::None;
@@ -38,7 +44,9 @@ pub fn extract_functions(
         let raw = &line.text;
 
         if raw.starts_with("function") {
-            opened_braces_type = OpenedBraceType::Function;
+            if let OpenedBraceType::Contract = opened_braces_type {
+                opened_braces_type = OpenedBraceType::Function;
+            }
         } else if raw.starts_with("constructor") {
             opened_braces_type = OpenedBraceType::Constructor;
         } else if raw.starts_with("receive") {
@@ -49,6 +57,12 @@ pub fn extract_functions(
             opened_braces_type = OpenedBraceType::Cron;
         } else if raw.starts_with("contract") {
             opened_braces_type = OpenedBraceType::Contract;
+        } else if raw.starts_with("modifier") {
+            opened_braces_type = OpenedBraceType::Modifier;
+        } else if raw.starts_with("interface") {
+            opened_braces_type = OpenedBraceType::Interface;
+        } else if raw.starts_with("contract") {
+            opened_braces_type = OpenedBraceType::Contract;
         }
 
         if let OpenedBraceType::Contract = opened_braces_type {
@@ -56,17 +70,20 @@ pub fn extract_functions(
         }
 
         if raw.contains("{") {
-            for character in raw.chars() {
+            let characters = raw.chars();
+            for character in characters {
                 if character == '{' {
                     if let OpenedBraceType::Contract = opened_braces_type {
-                        opened_braces_type = OpenedBraceType::None;
                         let lexems = LineDescriptions::to_token(raw);
-                        extract_contract_headers(
-                            lexems,
-                            &mut contract_name,
-                            &mut contract_inheritance,
-                        )
+                        if opened_braces == 0 {
+                            extract_contract_headers(
+                                lexems,
+                                &mut contract_name,
+                                &mut contract_inheritance,
+                            );
+                        }
                     }
+
                     opened_braces += 1;
                 }
             }
@@ -77,12 +94,25 @@ pub fn extract_functions(
                 if character == '}' {
                     opened_braces -= 1;
                     if opened_braces == 1 {
+                        // if let OpenedBraceType::Interface = opened_braces_type {
+                        //     print_error("Cannot define \"interface\" in contract");
+                        // }
+
                         if let OpenedBraceType::Function
                         | OpenedBraceType::Constructor
                         | OpenedBraceType::Fallback
                         | OpenedBraceType::Cron
+                        | OpenedBraceType::Modifier
                         | OpenedBraceType::Receive = opened_braces_type
                         {
+                            opened_braces_type = OpenedBraceType::Contract;
+                            combined.push(line.clone());
+
+                            processed_data.push(combined.clone());
+                            combined.clear();
+                        }
+                    } else if opened_braces == 0 {
+                        if let OpenedBraceType::Interface = opened_braces_type {
                             opened_braces_type = OpenedBraceType::None;
                             combined.push(line.clone());
 
@@ -98,6 +128,8 @@ pub fn extract_functions(
         | OpenedBraceType::Constructor
         | OpenedBraceType::Receive
         | OpenedBraceType::Cron
+        | OpenedBraceType::Modifier
+        | OpenedBraceType::Interface
         | OpenedBraceType::Fallback = opened_braces_type
         {
             combined.push(line.clone())
@@ -120,7 +152,7 @@ pub fn extract_functions(
         combined.clear();
     }
 
-    for single_stringified in stringified {
+    for single_stringified in &stringified {
         let tokens = LineDescriptions::to_token(single_stringified.as_str());
 
         match tokens[0] {
@@ -132,6 +164,263 @@ pub fn extract_functions(
                 &tokens,
                 &mut function_identifiers,
             ),
+
+            Token::Interface => {
+                let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+                let interface_definition: &[Token] = &tokens[..start_index.unwrap() + 1];
+                let mut interface_name = String::new();
+                let mut interface_inheritance: Vec<String> = Vec::new();
+                // println!("{:?}", interface_definition);
+                extract_contract_headers(
+                    interface_definition.to_vec(),
+                    &mut interface_name,
+                    &mut interface_inheritance,
+                );
+                let function_body_start_index =
+                    tokens.iter().position(|pred| pred == &Token::OpenBraces);
+                if let None = function_body_start_index {
+                    print_error(&format!("Unprocessible entity",));
+                }
+
+                let function_body =
+                    &tokens[function_body_start_index.unwrap() + 1..tokens.len() - 1];
+
+                let mut semicolon_seperated: Vec<Vec<Token>> = Vec::new();
+                let mut brace_seperated: Vec<Vec<Token>> = Vec::new();
+                let mut opened_brace = 0;
+
+                let mut current_variant = InterfaceVariants::None;
+                let mut combo: Vec<Token> = Vec::new();
+                for (index, tkn) in function_body.iter().enumerate() {
+                    match tkn {
+                        Token::OpenBraces => {
+                            opened_brace += 1;
+                            combo.push(tkn.clone());
+                        }
+                        Token::CloseBraces => {
+                            opened_brace -= 1;
+
+                            if opened_brace == 0 {
+                                if let InterfaceVariants::Struct | InterfaceVariants::Enum =
+                                    current_variant
+                                {
+                                    combo.push(tkn.clone());
+                                    brace_seperated.push(combo.clone());
+                                    combo.clear();
+                                }
+                            }
+                        }
+                        Token::SemiColon => {
+                            if let InterfaceVariants::Error
+                            | InterfaceVariants::Function
+                            | InterfaceVariants::Event = current_variant
+                            {
+                                combo.push(Token::SemiColon);
+                                semicolon_seperated.push(combo.clone());
+                                combo.clear();
+                            } else {
+                                combo.push(Token::SemiColon);
+                            }
+                        }
+                        Token::Error => {
+                            current_variant = InterfaceVariants::Error;
+                            combo.push(Token::Error)
+                        }
+                        Token::Event => {
+                            current_variant = InterfaceVariants::Event;
+                            combo.push(Token::Event)
+                        }
+                        Token::Struct => {
+                            current_variant = InterfaceVariants::Struct;
+                            combo.push(tkn.clone())
+                        }
+                        Token::Enum => {
+                            current_variant = InterfaceVariants::Enum;
+                            combo.push(tkn.clone())
+                        }
+                        Token::Function => {
+                            current_variant = InterfaceVariants::Function;
+                            combo.push(tkn.clone())
+                        }
+                        Token::Identifier(_id) => {
+                            if opened_brace == 1 {
+                                if let InterfaceVariants::Struct = current_variant {
+                                    if let Token::SemiColon = function_body.get(index + 1).unwrap()
+                                    {
+                                        combo.push(Token::Space);
+                                        combo.push(tkn.clone());
+                                    }
+                                } else {
+                                    combo.push(tkn.clone());
+                                }
+                            } else {
+                                combo.push(tkn.clone());
+                            }
+                        }
+                        _other => combo.push(_other.clone()),
+                    }
+                }
+
+                let variants = [semicolon_seperated, brace_seperated].concat();
+                let mut interface_events_and_errors: Vec<LineDescriptions> = Vec::new();
+                interface_events_and_errors.push(LineDescriptions {
+                    line: 0,
+                    text: String::from("contract{"),
+                });
+                let mut interface_enums: Vec<LineDescriptions> = Vec::new();
+                interface_enums.push(LineDescriptions {
+                    line: 0,
+                    text: String::from("contract{"),
+                });
+                let mut interface_structs: Vec<LineDescriptions> = Vec::new();
+                interface_structs.push(LineDescriptions {
+                    line: 0,
+                    text: String::from("contract{"),
+                });
+                let mut functions_headers: Vec<FunctionHeader> = Vec::new();
+                let mut unprocessed_function_headers: Vec<Vec<Token>> = Vec::new();
+                for split in variants {
+                    if split.is_empty() {
+                        continue;
+                    }
+                    match split[0] {
+                        Token::Error | Token::Event | Token::Enum | Token::Struct => {
+                            let mut stringified_data = String::new();
+
+                            for spl_token in &split {
+                                stringified_data.push_str(&detokenize(&spl_token));
+                            }
+                            if let Token::Enum = split[0] {
+                                stringified_data.push('}');
+                                interface_enums.push(LineDescriptions {
+                                    line: 0,
+                                    text: stringified_data,
+                                })
+                            } else if let Token::Struct = split[0] {
+                                stringified_data.push('}');
+                                interface_structs.push(LineDescriptions {
+                                    line: 0,
+                                    text: stringified_data,
+                                })
+                            } else {
+                                // stringified_data.push(';');
+
+                                interface_events_and_errors.push(LineDescriptions {
+                                    line: 0,
+                                    text: stringified_data,
+                                })
+                            }
+                        }
+
+                        Token::Function => {
+                            unprocessed_function_headers.push(split);
+                        }
+                        _ => {}
+                    }
+                }
+                interface_events_and_errors.push(LineDescriptions {
+                    text: String::from("}"),
+                    line: 0,
+                });
+                interface_enums.push(LineDescriptions {
+                    text: String::from("}"),
+                    line: 0,
+                });
+                interface_structs.push(LineDescriptions {
+                    text: String::from("}"),
+                    line: 0,
+                });
+                let _structs_tree = extract_struct(&interface_structs);
+
+                let _extracted_enums: Vec<crate::mods::types::types::EnumIdentifier> =
+                    extract_enum(&interface_enums);
+
+                let struct_identifiers: Vec<&str> = _structs_tree
+                    .iter()
+                    .map(|pred| pred.identifier.as_str())
+                    .collect();
+
+                let enum_identifiers: Vec<&str> = _extracted_enums
+                    .iter()
+                    .map(|pred| pred.identifier.as_str())
+                    .collect();
+
+                let _custom_data_types_identifiers: Vec<&str> =
+                    [enum_identifiers.clone(), struct_identifiers].concat();
+
+                let (_, _custom_errors, _, _events) =
+                    extract_global_elements(&interface_events_and_errors, &Vec::new(), &Vec::new());
+
+                for unprocessed in unprocessed_function_headers {
+                    let function_header = extract_function_header(
+                        &unprocessed[..],
+                        &unprocessed[1],
+                        &_custom_data_types_identifiers,
+                        &enum_identifiers,
+                    );
+
+                    functions_headers.push(function_header);
+                }
+
+                let structured = InterfaceIdentifier {
+                    custom_errors: _custom_errors,
+                    enums: _extracted_enums,
+                    events: _events,
+                    functions: functions_headers,
+                    identifier: interface_name,
+                    inheritance: if interface_inheritance.is_empty() {
+                        None
+                    } else {
+                        Some(interface_inheritance)
+                    },
+                    structs: _structs_tree,
+                };
+                interfaces.push(structured);
+                // println!("{:?}", interface_name);
+            }
+            Token::Modifier => {
+                let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+                let mut arguments: Vec<Argument> = Vec::new();
+                let mut identifier = String::new();
+                let function_definition: &[Token] = &tokens[..start_index.unwrap()];
+
+                match &function_definition[1] {
+                    Token::Identifier(_identifier) => {
+                        identifier = _identifier.to_owned();
+                    }
+                    _ => {
+                        print_error("Unprocessible entity for modifier name");
+                    }
+                }
+                if let Token::OpenParenthesis = &function_definition[2] {
+                    arguments =
+                        prepare_and_get_function_args(function_definition, custom_data_types);
+                }
+
+                let function_body_start_index =
+                    tokens.iter().position(|pred| pred == &Token::OpenBraces);
+                if let None = function_body_start_index {
+                    print_error(&format!("Unprocessible entity",));
+                }
+
+                let function_body = &tokens[function_body_start_index.unwrap()..];
+
+                let arms: Vec<FunctionArm> = extract_function_arms(
+                    &function_body.to_vec(),
+                    custom_data_types,
+                    global_variables,
+                    enums,
+                    Vec::new(),
+                    mappings,
+                );
+
+                let structured = ModifierIdentifier {
+                    arguments,
+                    arms,
+                    name: identifier,
+                };
+                function_identifiers.push(FunctionsIdentifier::ModifierIdentifier(structured));
+            }
             Token::Constructor => {
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
 
@@ -423,7 +712,39 @@ fn extract_full_function(
     let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
 
     let function_definition: &[Token] = &tokens[..start_index.unwrap()];
-    let function_name = match &tokens[1] {
+    let function_header =
+        extract_function_header(function_definition, &tokens[1], custom_data_types, enums);
+
+    let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+    if let None = function_body_start_index {
+        print_error(&format!("Unprocessible entity",));
+    }
+
+    let function_body = &tokens[function_body_start_index.unwrap()..];
+
+    let arms: Vec<FunctionArm> = extract_function_arms(
+        &function_body.to_vec(),
+        custom_data_types,
+        global_variables,
+        enums,
+        Vec::new(),
+        mappings,
+    );
+
+    let structure: FunctionIdentifier = FunctionIdentifier {
+        header: function_header,
+        arms,
+    };
+    function_identifiers.push(FunctionsIdentifier::FunctionIdentifier(structure));
+}
+
+fn extract_function_header(
+    function_definition: &[Token],
+    name: &Token,
+    custom_data_types: &Vec<&str>,
+    enums: &Vec<&str>,
+) -> FunctionHeader {
+    let function_name = match &name {
         Token::Identifier(_val) => {
             let validated = validate_identifier_regex(_val, 0);
             if validated {
@@ -452,7 +773,7 @@ fn extract_full_function(
         _ => {
             print_error(&format!(
                 "Unsupported function name \"{}\"",
-                LineDescriptions::from_token_to_string(&tokens[1])
+                LineDescriptions::from_token_to_string(&name)
             ));
             process::exit(1);
         }
@@ -464,6 +785,7 @@ fn extract_full_function(
     let mut function_visibility = Token::Internal;
     let mut function_returns: Option<Vec<ReturnType>> = None;
     let function_arguments = prepare_and_get_function_args(function_definition, custom_data_types);
+
     for visibility in [
         Token::Internal,
         Token::External,
@@ -513,22 +835,6 @@ fn extract_full_function(
         ));
     }
 
-    let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
-    if let None = function_body_start_index {
-        print_error(&format!("Unprocessible entity",));
-    }
-
-    let function_body = &tokens[function_body_start_index.unwrap()..];
-
-    let arms: Vec<FunctionArm> = extract_function_arms(
-        &function_body.to_vec(),
-        custom_data_types,
-        global_variables,
-        enums,
-        Vec::new(),
-        mappings,
-    );
-
     if function_definition.contains(&Token::View) {
         function_mutability = FunctionMutability::View;
     } else if function_definition.contains(&Token::Pure) {
@@ -544,20 +850,25 @@ fn extract_full_function(
     }
 
     if function_definition.contains(&Token::Gasless) {
-        gasless = true;
+        if let FunctionMutability::Mutable = function_mutability {
+            gasless = true;
+        } else {
+            print_error("cannot define \"gasless\" for view or pure function");
+        }
     }
-    let structure: FunctionIdentifier = FunctionIdentifier {
-        arguments: function_arguments,
-        arms,
-        mutability: function_mutability,
+
+    let structured = FunctionHeader {
         gasless,
+        mutability: function_mutability,
         name: function_name.to_string(),
         r#override: function_override,
         returns: function_returns,
         r#virtual: function_virtual,
         visibility: function_visibility,
+        arguments: function_arguments,
     };
-    function_identifiers.push(FunctionsIdentifier::FunctionIdentifier(structure));
+
+    structured
 }
 
 fn extract_function_params(
@@ -1106,6 +1417,21 @@ fn extract_function_block(
                                     if let Some(_) = function_scope_variable {
                                         full_block.push(function_scope_variable.unwrap());
                                     }
+                                }
+                            } else if _identifier == "_" {
+                                if let Token::SemiColon = block[1] {
+                                    full_block.push(FunctionArm::FunctionExecution);
+                                } else {
+                                    print_error(&format!(
+                                        "Unidentifined variable \"{}\"",
+                                        _identifier
+                                    ))
+                                }
+                            } else if _identifier == "break" {
+                                if let Token::SemiColon = block[1] {
+                                    full_block.push(FunctionArm::Break);
+                                } else {
+                                    print_error("Expecting \";\" for break");
                                 }
                             } else {
                                 print_error(&format!("Unidentifined variable \"{}\"", _identifier))

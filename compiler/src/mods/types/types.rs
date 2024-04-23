@@ -3,7 +3,10 @@
 pub enum Token {
     Identifier(String),
     Contract,
+    Modifier,
+    Interface,
     Revert,
+    Space,
     Event,
     Ether,
     Wei,
@@ -159,6 +162,14 @@ pub struct VariableIdentifier {
     pub storage_location: Option<Token>,
 }
 
+pub enum InterfaceVariants {
+    Enum,
+    Struct,
+    None,
+    Function,
+    Error,
+    Event,
+}
 #[derive(Debug)]
 pub struct ConstructorIdentifier {
     pub arguments: Vec<Argument>,
@@ -193,6 +204,7 @@ pub enum FunctionsIdentifier {
     ReceiveIdentifier(ReceiveIdentifier),
     FallbackIdentifier(FallbackIdentifier),
     CronIdentifier(CronIdentifier),
+    ModifierIdentifier(ModifierIdentifier),
 }
 
 #[derive(Debug)]
@@ -213,12 +225,14 @@ pub enum OpenedBraceType {
     None,
     Struct,
     Callback,
+    Modifier,
     Function,
     Receive,
     Fallback,
     Contract,
     Enum,
     Constructor,
+    Interface,
     Cron,
 }
 
@@ -236,15 +250,38 @@ pub enum FunctionMutability {
 }
 
 #[derive(Debug)]
-pub struct FunctionIdentifier {
+pub struct InterfaceIdentifier {
+    pub identifier: String,
+    pub inheritance: Option<Vec<String>>,
+    pub enums: Vec<EnumIdentifier>,
+    pub structs: Vec<StructIdentifier>,
+    pub custom_errors: Vec<String>,
+    pub events: Vec<String>,
+    pub functions: Vec<FunctionHeader>,
+}
+
+#[derive(Debug)]
+pub struct FunctionHeader {
     pub name: String,
     pub gasless: bool,
     pub mutability: FunctionMutability,
     pub visibility: Token,
-    pub arguments: Vec<Argument>,
     pub returns: Option<Vec<ReturnType>>,
     pub r#override: bool,
     pub r#virtual: bool,
+    pub arguments: Vec<Argument>,
+}
+
+#[derive(Debug)]
+pub struct FunctionIdentifier {
+    pub header: FunctionHeader,
+    pub arms: Vec<FunctionArm>,
+}
+
+#[derive(Debug)]
+pub struct ModifierIdentifier {
+    pub name: String,
+    pub arguments: Vec<Argument>,
     pub arms: Vec<FunctionArm>,
 }
 
@@ -352,6 +389,8 @@ pub enum FunctionArm {
     MappingAssign(MappingAssign),
     TuppleAssignment(TuppleAssignment),
     FunctionCall(FunctionCall),
+    FunctionExecution,
+    Break,
     Require(Require),
     Conditionals(Conditionals),
     Return(Return),

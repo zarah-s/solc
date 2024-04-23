@@ -227,12 +227,29 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn test_event_count() {
+            let contents = get_file_contents("test/files/vars/Event.sol").await;
+            let (_, _, _, _events) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
+            assert_eq!(_events.len(), 1);
+        }
+
+        #[tokio::test]
         async fn test_custom_error_intergrity() {
             let contents = get_file_contents("test/files/vars/Error.sol").await;
             let (_, _errs, _, _) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
             assert_eq!(
                 _errs[0],
                 "error InsufficientBalance(uint256 balance, uint256 withdrawAmount);"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_event_intergrity() {
+            let contents = get_file_contents("test/files/vars/Event.sol").await;
+            let (_, _, _, _events) = extract_global_elements(&contents, &Vec::new(), &Vec::new());
+            assert_eq!(
+                _events[0],
+                "event BuyShares(address indexed user,uint indexed amount,uint8 indexed shares);"
             );
         }
 
@@ -419,6 +436,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
 
             assert_eq!(functions.0.len(), 4)
@@ -434,6 +452,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -447,6 +466,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -462,6 +482,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -475,12 +496,13 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
 
             for (i, _fn) in fns.0.iter().enumerate() {
                 match _fn {
                     FunctionsIdentifier::FunctionIdentifier(__fn) => {
-                        assert_eq!(__fn.name, fn_names[i]);
+                        assert_eq!(__fn.header.name, fn_names[i]);
                     }
                     _ => (),
                 }
@@ -499,6 +521,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -512,6 +535,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -527,6 +551,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -542,6 +567,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -557,6 +583,21 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
+            );
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: cannot define \"gasless\" for view or pure function")]
+        async fn test_function_arg_panic_if_gasless_is_defined_for_non_mutable_function() {
+            let contents = get_file_contents("test/files/function/Fn45.sol").await;
+            extract_functions(
+                &contents,
+                &Vec::new(),
+                &Vec::new(),
+                &Vec::new(),
+                &Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -569,17 +610,18 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
 
             match &functions.0[0] {
                 FunctionsIdentifier::FunctionIdentifier(_function) => {
-                    assert_eq!(_function.arguments.len(), 1);
-                    assert_eq!(_function.arguments[0].is_array, false);
-                    assert_eq!(_function.arguments[0].location, None);
-                    assert_eq!(_function.arguments[0].name_, "_i".to_string());
-                    assert_eq!(_function.arguments[0].payable_address, false);
-                    assert_eq!(_function.arguments[0].size, None);
-                    assert_eq!(_function.arguments[0].type_, "uint256".to_string());
+                    assert_eq!(_function.header.arguments.len(), 1);
+                    assert_eq!(_function.header.arguments[0].is_array, false);
+                    assert_eq!(_function.header.arguments[0].location, None);
+                    assert_eq!(_function.header.arguments[0].name_, "_i".to_string());
+                    assert_eq!(_function.header.arguments[0].payable_address, false);
+                    assert_eq!(_function.header.arguments[0].size, None);
+                    assert_eq!(_function.header.arguments[0].type_, "uint256".to_string());
                 }
                 _ => (),
             }
@@ -600,12 +642,13 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
 
             for (i, _fn) in fns.0.iter().enumerate() {
                 match _fn {
                     FunctionsIdentifier::FunctionIdentifier(__fn) => {
-                        assert_eq!(__fn.visibility, fn_visibilities[i]);
+                        assert_eq!(__fn.header.visibility, fn_visibilities[i]);
                     }
                     _ => (),
                 }
@@ -627,12 +670,13 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
 
             for (i, _fn) in fns.0.iter().enumerate() {
                 match _fn {
                     FunctionsIdentifier::FunctionIdentifier(__fn) => {
-                        assert_eq!(__fn.mutability, fn_mutabilities[i]);
+                        assert_eq!(__fn.header.mutability, fn_mutabilities[i]);
                     }
                     _ => (),
                 }
@@ -649,11 +693,12 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
             );
 
             match &fns.0[0] {
                 FunctionsIdentifier::FunctionIdentifier(_fn) => {
-                    let __d = _fn.returns.as_ref().unwrap();
+                    let __d = _fn.header.returns.as_ref().unwrap();
                     assert_eq!(__d.len(), 3);
                     assert_eq!(__d[0].type_, "uint");
                     assert_eq!(__d[0].is_array, false);
@@ -855,7 +900,6 @@ mod tests {
                 },
                 _ => (),
             }
-            // assert_eq!(fns[0], expected);
         }
 
         #[tokio::test]
@@ -879,6 +923,45 @@ mod tests {
                 }
                 _ => (),
             }
+        }
+
+        #[tokio::test]
+        async fn test_modifier() {
+            let fns = get_fns("test/files/function/Fn43.sol").await;
+            match &fns[0] {
+                FunctionsIdentifier::ModifierIdentifier(_fn) => {
+                    assert_eq!(_fn.arms.len(), 1);
+                }
+                _ => (),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_modifier_argument() {
+            let fns = get_fns("test/files/function/Fn43.sol").await;
+            match &fns[0] {
+                FunctionsIdentifier::ModifierIdentifier(_fn) => {
+                    assert_eq!(_fn.arguments.len(), 0);
+                }
+                _ => (),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_modifier_name() {
+            let fns = get_fns("test/files/function/Fn43.sol").await;
+            match &fns[0] {
+                FunctionsIdentifier::ModifierIdentifier(_fn) => {
+                    assert_eq!(_fn.name, "OnlyOwner");
+                }
+                _ => (),
+            }
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "ERROR: Unprocessible entity for modifier name")]
+        async fn test_modifier_panic_if_no_name() {
+            get_fns("test/files/function/Fn44.sol").await;
         }
 
         #[tokio::test]
@@ -1039,6 +1122,7 @@ mod tests {
             &_vars,
             &enum_identifiers,
             &_maps,
+            &mut Vec::new(),
         );
         fns
     }
