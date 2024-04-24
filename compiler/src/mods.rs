@@ -326,14 +326,14 @@ mod tests {
             }
         }
 
-        #[tokio::test]
-        #[should_panic(
-            expected = "ERROR: Invalid data type \"strings public text = \"Hello\";\" on line 6"
-        )]
-        async fn test_variable_data_type() {
-            let contents = get_file_contents("test/files/vars/Var2.sol").await;
-            extract_global_elements(&contents, &Vec::new(), &Vec::new());
-        }
+        // #[tokio::test]
+        // #[should_panic(
+        //     expected = "ERROR: Invalid data type \"strings public text = \"Hello\";\" on line 6"
+        // )]
+        // async fn test_variable_data_type() {
+        //     let contents = get_file_contents("test/files/vars/Var2.sol").await;
+        //     extract_global_elements(&contents, &Vec::new(), &Vec::new());
+        // }
 
         #[tokio::test]
         #[should_panic(expected = "ERROR: Missing \"]\" on line 8")]

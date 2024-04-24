@@ -170,7 +170,6 @@ pub fn extract_functions(
                 let interface_definition: &[Token] = &tokens[..start_index.unwrap() + 1];
                 let mut interface_name = String::new();
                 let mut interface_inheritance: Vec<String> = Vec::new();
-                // println!("{:?}", interface_definition);
                 extract_contract_headers(
                     interface_definition.to_vec(),
                     &mut interface_name,
@@ -376,7 +375,6 @@ pub fn extract_functions(
                     structs: _structs_tree,
                 };
                 interfaces.push(structured);
-                // println!("{:?}", interface_name);
             }
             Token::Modifier => {
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
@@ -685,7 +683,11 @@ fn extract_contract_headers(
         }
     } else {
         if lexems.len() != 3 {
-            print_error("Unprocessible entity for contract definition");
+            if let Token::CloseBraces = lexems[3] {
+                //nothing
+            } else {
+                print_error("Unprocessible entity for contract definition");
+            }
         }
     }
 }

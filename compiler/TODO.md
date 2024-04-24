@@ -15,8 +15,10 @@
 
 - [x] parse interface
 
-- [] test interface interaction and implementation
+- [x] test contract-variable assign
+
+- [x] test interface interaction and implementation
 
 - [] test inherited constructor initialization
 
-- [] test contract-variable assign
+- [] add tests for interfaces

@@ -421,7 +421,6 @@ pub fn extract_custom_data_types_tokens(
         stringified.push_str(&line_data.text);
     }
     let tokens = LineDescriptions::to_token(&stringified);
-    // println!("\n\n Data=>>>>>>>> \n {:?}\n", tokens);
 
     let mut opened_braces = 0;
     let mut opened_brace_type = OpenedBraceType::None;
@@ -616,6 +615,11 @@ pub fn validate_variable(
                         type_ = VariableType::Struct;
                     }
                 }
+            }
+
+            if let None = data_type {
+                data_type = Some(tokens[0].clone());
+                type_ = VariableType::Contract;
             }
         } else {
             if let Token::Error = &tokens[0] {

@@ -32,25 +32,44 @@ interface IERC20 {
     function deposit() external;
 }
 
-contract Mapping {
+contract NewContract {}
+
+contract TestContract {
+    address owner;
+
+    constructor(address _owner) {
+        owner = _owner;
+    }
+}
+
+contract Mapping is IERC20, TestContract {
+    IERC20 token;
+    NewContract newCon;
+
     // Mapping from address to uint
+    function deposit() external {}
+
+    constructor(address _addr) TestContract(_addr) {
+        token = IERC20(_addr);
+        newCon = new NewContract();
+    }
 
     struct Yos {
         address owner;
         string name;
     }
-    error INSUFFICIENT_BALANCE(
-        uint,
-        address,
-        string,
-        string,
-        uint,
-        uint,
-        uint,
-        uint,
-        uint,
-        uint
-    );
+    // error INSUFFICIENT_BALANCE(
+    //     uint,
+    //     address,
+    //     string,
+    //     string,
+    //     uint,
+    //     uint,
+    //     uint,
+    //     uint,
+    //     uint,
+    //     uint
+    // );
     enum Status {
         Pending,
         Shipped,
@@ -65,7 +84,7 @@ contract Mapping {
         uint8 indexed shares
     );
 
-    function testFn() external view returns (uint) {
+    function testFn() external pure returns (uint) {
         return 112;
     }
 
@@ -83,7 +102,7 @@ contract Mapping {
         _;
     }
 
-    function _fn() {}
+    function _fn() external {}
 
     mapping(address => uint) public myMap;
 
