@@ -121,7 +121,7 @@ pub struct ReturnType {
 pub enum VariableType {
     Variable,
     Struct,
-    // Contract,
+    Contract,
     Enum,
 }
 
