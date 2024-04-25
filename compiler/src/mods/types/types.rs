@@ -11,6 +11,8 @@ pub enum Token {
     Ether,
     Wei,
     Bytes,
+    Bytes1,
+    Bytes32,
     Assert,
     Require,
     Storage,

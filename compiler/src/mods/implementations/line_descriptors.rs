@@ -37,7 +37,7 @@ impl LineDescriptions {
         let mut lexems: Vec<Token> = Vec::new();
         let mut opened_quotations = 0;
         let identifier_regex = Regex::new(r"[a-zA-Z_]\w*").unwrap();
-        for (index, character) in input.chars().enumerate() {
+        for (index, character) in input.trim().chars().enumerate() {
             if character == '"' || character == '\'' {
                 if opened_quotations == 0 {
                     opened_quotations += 1;
@@ -91,7 +91,7 @@ impl LineDescriptions {
                 }
             } else {
                 combined_char.push_str(character.to_string().as_str());
-                if index == input.len() - 1 {
+                if index == input.trim().len() - 1 {
                     lex.push(combined_char.trim().to_string());
                     combined_char.clear();
                 }
