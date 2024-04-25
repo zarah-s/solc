@@ -1941,9 +1941,7 @@ fn extract_function_block(
                                 }
                             }
 
-                            // println!("{:?}", splitted);
                             if splitted[0].contains(&&Token::Equals) {
-                                // println!("{:?}", splitted[0])
                                 let mut _stringified_val = String::new();
 
                                 for __token in &splitted[0][3..] {
@@ -1958,20 +1956,6 @@ fn extract_function_block(
                                     }
                                 }
                             }
-                            // if let Token::Equals = splitted[0][splitted[0].len() - 2] {
-                            //     //
-                            //     _value = Some(detokenize(splitted[0][splitted[0].len() - 1]));
-                            // } else {
-                            //     match splitted[0][splitted[0].len() - 1] {
-                            //         Token::Identifier(_id) => _value = Some("0".to_string()),
-                            //         _ => {
-                            //             // println!("{:?}", splitted[0]);
-                            //             print_error("Unprocessible entity for loop");
-                            //         }
-                            //     }
-                            //     // println!("{:?}", splitted[0]);
-                            //     // print_error("Identifier needs assignment");
-                            // }
                         } else {
                             print_error("Identifier type can only be uint or int");
                         }
