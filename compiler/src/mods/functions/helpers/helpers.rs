@@ -518,6 +518,9 @@ pub fn validate_variable(
     let mut is_primitive = true;
     let tokens = LineDescriptions::to_token(&format!("{}", text.text));
     let mut mapping = Mapping::new();
+
+    // println!("{:?}", text.te);
+
     if let Token::Mapping = &tokens[0] {
         let mut pad = 0;
 

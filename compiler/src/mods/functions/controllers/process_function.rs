@@ -900,13 +900,19 @@ fn extract_function_params(
 
                 if DATA_TYPES
                     .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
-                    || custom_data_types.contains(
-                        &LineDescriptions::from_token_to_string(&splited_param[0]).as_str(),
-                    )
                 {
                     if let Token::String | Token::Bytes = splited_param[0] {
                         is_primitive = false;
                     }
+                    type_ = Some(format!(
+                        "{}",
+                        LineDescriptions::from_token_to_string(&splited_param[0],)
+                    ));
+                } else if custom_data_types
+                    .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
+                {
+                    is_primitive = false;
+
                     type_ = Some(format!(
                         "{}",
                         LineDescriptions::from_token_to_string(&splited_param[0],)
@@ -1000,6 +1006,7 @@ fn extract_function_params(
 
             if is_primitive {
                 if location_.is_some() {
+                    println!("{:?}", type_);
                     print_error("Cannot declare \"memory\" or \"calldata\" to a primitive type")
                 }
             }
@@ -1436,11 +1443,14 @@ fn extract_function_block(
                                     print_error("Expecting \";\" for break");
                                 }
                             } else {
+                                println!("{:?} {:?}", arms, block);
                                 print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                             }
                         }
                     }
                 }
+
+                // println!("{:#?}", full_block)
             }
             Token::While => {
                 let open_brace_index = block.iter().position(|pred| pred == &&Token::OpenBraces);
@@ -1455,10 +1465,10 @@ fn extract_function_block(
                     for _batch in &block[_open_brace_index..] {
                         batched.push(_batch.to_owned().clone());
                     }
-                    let mut local_vars: Vec<&VariableIdentifier> = Vec::new();
+                    let mut _local_vars: Vec<&VariableIdentifier> = local_vars.clone();
                     for __blk in &full_block {
                         if let FunctionArm::VariableIdentifier(_identifier) = __blk {
-                            local_vars.push(_identifier)
+                            _local_vars.push(_identifier)
                         }
                     }
 
@@ -1467,7 +1477,7 @@ fn extract_function_block(
                         custom_data_types,
                         global_variables,
                         enums,
-                        local_vars,
+                        _local_vars,
                         mappings,
                     );
 
@@ -1492,6 +1502,7 @@ fn extract_function_block(
                 let mut condition: Vec<Token> = Vec::new();
                 let mut skip = 0;
                 let mut opened_braces = 0;
+
                 for (index, blk) in block.iter().enumerate() {
                     if index > 0 && skip == index {
                         continue;
@@ -1576,10 +1587,10 @@ fn extract_function_block(
                                 if !batched.is_empty() {
                                     batched.push(Token::CloseBraces);
                                 }
-                                let mut local_vars: Vec<&VariableIdentifier> = Vec::new();
+                                let mut _local_vars: Vec<&VariableIdentifier> = local_vars.clone();
                                 for __blk in &full_block {
                                     if let FunctionArm::VariableIdentifier(_identifier) = __blk {
-                                        local_vars.push(_identifier)
+                                        _local_vars.push(_identifier)
                                     }
                                 }
                                 let __arm: Vec<FunctionArm> = extract_function_arms(
@@ -1587,7 +1598,7 @@ fn extract_function_block(
                                     custom_data_types,
                                     global_variables,
                                     enums,
-                                    local_vars,
+                                    _local_vars,
                                     mappings,
                                 );
                                 tree.arm = __arm;
@@ -1599,10 +1610,10 @@ fn extract_function_block(
                                 if !batched.is_empty() {
                                     batched.push(Token::CloseBraces);
                                 }
-                                let mut local_vars: Vec<&VariableIdentifier> = Vec::new();
+                                let mut _local_vars: Vec<&VariableIdentifier> = local_vars.clone();
                                 for __blk in &full_block {
                                     if let FunctionArm::VariableIdentifier(_identifier) = __blk {
-                                        local_vars.push(_identifier)
+                                        _local_vars.push(_identifier)
                                     }
                                 }
                                 let __arm: Vec<FunctionArm> = extract_function_arms(
@@ -1610,7 +1621,7 @@ fn extract_function_block(
                                     custom_data_types,
                                     global_variables,
                                     enums,
-                                    local_vars,
+                                    _local_vars,
                                     mappings,
                                 );
 
@@ -1628,10 +1639,10 @@ fn extract_function_block(
                                     batched.push(Token::CloseBraces);
                                 }
 
-                                let mut local_vars: Vec<&VariableIdentifier> = Vec::new();
+                                let mut _local_vars: Vec<&VariableIdentifier> = local_vars.clone();
                                 for __blk in &full_block {
                                     if let FunctionArm::VariableIdentifier(_identifier) = __blk {
-                                        local_vars.push(_identifier)
+                                        _local_vars.push(_identifier)
                                     }
                                 }
 
@@ -1640,7 +1651,7 @@ fn extract_function_block(
                                     custom_data_types,
                                     global_variables,
                                     enums,
-                                    local_vars,
+                                    _local_vars,
                                     mappings,
                                 );
                                 tree.el = Some(__arm);
@@ -1973,18 +1984,19 @@ fn extract_function_block(
                     for _batch in &block[_open_brace_index..] {
                         batched.push(_batch.to_owned().clone());
                     }
-                    let mut local_vars: Vec<&VariableIdentifier> = Vec::new();
+                    let mut _local_vars: Vec<&VariableIdentifier> = local_vars.clone();
                     for __blk in &full_block {
                         if let FunctionArm::VariableIdentifier(_identifier) = __blk {
-                            local_vars.push(_identifier)
+                            _local_vars.push(_identifier)
                         }
                     }
+
                     let __arms = extract_function_arms(
                         &batched,
                         custom_data_types,
                         global_variables,
                         enums,
-                        local_vars,
+                        _local_vars,
                         mappings,
                     );
 
@@ -2080,7 +2092,7 @@ fn extract_function_block(
                     if let None = variable {
                         print_error("OOPS!!!");
                     }
-
+                    // println!("{:?}", variable);
                     full_block.push(FunctionArm::VariableIdentifier(variable.unwrap()));
                 } else if let Token::OpenParenthesis = _token {
                     let end_index = block
