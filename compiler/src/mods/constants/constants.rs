@@ -1,4 +1,4 @@
-pub const DATA_TYPES: [&str; 30] = [
+pub const DATA_TYPES: [&str; 32] = [
     "bytes",
     "bytes[]",
     "uint8",
@@ -10,7 +10,9 @@ pub const DATA_TYPES: [&str; 30] = [
     "uint32",
     "uint32[]",
     "bytes1",
+    "bytes32",
     "bytes1[]",
+    "bytes32[]",
     "uint256",
     "uint256[]",
     "int",

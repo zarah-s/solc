@@ -1006,7 +1006,6 @@ fn extract_function_params(
 
             if is_primitive {
                 if location_.is_some() {
-                    println!("{:?}", type_);
                     print_error("Cannot declare \"memory\" or \"calldata\" to a primitive type")
                 }
             }
@@ -1443,14 +1442,11 @@ fn extract_function_block(
                                     print_error("Expecting \";\" for break");
                                 }
                             } else {
-                                println!("{:?} {:?}", arms, block);
                                 print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                             }
                         }
                     }
                 }
-
-                // println!("{:#?}", full_block)
             }
             Token::While => {
                 let open_brace_index = block.iter().position(|pred| pred == &&Token::OpenBraces);
@@ -1945,17 +1941,37 @@ fn extract_function_block(
                                 }
                             }
 
-                            if let Token::Equals = splitted[0][2] {
-                                //
+                            // println!("{:?}", splitted);
+                            if splitted[0].contains(&&Token::Equals) {
+                                // println!("{:?}", splitted[0])
+                                let mut _stringified_val = String::new();
+
+                                for __token in &splitted[0][3..] {
+                                    _stringified_val.push_str(&detokenize(__token));
+                                }
+                                _value = Some(_stringified_val);
                             } else {
-                                print_error("Identifier needs assignment");
-                            }
-                            match splitted[0][3] {
-                                Token::Identifier(_id) => _value = Some(_id.to_string()),
-                                _ => {
-                                    print_error("Unprocessible entity for loop");
+                                match splitted[0][splitted[0].len() - 1] {
+                                    Token::Identifier(_id) => _value = Some("0".to_string()),
+                                    _ => {
+                                        print_error("Unprocessible entity for loop");
+                                    }
                                 }
                             }
+                            // if let Token::Equals = splitted[0][splitted[0].len() - 2] {
+                            //     //
+                            //     _value = Some(detokenize(splitted[0][splitted[0].len() - 1]));
+                            // } else {
+                            //     match splitted[0][splitted[0].len() - 1] {
+                            //         Token::Identifier(_id) => _value = Some("0".to_string()),
+                            //         _ => {
+                            //             // println!("{:?}", splitted[0]);
+                            //             print_error("Unprocessible entity for loop");
+                            //         }
+                            //     }
+                            //     // println!("{:?}", splitted[0]);
+                            //     // print_error("Identifier needs assignment");
+                            // }
                         } else {
                             print_error("Identifier type can only be uint or int");
                         }
@@ -2085,14 +2101,15 @@ fn extract_function_block(
             _token => {
                 match block[block.len() - 1] {
                     Token::SemiColon => (),
-                    _ => print_error("Missing ;"),
+                    _ => {
+                        print_error("Missing ;");
+                    }
                 }
                 if DATA_TYPES.contains(&detokenize(_token).as_str()) {
                     let variable = extract_function_variable(&block, custom_data_types, enums);
                     if let None = variable {
                         print_error("OOPS!!!");
                     }
-                    // println!("{:?}", variable);
                     full_block.push(FunctionArm::VariableIdentifier(variable.unwrap()));
                 } else if let Token::OpenParenthesis = _token {
                     let end_index = block

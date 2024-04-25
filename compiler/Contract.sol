@@ -132,7 +132,7 @@ contract Dao {
         );
 
         bool exist;
-        for (uint i = 0; i < _administration.agents.length; i++) {
+        for (uint i = _agent.length; i < _administration.agents.length; i++) {
             if (_administration.agents[i].id == _agent.id) {
                 exist = true;
             }
@@ -150,8 +150,8 @@ contract Dao {
                 keccak256(abi.encode(_agent.region)),
             "REGION_DID_NOT_MATCH"
         );
-        _agent.deleted = false;
-        _administration.agents.push(_agent);
+        // _agent.deleted = false;
+        // _administration.agents.push(_agent);
     }
 
     function delegateListingForApproval(
@@ -196,14 +196,14 @@ contract Dao {
         Administration storage _administration = administration[_state];
         require(msg.sender == _administration.superior, "UNAUTHORIZED");
 
-        {
-            Assign[] memory _assign = assign[_state];
+        // {
+        Assign[] memory _assign = assign[_state];
 
-            require(
-                _assign.length > 0 && _assign.length >= assignId - 1,
-                "INVALID_ASSIGN_ID"
-            );
-        }
+        require(
+            _assign.length > 0 && _assign.length >= assignId - 1,
+            "INVALID_ASSIGN_ID"
+        );
+        // }
         Assign storage _asign = assign[_state][assignId - 1];
         require(
             keccak256(abi.encode(_asign.listing.state)) ==
@@ -240,25 +240,25 @@ contract Dao {
         string calldata _state
     ) external view returns (Assign[] memory) {
         uint count;
-        {
-            for (uint i; i < assign[_state].length; i++) {
-                if (!assign[_state][i].approved) {
-                    count += 1;
-                }
+        // {
+        for (uint i; i < assign[_state].length; i++) {
+            if (!assign[_state][i].approved) {
+                count += 1;
             }
         }
+        // }
 
         Assign[] memory _return = new Assign[](count);
 
-        {
-            uint current_index;
-            for (uint i; i < assign[_state].length; i++) {
-                if (!assign[_state][i].approved) {
-                    _return[current_index] = assign[_state][i];
-                    current_index += 1;
-                }
+        // {
+        uint current_index;
+        for (uint i; i < assign[_state].length; i++) {
+            if (!assign[_state][i].approved) {
+                _return[current_index] = assign[_state][i];
+                current_index += 1;
             }
         }
+        // }
 
         return _return;
     }
@@ -267,25 +267,25 @@ contract Dao {
         string calldata _state
     ) external view returns (Assign[] memory) {
         uint count;
-        {
-            for (uint i; i < assign[_state].length; i++) {
-                if (assign[_state][i].approved) {
-                    count += 1;
-                }
+        // {
+        for (uint i; i < assign[_state].length; i++) {
+            if (assign[_state][i].approved) {
+                count += 1;
             }
         }
+        // }
 
         Assign[] memory _return = new Assign[](count);
 
-        {
-            uint current_index;
-            for (uint i; i < assign[_state].length; i++) {
-                if (assign[_state][i].approved) {
-                    _return[current_index] = assign[_state][i];
-                    current_index += 1;
-                }
+        // {
+        uint current_index;
+        for (uint i; i < assign[_state].length; i++) {
+            if (assign[_state][i].approved) {
+                _return[current_index] = assign[_state][i];
+                current_index += 1;
             }
         }
+        // }
 
         return _return;
     }

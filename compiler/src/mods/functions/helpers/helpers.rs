@@ -19,6 +19,8 @@ pub fn lex_to_token(input: &str) -> Token {
         "modifier" => Token::Modifier,
         "assert" => Token::Assert,
         "bytes" => Token::Bytes,
+        "bytes1" => Token::Bytes1,
+        "bytes32" => Token::Bytes32,
         "wei" => Token::Wei,
         "interface" => Token::Interface,
         "ether" => Token::Ether,
@@ -119,6 +121,8 @@ pub fn detokenize(input: &Token) -> String {
         Token::Ether => "ether".to_string(),
         Token::Wei => "wei".to_string(),
         Token::Bytes => "bytes".to_string(),
+        Token::Bytes1 => "bytes1".to_string(),
+        Token::Bytes32 => "bytes32".to_string(),
         Token::Revert => "revert".to_string(),
         Token::Storage => "storage".to_string(),
         Token::While => "while".to_string(),
@@ -518,8 +522,6 @@ pub fn validate_variable(
     let mut is_primitive = true;
     let tokens = LineDescriptions::to_token(&format!("{}", text.text));
     let mut mapping = Mapping::new();
-
-    // println!("{:?}", text.te);
 
     if let Token::Mapping = &tokens[0] {
         let mut pad = 0;
