@@ -7,6 +7,10 @@ contract Dao {
     address nextSuperior;
     address owner;
 
+    //     cron("0 0 1 8 9"){
+    // /// do something
+    //     }
+
     address realEstateContractAddress;
 
     struct Listing {
@@ -144,14 +148,16 @@ contract Dao {
                 exist = true;
             }
         }
-        require(!exist, "AGENT_ALREADY_EXIST(CODE_OR_ADDRESS)");
+        require(!exist, "AGENT_ALREADY_EXIST");
         require(
             keccak256(abi.encode(_administration.region)) !=
                 keccak256(abi.encode(_agent.region)),
             "REGION_DID_NOT_MATCH"
         );
+        // string memory str = "Hello";
+        // str.length;
         // _agent.deleted = false;
-        // _administration.agents.push(_agent);
+        _administration.agents.push(_agent);
     }
 
     function delegateListingForApproval(

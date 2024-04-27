@@ -72,6 +72,9 @@ pub fn extract_functions(
         if raw.contains("{") {
             let characters = raw.chars();
             for character in characters {
+                if let OpenedBraceType::Interface = opened_braces_type {
+                    print_error("Cannot define \"interface\" in contract");
+                }
                 if character == '{' {
                     if let OpenedBraceType::Contract = opened_braces_type {
                         let lexems = LineDescriptions::to_token(raw);
@@ -94,10 +97,6 @@ pub fn extract_functions(
                 if character == '}' {
                     opened_braces -= 1;
                     if opened_braces == 1 {
-                        // if let OpenedBraceType::Interface = opened_braces_type {
-                        //     print_error("Cannot define \"interface\" in contract");
-                        // }
-
                         if let OpenedBraceType::Function
                         | OpenedBraceType::Constructor
                         | OpenedBraceType::Fallback
@@ -2208,7 +2207,7 @@ fn extract_function_scope_variable(
                     } else {
                         VariableAssignOperation::Pop
                     },
-                    variant: None,
+                    variants: None,
                     type_: VariableAssignType::Array(None),
                     value,
                 }));
@@ -2237,7 +2236,7 @@ fn extract_function_scope_variable(
                         return Some(FunctionArm::VariableAssign(VariableAssign {
                             identifier: _identifier.to_string(),
                             operation: VariableAssignOperation::Assign,
-                            variant: None,
+                            variants: None,
                             type_: VariableAssignType::Array(Some(stringified_index)),
                             value,
                         }));
@@ -2266,7 +2265,7 @@ fn extract_function_scope_variable(
                         Some(FunctionArm::VariableAssign(VariableAssign {
                             identifier: _identifier.to_string(),
                             operation: VariableAssignOperation::Assign,
-                            variant: None,
+                            variants: None,
                             type_: VariableAssignType::Expression,
                             value,
                         }))
@@ -2281,7 +2280,7 @@ fn extract_function_scope_variable(
                         Some(FunctionArm::VariableAssign(VariableAssign {
                             identifier: _identifier.to_string(),
                             operation: VariableAssignOperation::Assign,
-                            variant: None,
+                            variants: None,
                             type_: VariableAssignType::Expression,
                             value,
                         }))
@@ -2297,7 +2296,7 @@ fn extract_function_scope_variable(
                         Some(FunctionArm::VariableAssign(VariableAssign {
                             identifier: _identifier.to_string(),
                             operation: VariableAssignOperation::Assign,
-                            variant: None,
+                            variants: None,
                             type_: VariableAssignType::Enum,
                             value,
                         }))
@@ -2306,7 +2305,7 @@ fn extract_function_scope_variable(
                             Some(FunctionArm::VariableAssign(VariableAssign {
                                 identifier: _identifier.to_string(),
                                 operation: VariableAssignOperation::Assign,
-                                variant: Some(detokenize(block[2])),
+                                variants: Some(vec![detokenize(block[2])]),
                                 type_: VariableAssignType::Struct,
                                 value,
                             }))
@@ -2314,7 +2313,7 @@ fn extract_function_scope_variable(
                             Some(FunctionArm::VariableAssign(VariableAssign {
                                 identifier: _identifier.to_string(),
                                 operation: VariableAssignOperation::Assign,
-                                variant: None,
+                                variants: None,
                                 type_: VariableAssignType::Struct,
                                 value,
                             }))
@@ -2323,7 +2322,7 @@ fn extract_function_scope_variable(
                         Some(FunctionArm::VariableAssign(VariableAssign {
                             identifier: _identifier.to_string(),
                             operation: VariableAssignOperation::Assign,
-                            variant: None,
+                            variants: None,
                             type_: VariableAssignType::Expression,
                             value,
                         }))
@@ -2346,12 +2345,54 @@ fn extract_function_scope_variable(
                 Some(FunctionArm::VariableAssign(VariableAssign {
                     identifier: _identifier.to_string(),
                     operation: VariableAssignOperation::Assign,
-                    variant: None,
+                    variants: None,
                     type_: VariableAssignType::Expression,
                     value,
                 }))
             } else {
-                print_error(&format!("Missing = {:?}", block));
+                // println!("{:?}", _var);
+
+                if block.contains(&&Token::Push) {
+                    let value_start_index = block.iter().position(|pred| pred == &&Token::Push);
+                    let mut value = String::new();
+
+                    for val_preset in &block[value_start_index.unwrap() + 2..block.len() - 2] {
+                        value.push_str(&detokenize(&val_preset));
+                    }
+
+                    let first_dot = block.iter().position(|pred| pred == &&Token::Dot);
+                    let mut variants: Vec<String> = Vec::new();
+                    let variants_preset =
+                        &block[first_dot.unwrap() + 1..value_start_index.unwrap()];
+
+                    for _variant_preset in variants_preset {
+                        match _variant_preset {
+                            Token::Identifier(_id) => variants.push(_id.to_string()),
+                            Token::Dot => (),
+                            _ => {
+                                print_error("Unprocessible Entity");
+                            }
+                        }
+                    }
+                    return Some(FunctionArm::VariableAssign(VariableAssign {
+                        identifier: _identifier.to_string(),
+                        operation: if block.contains(&&Token::Push) {
+                            VariableAssignOperation::Push
+                        } else {
+                            VariableAssignOperation::Pop
+                        },
+                        variants: if variants.is_empty() {
+                            None
+                        } else {
+                            Some(variants)
+                        },
+                        type_: VariableAssignType::Struct,
+                        value,
+                    }));
+                } else {
+                    print_error(&format!("Missing = {:?}", block));
+                }
+
                 None
             }
         }
