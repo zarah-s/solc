@@ -393,6 +393,7 @@ pub enum FunctionArm {
     FunctionCall(FunctionCall),
     FunctionExecution,
     Break,
+    Continue,
     Require(Require),
     Conditionals(Conditionals),
     Return(Return),

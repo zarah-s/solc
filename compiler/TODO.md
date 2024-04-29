@@ -22,3 +22,13 @@
 - [] test inherited constructor initialization
 
 - [] add tests for interfaces
+
+- [] test this function
+
+```
+ function test() public {
+    val = 123;
+    bytes memory b = "";
+    msg.sender.call(b);
+}
+```

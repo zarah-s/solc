@@ -114,7 +114,7 @@ async fn main() -> Result<(), io::Error> {
     }
 
     println!(
-        "===>>> INTERFACES ===>>>\n{:?}\n\n ===>>> CONTRACTS ===>>>\n{:?}",
+        "===>>> INTERFACES ===>>>\n{:#?}\n\n ===>>> CONTRACTS ===>>>\n{:#?}",
         interfaces, contract_construct
     );
 
