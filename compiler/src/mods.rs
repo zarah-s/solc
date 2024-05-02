@@ -745,7 +745,7 @@ mod tests {
                 value: "Status.Start".to_string(),
                 operation: VariableAssignOperation::Assign,
                 type_: VariableAssignType::Enum,
-                variant: None,
+                variants: None,
             });
             match &fns[0] {
                 FunctionsIdentifier::FunctionIdentifier(_fn) => {
@@ -763,7 +763,7 @@ mod tests {
                 value: "2".to_string(),
                 operation: VariableAssignOperation::Push,
                 type_: VariableAssignType::Array(None),
-                variant: None,
+                variants: None,
             });
 
             match &fns[0] {
@@ -782,7 +782,7 @@ mod tests {
                 value: "".to_string(),
                 operation: VariableAssignOperation::Pop,
                 type_: VariableAssignType::Array(None),
-                variant: None,
+                variants: None,
             });
             match &fns[0] {
                 FunctionsIdentifier::FunctionIdentifier(_fn) => {

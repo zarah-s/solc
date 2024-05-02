@@ -66,7 +66,6 @@ async fn main() -> Result<(), io::Error> {
     let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
 
     for ddd in joined {
-        // let extracted_enums: Vec<mods::types::types::EnumIdentifier> = Vec::new();
         let extracted_enums = extract_enum(&ddd);
 
         let structs_tree = extract_struct(&ddd);

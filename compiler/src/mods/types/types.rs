@@ -299,7 +299,7 @@ pub enum VariableAssignType {
 pub struct VariableAssign {
     pub identifier: String,
     pub value: String,
-    pub variant: Option<String>,
+    pub variants: Option<Vec<String>>,
     pub operation: VariableAssignOperation,
     pub type_: VariableAssignType,
 }
@@ -393,6 +393,7 @@ pub enum FunctionArm {
     FunctionCall(FunctionCall),
     FunctionExecution,
     Break,
+    Continue,
     Require(Require),
     Conditionals(Conditionals),
     Return(Return),
