@@ -166,6 +166,7 @@ pub fn extract_functions(
             ),
 
             Token::Interface => {
+                // println!("{:#?}", tokens);
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
                 let interface_definition: &[Token] = &tokens[..start_index.unwrap() + 1];
                 let mut interface_name = String::new();
@@ -260,6 +261,8 @@ pub fn extract_functions(
                     }
                 }
 
+                // println!("{:#?}", brace_seperated);
+
                 let variants = [semicolon_seperated, brace_seperated].concat();
                 let mut interface_events_and_errors: Vec<LineDescriptions> = Vec::new();
                 interface_events_and_errors.push(LineDescriptions {
@@ -290,20 +293,16 @@ pub fn extract_functions(
                                 stringified_data.push_str(&detokenize(&spl_token));
                             }
                             if let Token::Enum = split[0] {
-                                stringified_data.push('}');
                                 interface_enums.push(LineDescriptions {
                                     line: 0,
                                     text: stringified_data,
                                 })
                             } else if let Token::Struct = split[0] {
-                                stringified_data.push('}');
                                 interface_structs.push(LineDescriptions {
                                     line: 0,
                                     text: stringified_data,
                                 })
                             } else {
-                                // stringified_data.push(';');
-
                                 interface_events_and_errors.push(LineDescriptions {
                                     line: 0,
                                     text: stringified_data,
@@ -329,6 +328,7 @@ pub fn extract_functions(
                     text: String::from("}"),
                     line: 0,
                 });
+
                 let _structs_tree = extract_struct(&interface_structs);
 
                 let _extracted_enums: Vec<crate::mods::types::types::EnumIdentifier> =

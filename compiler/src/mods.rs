@@ -37,7 +37,7 @@ mod tests {
             process_state_variables::extract_global_elements, process_struct::extract_struct,
             strip_comments, structure_to_line_descriptors,
         },
-        types::types::{FunctionsIdentifier, LineDescriptions},
+        types::types::{FunctionsIdentifier, InterfaceIdentifier, LineDescriptions},
     };
 
     mod file_processing {
@@ -325,15 +325,6 @@ mod tests {
                 assert_eq!(_map, val);
             }
         }
-
-        // #[tokio::test]
-        // #[should_panic(
-        //     expected = "ERROR: Invalid data type \"strings public text = \"Hello\";\" on line 6"
-        // )]
-        // async fn test_variable_data_type() {
-        //     let contents = get_file_contents("test/files/vars/Var2.sol").await;
-        //     extract_global_elements(&contents, &Vec::new(), &Vec::new());
-        // }
 
         #[tokio::test]
         #[should_panic(expected = "ERROR: Missing \"]\" on line 8")]
@@ -1121,8 +1112,98 @@ mod tests {
         }
     }
 
+    mod interface_processing {
+        use super::get_interfaces;
+        use crate::mods::types::types::{FunctionMutability, InterfaceIdentifier, Token};
+
+        #[tokio::test]
+        async fn test_interface_count() {
+            let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
+            get_interfaces("test/files/interface/I1.sol", &mut interfaces).await;
+            assert_eq!(interfaces.len(), 2);
+        }
+
+        #[tokio::test]
+        async fn test_interface_identifier() {
+            let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
+            get_interfaces("test/files/interface/I2.sol", &mut interfaces).await;
+            assert_eq!(interfaces[0].identifier, "I2");
+        }
+
+        #[tokio::test]
+        async fn test_interface_inheritance() {
+            let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
+            get_interfaces("test/files/interface/I3.sol", &mut interfaces).await;
+            assert!(interfaces[0].inheritance.is_none());
+            let oi = interfaces[2].inheritance.clone();
+            assert_eq!(oi.unwrap()[0], "I1");
+        }
+
+        #[tokio::test]
+        async fn test_interface_enums() {
+            let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
+            get_interfaces("test/files/interface/I4.sol", &mut interfaces).await;
+            assert_eq!(interfaces[0].enums.len(), 2);
+            assert_eq!(interfaces[0].enums[0].identifier, "Status");
+            assert_eq!(interfaces[0].enums[0].variants[1], "Success");
+        }
+
+        #[tokio::test]
+        async fn test_interface_structs() {
+            let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
+            get_interfaces("test/files/interface/I5.sol", &mut interfaces).await;
+            assert_eq!(interfaces[0].structs.len(), 2);
+            assert_eq!(interfaces[0].structs[0].identifier, "User");
+            assert_eq!(interfaces[0].structs[0].types[1].name_, "addr");
+            assert_eq!(interfaces[0].structs[0].types[1].size, None);
+            assert_eq!(interfaces[0].structs[0].types[1].is_array, false);
+            assert_eq!(interfaces[0].structs[0].types[1].type_, "address");
+        }
+
+        #[tokio::test]
+        async fn test_interface_custom_errors() {
+            let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
+            get_interfaces("test/files/interface/I6.sol", &mut interfaces).await;
+            assert_eq!(interfaces[0].custom_errors.len(), 2);
+            assert_eq!(interfaces[0].custom_errors[0], "error Err();");
+        }
+
+        #[tokio::test]
+        async fn test_interface_events() {
+            let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
+            get_interfaces("test/files/interface/I7.sol", &mut interfaces).await;
+            assert_eq!(interfaces[0].events.len(), 2);
+            // assert_eq!(
+            //     interfaces[0].events[0],
+            //     "event Event(address indexed owner);"
+            // );
+        }
+
+        #[tokio::test]
+        async fn test_interface_functions() {
+            let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
+            get_interfaces("test/files/interface/I8.sol", &mut interfaces).await;
+            assert_eq!(interfaces[0].functions.len(), 2);
+            assert_eq!(interfaces[0].functions[0].name, "call");
+            assert_eq!(interfaces[0].functions[0].arguments[0].name_, "owner");
+            assert_eq!(interfaces[0].functions[0].gasless, false);
+            assert_eq!(
+                interfaces[0].functions[0].mutability,
+                FunctionMutability::View
+            );
+            assert_eq!(
+                interfaces[0].functions[1].mutability,
+                FunctionMutability::Mutable
+            );
+            assert_eq!(interfaces[0].functions[0].visibility, Token::External);
+        }
+    }
+
     //******************************** HELPER FUNCTIONS***************** */
-    async fn process_function(path: &str) -> (Vec<FunctionsIdentifier>, String, Vec<String>) {
+    async fn process_function(
+        path: &str,
+        interfaces: &mut Vec<InterfaceIdentifier>,
+    ) -> (Vec<FunctionsIdentifier>, String, Vec<String>) {
         let contents = get_file_contents(path).await;
         let structs_tree = extract_struct(&contents);
         let struct_identifiers: Vec<&str> = structs_tree
@@ -1139,26 +1220,29 @@ mod tests {
             [enum_identifiers.clone(), struct_identifiers].concat();
         let (_vars, _, _maps, _) =
             extract_global_elements(&contents, &custom_data_types_identifiers, &enum_identifiers);
-
         let fns = extract_functions(
             &contents,
             &custom_data_types_identifiers,
             &_vars,
             &enum_identifiers,
             &_maps,
-            &mut Vec::new(),
+            interfaces,
         );
         fns
     }
 
     async fn get_contract_definition(path: &str) -> (String, Vec<String>) {
-        let fns = process_function(path).await;
+        let fns = process_function(path, &mut Vec::new()).await;
         (fns.1, fns.2)
     }
 
     async fn get_fns(path: &str) -> Vec<FunctionsIdentifier> {
-        let fns = process_function(path).await;
+        let fns = process_function(path, &mut Vec::new()).await;
         fns.0
+    }
+
+    async fn get_interfaces(path: &str, interfaces: &mut Vec<InterfaceIdentifier>) {
+        process_function(path, interfaces).await;
     }
 
     async fn get_file_contents(path: &str) -> Vec<LineDescriptions> {

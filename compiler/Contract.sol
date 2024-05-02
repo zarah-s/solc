@@ -1,6 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+interface I4 {
+    enum Status {
+        Success,
+        Pending
+    }
+
+    enum Chiiii {
+        Success,
+        Pending
+    }
+
+    struct Oi {
+        address _d;
+        string chs;
+    }
+
+    struct Oid {
+        address _d;
+        string chs;
+    }
+
+    event Name();
+    event Names();
+}
+
 contract Inher {
     address owner;
 
@@ -12,6 +37,10 @@ contract Inher {
 contract Oi {
     constructor(string memory yo, address _addr) {}
 }
+
+// interface IFunction {
+//     function call() external;
+// }
 
 contract Function is Inher, Oi {
     constructor() Inher() Oi(string("hello"), address(0)) {}

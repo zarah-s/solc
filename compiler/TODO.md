@@ -21,7 +21,7 @@
 
 - [x] test inherited constructor initialization
 
-- [] add tests for interfaces
+- [x] add tests for interfaces
 
 - [] consider empty vars for tupple e.g `(bool _s, , uint j) = (1,2,3)`
 
