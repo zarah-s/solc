@@ -2130,7 +2130,6 @@ fn extract_function_block(
                         let splited = vars_
                             .split(|pred| pred == &&Token::Coma)
                             .collect::<Vec<_>>();
-
                         let mut line_descriptors: Vec<LineDescriptions> = vec![LineDescriptions {
                             line: 0,
                             text: "contract{".to_string(),
@@ -2141,7 +2140,7 @@ fn extract_function_block(
                                 line_text.push_str(&format!("{} ", &detokenize(__val)))
                             }
                             line_descriptors.push(LineDescriptions {
-                                text: line_text.trim().to_string(),
+                                text: format!("{};",line_text.trim().to_string()),
                                 line: 0,
                             })
                         }
@@ -2149,6 +2148,8 @@ fn extract_function_block(
                             text: "}".to_string(),
                             line: 0,
                         });
+
+
                         let (__variables, _, _, _): (
                             Vec<VariableIdentifier>,
                             Vec<String>,

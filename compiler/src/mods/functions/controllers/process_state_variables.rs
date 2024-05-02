@@ -14,6 +14,7 @@ pub fn extract_global_elements(
     Vec<MappingIdentifier>,
     Vec<String>,
 ) {
+
     let mut global_variables: Vec<VariableIdentifier> = Vec::new();
     let mut custom_errors: Vec<String> = Vec::new();
     let mut events: Vec<String> = Vec::new();
@@ -108,6 +109,7 @@ pub fn extract_global_elements(
     }
 
     for variable in variables {
+
         let validated = validate_variable(variable, custom_data_types, enums, false);
         if let Some(_raw) = validated.0 {
             global_variables.push(_raw);
