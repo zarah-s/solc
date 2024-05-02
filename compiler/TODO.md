@@ -19,7 +19,7 @@
 
 - [x] test interface interaction and implementation
 
-- [] test inherited constructor initialization
+- [x] test inherited constructor initialization
 
 - [] add tests for interfaces
 

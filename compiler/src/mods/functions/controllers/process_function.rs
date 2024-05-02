@@ -12,13 +12,14 @@ use crate::mods::{
         },
     },
     types::types::{
-        Argument, Assert, ConditionalType, Conditionals, ConstructorIdentifier, CronIdentifier,
-        Delete, ElIf, FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall,
-        FunctionHeader, FunctionIdentifier, FunctionMutability, FunctionsIdentifier,
-        InterfaceIdentifier, InterfaceVariants, LineDescriptions, Loop, LoopType, MappingAssign,
-        MappingIdentifier, ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return,
-        ReturnType, Revert, RevertType, Token, TuppleAssignment, VariableAssign,
-        VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
+        Argument, Assert, ConditionalType, Conditionals, ConstructorIdentifier,
+        ConstructorInheritanceInitialization, CronIdentifier, Delete, ElIf, FallbackIdentifier,
+        FunctionArm, FunctionArmType, FunctionCall, FunctionHeader, FunctionIdentifier,
+        FunctionMutability, FunctionsIdentifier, InterfaceIdentifier, InterfaceVariants,
+        LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier, ModifierIdentifier,
+        OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType, Revert, RevertType, Token,
+        TuppleAssignment, VariableAssign, VariableAssignOperation, VariableAssignType,
+        VariableIdentifier, VariableType,
     },
 };
 
@@ -425,8 +426,88 @@ pub fn extract_functions(
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
 
                 let function_definition: &[Token] = &tokens[..start_index.unwrap()];
+                // println!("{:?}", function_definition);
                 let arguments =
                     prepare_and_get_function_args(function_definition, custom_data_types, enums);
+                let close_paren_index = function_definition
+                    .iter()
+                    .position(|pred| pred == &Token::CloseParenthesis);
+                let mut inheritance_initialization: Vec<ConstructorInheritanceInitialization> =
+                    Vec::new();
+                if let Some(_index) = close_paren_index {
+                    let _variants = &function_definition[_index + 1..];
+                    if !_variants.is_empty() {
+                        let mut _open_brace_count = 0;
+                        let mut _full_combo: Vec<Vec<Token>> = Vec::new();
+                        let mut _combo: Vec<Token> = Vec::new();
+                        for _variant in _variants {
+                            match _variant {
+                                Token::OpenParenthesis => {
+                                    _open_brace_count += 1;
+                                    _combo.push(_variant.clone());
+                                }
+                                Token::CloseParenthesis => {
+                                    _open_brace_count -= 1;
+                                    _combo.push(_variant.clone());
+                                    if _open_brace_count == 0 {
+                                        _full_combo.push(_combo.clone());
+                                        _combo.clear();
+                                    }
+                                }
+                                _token => {
+                                    _combo.push(_token.clone());
+                                }
+                            }
+                        }
+
+                        for __full_combo in _full_combo {
+                            let mut args: Vec<String> = Vec::new();
+                            let tkns = &__full_combo[2..__full_combo.len() - 1].to_vec();
+                            let mut skip = 0;
+                            for (index, arg) in tkns.iter().enumerate() {
+                                if skip > index {
+                                    continue;
+                                }
+                                match arg {
+                                    Token::Identifier(_id) => {
+                                        args.push(_id.to_string());
+                                    }
+                                    Token::Coma => (),
+                                    Token::OpenBraces => {
+                                        print_error("Named arguments not supported");
+                                    }
+                                    __other => {
+                                        let mut comb = String::new();
+                                        let coma_index = &tkns[index..]
+                                            .iter()
+                                            .position(|pred| pred == &Token::Coma);
+                                        if let Some(_index) = coma_index {
+                                            for cmb in &tkns[index..index + *_index] {
+                                                comb.push_str(&detokenize(cmb))
+                                            }
+                                            skip = index + *_index;
+                                        } else {
+                                            for cmb in &tkns[index..tkns.len()] {
+                                                comb.push_str(&detokenize(cmb))
+                                            }
+                                            skip = index + tkns.len();
+                                        }
+
+                                        if !comb.trim().is_empty() {
+                                            args.push(comb);
+                                        }
+                                    }
+                                }
+                            }
+                            let structured_initialization = ConstructorInheritanceInitialization {
+                                args,
+                                identifier: detokenize(&__full_combo[0]),
+                            };
+
+                            inheritance_initialization.push(structured_initialization);
+                        }
+                    }
+                }
 
                 let function_body_start_index =
                     tokens.iter().position(|pred| pred == &Token::OpenBraces);
@@ -445,7 +526,11 @@ pub fn extract_functions(
                     mappings,
                 );
 
-                let structured = ConstructorIdentifier { arguments, arms };
+                let structured = ConstructorIdentifier {
+                    arguments,
+                    arms,
+                    initialization: inheritance_initialization,
+                };
                 function_identifiers.push(FunctionsIdentifier::ConstructorIdentifier(structured))
             }
             Token::Receive => {
@@ -2140,7 +2225,7 @@ fn extract_function_block(
                                 line_text.push_str(&format!("{} ", &detokenize(__val)))
                             }
                             line_descriptors.push(LineDescriptions {
-                                text: format!("{};",line_text.trim().to_string()),
+                                text: format!("{};", line_text.trim().to_string()),
                                 line: 0,
                             })
                         }
@@ -2148,7 +2233,6 @@ fn extract_function_block(
                             text: "}".to_string(),
                             line: 0,
                         });
-
 
                         let (__variables, _, _, _): (
                             Vec<VariableIdentifier>,

@@ -176,6 +176,7 @@ pub enum InterfaceVariants {
 pub struct ConstructorIdentifier {
     pub arguments: Vec<Argument>,
     pub arms: Vec<FunctionArm>,
+    pub initialization: Vec<ConstructorInheritanceInitialization>,
 }
 
 #[derive(Debug)]
@@ -278,6 +279,12 @@ pub struct FunctionHeader {
 pub struct FunctionIdentifier {
     pub header: FunctionHeader,
     pub arms: Vec<FunctionArm>,
+}
+
+#[derive(Debug)]
+pub struct ConstructorInheritanceInitialization {
+    pub identifier: String,
+    pub args: Vec<String>,
 }
 
 #[derive(Debug)]

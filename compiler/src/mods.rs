@@ -915,6 +915,30 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn test_constructor_initialization_count() {
+            let fns = get_fns("test/files/function/Fn46.sol").await;
+            match &fns[0] {
+                FunctionsIdentifier::ConstructorIdentifier(_fn) => {
+                    assert_eq!(_fn.initialization.len(), 1);
+                }
+                _ => (),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_constructor_initialization_integrity() {
+            let fns = get_fns("test/files/function/Fn47.sol").await;
+            match &fns[0] {
+                FunctionsIdentifier::ConstructorIdentifier(_fn) => {
+                    assert_eq!(_fn.initialization.len(), 1);
+                    assert_eq!(_fn.initialization[0].identifier, "Test".to_string());
+                    assert_eq!(_fn.initialization[0].args[0], "address(0)".to_string());
+                }
+                _ => (),
+            }
+        }
+
+        #[tokio::test]
         async fn test_receive() {
             let fns = get_fns("test/files/function/Fn27.sol").await;
             match &fns[0] {
