@@ -502,6 +502,7 @@ pub fn validate_variable(
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
     is_function_variable: bool,
+    variable_position: Option<u8>,
 ) -> (
     Option<VariableIdentifier>,
     Option<String>,
@@ -747,6 +748,7 @@ pub fn validate_variable(
         }
         let structured = VariableIdentifier {
             data_type: data_type.unwrap(),
+            index: variable_position,
             is_array,
             mutability,
             name: variable_name.unwrap(),

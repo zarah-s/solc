@@ -16,7 +16,7 @@
 - [] consider empty vars for tupple e.g `(bool _s, , uint j) = (1,2,3)`
 - [] test this function
 ```
- function test() public {
+function test() public {
     val = 123;
     bytes memory b = "";
     msg.sender.call(b);
