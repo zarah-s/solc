@@ -347,8 +347,12 @@ pub fn extract_functions(
                 let _custom_data_types_identifiers: Vec<&str> =
                     [enum_identifiers.clone(), struct_identifiers].concat();
 
-                let (_, _custom_errors, _, _events) =
-                    extract_global_elements(&interface_events_and_errors, &Vec::new(), &Vec::new());
+                let (_, _custom_errors, _, _events) = extract_global_elements(
+                    &interface_events_and_errors,
+                    &Vec::new(),
+                    &Vec::new(),
+                    Vec::new(),
+                );
 
                 for unprocessed in unprocessed_function_headers {
                     let function_header = extract_function_header(
@@ -2219,9 +2223,17 @@ fn extract_function_block(
                             line: 0,
                             text: "contract{".to_string(),
                         }];
-                        for line in splited {
+
+                        let mut positions: Vec<Option<u8>> = Vec::new();
+
+                        for (index, line) in splited.iter().enumerate() {
                             let mut line_text = String::new();
-                            for __val in line {
+                            if line.is_empty() {
+                                positions.push(None);
+                            } else {
+                                positions.push(Some(index as u8));
+                            }
+                            for __val in *line {
                                 line_text.push_str(&format!("{} ", &detokenize(__val)))
                             }
                             line_descriptors.push(LineDescriptions {
@@ -2229,6 +2241,7 @@ fn extract_function_block(
                                 line: 0,
                             })
                         }
+                        // println!("{:?} ====>>>> {:?}", positions, line_descriptors);
                         line_descriptors.push(LineDescriptions {
                             text: "}".to_string(),
                             line: 0,
@@ -2239,7 +2252,14 @@ fn extract_function_block(
                             Vec<String>,
                             Vec<MappingIdentifier>,
                             Vec<String>,
-                        ) = extract_global_elements(&line_descriptors, custom_data_types, enums);
+                        ) = extract_global_elements(
+                            &line_descriptors,
+                            custom_data_types,
+                            enums,
+                            positions,
+                        );
+
+                        // println!("")
                         full_block.push(FunctionArm::TuppleAssignment(TuppleAssignment {
                             value: _value.unwrap(),
                             variables: __variables,
@@ -2272,6 +2292,7 @@ fn extract_function_variable(
         custom_data_types,
         enums,
         true,
+        None,
     );
     variable.0
 }

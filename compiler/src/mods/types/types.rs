@@ -162,6 +162,7 @@ pub struct VariableIdentifier {
     pub is_array: bool,
     pub size: Option<String>,
     pub storage_location: Option<Token>,
+    pub index: Option<u8>,
 }
 
 pub enum InterfaceVariants {

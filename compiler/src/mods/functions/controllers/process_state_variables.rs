@@ -8,13 +8,13 @@ pub fn extract_global_elements(
     data: &Vec<LineDescriptions>,
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
+    variable_positions: Vec<Option<u8>>,
 ) -> (
     Vec<VariableIdentifier>,
     Vec<String>,
     Vec<MappingIdentifier>,
     Vec<String>,
 ) {
-
     let mut global_variables: Vec<VariableIdentifier> = Vec::new();
     let mut custom_errors: Vec<String> = Vec::new();
     let mut events: Vec<String> = Vec::new();
@@ -107,10 +107,34 @@ pub fn extract_global_elements(
             "Unprocessible entity for {combo}. expecting \";\""
         ));
     }
-
+    let mut skip = 0;
     for variable in variables {
+        let validated: (
+            Option<VariableIdentifier>,
+            Option<String>,
+            Option<MappingIdentifier>,
+            Option<String>,
+        );
 
-        let validated = validate_variable(variable, custom_data_types, enums, false);
+        if variable_positions.is_empty() {
+            validated = validate_variable(variable, custom_data_types, enums, false, None);
+        } else {
+            for (__index, __position) in variable_positions[skip..].iter().enumerate() {
+                if __position.is_some() {
+                    skip += __index + 1;
+                    break;
+                } else {
+                }
+            }
+
+            validated = validate_variable(
+                variable,
+                custom_data_types,
+                enums,
+                false,
+                variable_positions[skip - 1],
+            );
+        };
         if let Some(_raw) = validated.0 {
             global_variables.push(_raw);
         } else if let Some(_custom_err) = validated.1 {

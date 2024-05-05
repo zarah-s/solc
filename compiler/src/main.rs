@@ -82,8 +82,12 @@ async fn main() -> Result<(), io::Error> {
         let custom_data_types_identifiers: Vec<&str> =
             [enum_identifiers.clone(), struct_identifiers].concat();
 
-        let (state_variables, custom_errors, mappings, events) =
-            extract_global_elements(&ddd, &custom_data_types_identifiers, &enum_identifiers);
+        let (state_variables, custom_errors, mappings, events) = extract_global_elements(
+            &ddd,
+            &custom_data_types_identifiers,
+            &enum_identifiers,
+            Vec::new(),
+        );
         let (functions, contract_identifier, contract_inheritance) = extract_functions(
             &ddd,
             &custom_data_types_identifiers,
