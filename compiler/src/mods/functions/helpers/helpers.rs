@@ -682,14 +682,17 @@ pub fn validate_variable(
 
         if !is_primitive {
             if tokens.contains(&Token::Storage) || tokens.contains(&Token::Memory) {
-                storage = Some(tokens[1].to_owned())
+                storage = if tokens.contains(&Token::Storage) {
+                    Some(Token::Storage)
+                } else {
+                    Some(Token::Memory)
+                }
             } else {
                 print_error(
                     &format!("Data location must be \"storage\", \"memory\" or \"calldata\" for variable, but none was given. {}",text.text),
                 )
             }
         }
-
         let equal_token_position = tokens.iter().position(|pred| pred == &Token::Equals);
         if let Some(_position) = equal_token_position {
             let slice_equal_token = &tokens[.._position];
@@ -712,10 +715,20 @@ pub fn validate_variable(
             value = Some(_string_value);
         } else {
             if !is_custom_error && !is_event {
-                for token in &tokens {
-                    if let Token::Identifier(_val) = token {
-                        variable_name = Some(_val.to_owned());
+                let semicolon_token_position =
+                    tokens.iter().position(|pred| pred == &Token::SemiColon);
+                if let Some(_position) = semicolon_token_position {
+                    let slice_equal_token = &tokens[.._position];
+
+                    if let Token::Identifier(_var_name) =
+                        &slice_equal_token[slice_equal_token.len() - 1]
+                    {
+                        variable_name = Some(_var_name.to_string());
+                    } else {
+                        print_error(&format!("Unprocessible entity {}", text.text))
                     }
+                } else {
+                    print_error("Missing ;");
                 }
 
                 if let None = variable_name {

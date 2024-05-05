@@ -1,124 +1,52 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-interface I4 {
-    enum Status {
-        Success,
-        Pending
-    }
-
-    enum Chiiii {
-        Success,
-        Pending
-    }
-
-    struct Oi {
-        address _d;
-        string chs;
-    }
-
-    struct Oid {
-        address _d;
-        string chs;
-    }
-
-    event Name();
-    event Names();
-}
-
-contract Inher {
-    address owner;
-
-    constructor() {
-        owner = msg.sender;
+contract A {
+    function foo() public pure virtual returns (string memory) {
+        return "A";
     }
 }
 
-contract Oi {
-    constructor(string memory yo, address _addr) {}
-}
-
-// interface IFunction {
-//     function call() external;
-// }
-
-contract Function is Inher, Oi {
-    constructor() Inher() Oi(string("hello"), address(0)) {}
-
-    function test() external view returns (uint, string memory) {
-        (uint _num, , uint num2) = returnMany();
-    }
-
-    // Functions can return multiple values.
-    function returnMany() public pure returns (uint256, bool, uint256) {
-        return (1, true, 2);
-    }
-
-    // Return values can be named.
-    function named() public pure returns (uint256, bool, uint256) {
-        return (1, true, 2);
-    }
-
-    // Return values can be assigned to their name.
-    // In this case the return statement can be omitted.
-    // function assigned() public pure returns (uint256 x, bool b, uint256 y) {
-    //     x = 1;
-    //     b = true;
-    //     y = 2;
-    // }
-
-    // Use destructuring assignment when calling another
-    // function that returns multiple values.
-    function destructuringAssignments()
-        public
-        pure
-        returns (uint256, bool, uint256, uint256, uint256)
-    {
-        (uint256 i, bool b, uint256 j) = returnMany();
-
-        // Values can be left out.
-        (uint256 x, , uint256 y) = (4, 5, 6);
-
-        return (i, b, j, x, y);
-    }
-
-    // Cannot use map for either input or output
-
-    // Can use array for input
-    function arrayInput(uint256[] memory _arr) public {}
-
-    // Can use array for output
-    uint256[] public arr;
-
-    function arrayOutput() public view returns (uint256[] memory) {
-        return arr;
+// Contracts inherit other contracts by using the keyword 'is'.
+contract B is A {
+    // Override A.foo()
+    function foo() public pure virtual override returns (string memory) {
+        return "B";
     }
 }
 
-// Call function with key-value inputs
-contract XYZ {
-    function someFuncWithManyInputs(
-        uint256 x,
-        uint256 y,
-        uint256 z,
-        address a,
-        bool b,
-        string memory c
-    ) public pure returns (uint256) {}
-
-    function callFunc() external pure returns (uint256) {
-        return someFuncWithManyInputs(1, 2, 3, address(0), true, "c");
+contract C is A {
+    // Override A.foo()
+    function foo() public pure virtual override returns (string memory) {
+        return "C";
     }
+}
 
-    function callFuncWithKeyValue() external pure returns (uint256) {
-        return
-            someFuncWithManyInputs({
-                a: address(0),
-                b: true,
-                c: "c",
-                x: 1,
-                y: 2,
-                z: 3
-            });
+// Contracts can inherit from multiple parent contracts.
+// When a function is called that is defined multiple times in
+// different contracts, parent contracts are searched from
+// right to left, and in depth-first manner.
+
+contract D is B, C {
+    // D.foo() returns "C"
+    // since C is the right most parent contract with function foo()
+    function foo() public pure override(B, C) returns (string memory) {
+        return super.foo();
+    }
+}
+
+contract E is C, B {
+    // E.foo() returns "B"
+    // since B is the right most parent contract with function foo()
+    function foo() public pure override(C, B) returns (string memory) {
+        return super.foo();
+    }
+}
+
+// Inheritance must be ordered from “most base-like” to “most derived”.
+// Swapping the order of A and B will throw a compilation error.
+contract F is A, B {
+    function foo() public pure override(A, B) returns (string memory) {
+        return super.foo();
     }
 }

@@ -769,10 +769,11 @@ fn extract_contract_headers(
             .split(|pred| pred == &Token::Coma)
             .collect::<Vec<_>>()
             .concat();
-        for splited in splits {
+        for splited in &splits {
             match splited {
-                Token::Identifier(_identifier) => contract_inheritance.push(_identifier),
+                Token::Identifier(_identifier) => contract_inheritance.push(_identifier.clone()),
                 _ => {
+                    println!("{:?} {:?}", splits, splited);
                     print_error("Unprocessible entity for contract inheritance");
                 }
             }
@@ -1278,6 +1279,7 @@ fn extract_function_arms(
 
     for token in &body[1..body.len() - 1] {
         combined.push(token);
+
         match token {
             Token::Require => {
                 prev_packet = packet;
@@ -1346,8 +1348,12 @@ fn extract_function_arms(
                 }
             }
 
-            _ => (),
+            _other => {}
         }
+    }
+
+    if !combined.is_empty() {
+        print_error("Missing ;");
     }
 
     let mut joined_conditionals: Vec<Vec<&Token>> = Vec::new();
@@ -1382,6 +1388,7 @@ fn extract_function_block(
     mappings: &Vec<MappingIdentifier>,
 ) -> Vec<FunctionArm> {
     let mut full_block: Vec<FunctionArm> = Vec::new();
+    // println!("{:?}", arms);
     for block in arms {
         let initial = block[0];
         match initial {
@@ -2188,6 +2195,7 @@ fn extract_function_block(
                 full_block.push(FunctionArm::Return(Return { value }));
             }
             _token => {
+                // println!("{:?}", );
                 match block[block.len() - 1] {
                     Token::SemiColon => (),
                     _ => {
@@ -2259,7 +2267,6 @@ fn extract_function_block(
                             positions,
                         );
 
-                        // println!("")
                         full_block.push(FunctionArm::TuppleAssignment(TuppleAssignment {
                             value: _value.unwrap(),
                             variables: __variables,
@@ -2270,6 +2277,8 @@ fn extract_function_block(
                 } else if let Token::CloseBraces = _token {
                     //
                 } else {
+                    // println!("{:?}", _token);
+
                     print_error(&format!("Unexpected identifier \"{}\"", detokenize(_token)))
                 }
             }
@@ -2283,10 +2292,12 @@ fn extract_function_variable(
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
 ) -> Option<VariableIdentifier> {
+    // println!("{:?}", block);
     let mut text = String::new();
     for strr in block {
         text.push_str(&format!("{} ", &detokenize(strr)))
     }
+    // println!("{:?}", text);
     let variable = validate_variable(
         LineDescriptions { text, line: 0 },
         custom_data_types,
