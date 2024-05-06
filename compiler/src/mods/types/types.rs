@@ -201,6 +201,21 @@ pub struct CronIdentifier {
     pub arms: Vec<FunctionArm>,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum CallIdentifierType {
+    // Transfer,
+    Call,
+    // Send,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CallIdentifier {
+    pub address: String,
+    pub arguments: Vec<String>,
+    pub raw_data: Option<[String; 2]>,
+    pub r#type: CallIdentifierType,
+}
+
 #[derive(Debug)]
 pub enum FunctionsIdentifier {
     FunctionIdentifier(FunctionIdentifier),
@@ -397,6 +412,7 @@ pub enum FunctionArm {
     VariableIdentifier(VariableIdentifier),
     VariableAssign(VariableAssign),
     MappingAssign(MappingAssign),
+    CallIdentifier(CallIdentifier),
     TuppleAssignment(TuppleAssignment),
     FunctionCall(FunctionCall),
     FunctionExecution,

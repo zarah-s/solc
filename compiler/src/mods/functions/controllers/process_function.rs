@@ -1,7 +1,7 @@
 use std::process;
 
 use crate::mods::{
-    constants::constants::{DATA_TYPES, KEYWORDS},
+    constants::constants::{DATA_TYPES, KEYWORDS, SYMBOLS},
     functions::{
         controllers::{
             process_enum::extract_enum, process_state_variables::extract_global_elements,
@@ -12,14 +12,14 @@ use crate::mods::{
         },
     },
     types::types::{
-        Argument, Assert, ConditionalType, Conditionals, ConstructorIdentifier,
-        ConstructorInheritanceInitialization, CronIdentifier, Delete, ElIf, FallbackIdentifier,
-        FunctionArm, FunctionArmType, FunctionCall, FunctionHeader, FunctionIdentifier,
-        FunctionMutability, FunctionsIdentifier, InterfaceIdentifier, InterfaceVariants,
-        LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier, ModifierIdentifier,
-        OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType, Revert, RevertType, Token,
-        TuppleAssignment, VariableAssign, VariableAssignOperation, VariableAssignType,
-        VariableIdentifier, VariableType,
+        Argument, Assert, CallIdentifier, CallIdentifierType, ConditionalType, Conditionals,
+        ConstructorIdentifier, ConstructorInheritanceInitialization, CronIdentifier, Delete, ElIf,
+        FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall, FunctionHeader,
+        FunctionIdentifier, FunctionMutability, FunctionsIdentifier, InterfaceIdentifier,
+        InterfaceVariants, LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier,
+        ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType,
+        Revert, RevertType, Token, TuppleAssignment, VariableAssign, VariableAssignOperation,
+        VariableAssignType, VariableIdentifier, VariableType,
     },
 };
 
@@ -1359,7 +1359,7 @@ fn extract_function_arms(
     let mut joined_conditionals: Vec<Vec<&Token>> = Vec::new();
 
     for arm in arms {
-        if let Token::Else = &arm[0] {
+        if let Token::Else | Token::OpenParenthesis = &arm[0] {
             let last_index = joined_conditionals.len() - 1;
             for sec in arm {
                 joined_conditionals[last_index].push(sec);
@@ -2195,10 +2195,10 @@ fn extract_function_block(
                 full_block.push(FunctionArm::Return(Return { value }));
             }
             _token => {
-                // println!("{:?}", );
                 match block[block.len() - 1] {
                     Token::SemiColon => (),
                     _ => {
+                        // println!("{:?}", block);
                         print_error("Missing ;");
                     }
                 }
@@ -2276,6 +2276,118 @@ fn extract_function_block(
                     }
                 } else if let Token::CloseBraces = _token {
                     //
+                } else if let Token::Msg = _token {
+                    let next_variant_index = block.iter().position(|pred| pred == &&Token::Dot);
+                    if let Some(_index) = next_variant_index {
+                        match &block[_index..][1] {
+                            Token::Identifier(_identifier) => {
+                                if _identifier != "sender" {
+                                    print_error(&format!("Unknown variant \"{_identifier}\""))
+                                } else {
+                                    let _variants = &block[_index + 1..];
+
+                                    match _variants[2] {
+                                        Token::Identifier(__identifier) => {
+                                            if __identifier != "call" {
+                                                print_error("Use \"call\" for low level calls");
+                                            } else {
+                                                let mut raw_data: Option<[String; 2]> = None;
+                                                let mut _final = 0;
+                                                if let Token::OpenBraces = _variants[3] {
+                                                    let close_brace_index =
+                                                        _variants.iter().position(|pred| {
+                                                            pred == &&Token::CloseBraces
+                                                        });
+                                                    if let Some(__index) = close_brace_index {
+                                                        _final = __index;
+                                                        let _raw_data = &_variants[3 + 1..__index];
+                                                        let mut stringified = String::new();
+
+                                                        for __raw in _raw_data {
+                                                            match __raw {
+                                                                Token::Identifier(
+                                                                    ___identifier,
+                                                                ) => {
+                                                                    stringified
+                                                                        .push_str(&___identifier);
+                                                                }
+                                                                _other => {
+                                                                    if SYMBOLS.contains(
+                                                                        &detokenize(&_other)
+                                                                            .as_str(),
+                                                                    ) {
+                                                                        stringified.push_str(
+                                                                            &detokenize(&_other),
+                                                                        );
+                                                                    } else {
+                                                                        print_error(
+                                                                            "Expecting identifier",
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        let split = stringified
+                                                            .split(":")
+                                                            .collect::<Vec<_>>();
+                                                        if split.len() != 2 {
+                                                            print_error("Unprocessible Entity");
+                                                        } else {
+                                                            if split[0] != "value" {
+                                                                print_error("Expecting \"value\"");
+                                                            } else {
+                                                                raw_data = Some([
+                                                                    split[0].to_owned(),
+                                                                    split[1].to_owned(),
+                                                                ]);
+                                                            }
+                                                        }
+                                                    } else {
+                                                        print_error("Unprocessible entity");
+                                                    }
+                                                }
+
+                                                let __args_variants = if _final == 0 {
+                                                    &_variants[4.._variants.len() - 2]
+                                                } else {
+                                                    &_variants[_final + 2.._variants.len() - 2]
+                                                };
+
+                                                if __args_variants.is_empty() {
+                                                    print_error("Expecting args for \"call\"");
+                                                }
+
+                                                let main_args = if let Token::Quotation =
+                                                    __args_variants[0]
+                                                {
+                                                    &__args_variants[1..__args_variants.len() - 1]
+                                                } else {
+                                                    __args_variants
+                                                };
+                                                let mut __stringified = String::new();
+
+                                                for _main_arg in main_args {
+                                                    __stringified.push_str(&detokenize(&_main_arg));
+                                                }
+                                                let structured = CallIdentifier {
+                                                    address: String::from("msg"),
+                                                    arguments: vec![__stringified],
+                                                    raw_data,
+                                                    r#type: CallIdentifierType::Call,
+                                                };
+                                                full_block
+                                                    .push(FunctionArm::CallIdentifier(structured));
+                                            }
+                                        }
+                                        _ => print_error("Unprocessible entity"),
+                                    }
+                                }
+                            }
+                            _ => print_error("Unprocessible entity"),
+                        }
+                    } else {
+                        print_error("Unprocessible entity");
+                    }
                 } else {
                     // println!("{:?}", _token);
 
