@@ -14,7 +14,8 @@
 - [x] test inherited constructor initialization
 - [x] add tests for interfaces
 - [x] consider empty vars for tupple e.g `(bool _s, , uint j) = (1,2,3)`
-- [] test this function
+- [x] test this function
+
 ```
 function test() public {
     val = 123;
@@ -22,3 +23,7 @@ function test() public {
     msg.sender.call(b);
 }
 ```
+
+- [] implement modifier to function header
+- [] target function arguments in function arm
+- [] implement emit to event
