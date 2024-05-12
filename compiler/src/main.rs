@@ -65,10 +65,10 @@ async fn main() -> Result<(), io::Error> {
     let mut contract_construct: Vec<ContractIdentifier> = Vec::new();
     let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
 
-    for ddd in joined {
-        let extracted_enums = extract_enum(&ddd);
+    for _joined in joined {
+        let extracted_enums = extract_enum(&_joined);
 
-        let structs_tree = extract_struct(&ddd);
+        let structs_tree = extract_struct(&_joined);
         let struct_identifiers: Vec<&str> = structs_tree
             .iter()
             .map(|pred| pred.identifier.as_str())
@@ -83,13 +83,13 @@ async fn main() -> Result<(), io::Error> {
             [enum_identifiers.clone(), struct_identifiers].concat();
 
         let (state_variables, custom_errors, mappings, events) = extract_global_elements(
-            &ddd,
+            &_joined,
             &custom_data_types_identifiers,
             &enum_identifiers,
             Vec::new(),
         );
         let (functions, contract_identifier, contract_inheritance) = extract_functions(
-            &ddd,
+            &_joined,
             &custom_data_types_identifiers,
             &state_variables,
             &enum_identifiers,
