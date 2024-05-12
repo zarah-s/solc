@@ -1359,7 +1359,7 @@ fn extract_function_arms(
     let mut joined_conditionals: Vec<Vec<&Token>> = Vec::new();
 
     for arm in arms {
-        if let Token::Else | Token::OpenParenthesis = &arm[0] {
+        if let Token::Else /* Todo: UNKNOWN YET | Token::OpenParenthesis*/ = &arm[0] {
             let last_index = joined_conditionals.len() - 1;
             for sec in arm {
                 joined_conditionals[last_index].push(sec);
