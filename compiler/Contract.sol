@@ -8,6 +8,6 @@ contract Name {
         val = 123;
         bytes memory b = "";
         // address(0).call(b);
-        address(msg.sender).call{value: 1}(b);
+        address(msg.sender).delegatecall(b);
     }
 }

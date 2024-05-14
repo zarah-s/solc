@@ -205,6 +205,7 @@ pub struct CronIdentifier {
 pub enum CallIdentifierType {
     // Transfer,
     Call,
+    Delegatecall,
     // Send,
 }
 
