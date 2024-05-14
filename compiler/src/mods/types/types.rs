@@ -290,6 +290,7 @@ pub struct FunctionHeader {
     pub r#override: bool,
     pub r#virtual: bool,
     pub arguments: Vec<Argument>,
+    pub modifiers: Vec<ModifierCall>,
 }
 
 #[derive(Debug)]
@@ -380,6 +381,12 @@ pub struct Return {
 pub struct FunctionCall {
     pub identifier: String,
     pub arguments: Vec<String>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ModifierCall {
+    pub identifier: String,
+    pub arguments: Option<Vec<String>>,
 }
 #[derive(Debug, PartialEq)]
 pub struct Require {

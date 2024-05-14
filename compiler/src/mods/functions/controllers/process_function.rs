@@ -17,9 +17,9 @@ use crate::mods::{
         FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall, FunctionHeader,
         FunctionIdentifier, FunctionMutability, FunctionsIdentifier, InterfaceIdentifier,
         InterfaceVariants, LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier,
-        ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType,
-        Revert, RevertType, Token, TuppleAssignment, VariableAssign, VariableAssignOperation,
-        VariableAssignType, VariableIdentifier, VariableType,
+        ModifierCall, ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return,
+        ReturnType, Revert, RevertType, Token, TuppleAssignment, VariableAssign,
+        VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
     },
 };
 
@@ -838,6 +838,7 @@ fn extract_function_header(
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
 ) -> FunctionHeader {
+    // println!("{:?}", function_definition);
     let function_name = match &name {
         Token::Identifier(_val) => {
             let validated = validate_identifier_regex(_val, 0);
@@ -872,6 +873,91 @@ fn extract_function_header(
             process::exit(1);
         }
     };
+
+    let mut function_modifiers: Vec<ModifierCall> = Vec::new();
+    let _modifiers_definition_index = function_definition
+        .iter()
+        .position(|pred| pred == &Token::CloseParenthesis);
+
+    let __modifiers_definition_count =
+        &function_definition[_modifiers_definition_index.unwrap() + 1..];
+
+    let mut skip = 0;
+    for (index, __def) in __modifiers_definition_count.iter().enumerate() {
+        if skip > index {
+            continue;
+        }
+        match __def {
+            Token::Identifier(_identifier) => {
+                let next = __modifiers_definition_count.get(index + 1);
+                if let Some(_next) = next {
+                    if let Token::OpenParenthesis = _next {
+                        let __modifier_id = &__modifiers_definition_count[index + 1..];
+
+                        let mut opened_bracket = 0;
+                        let mut _collection: Vec<&Token> = Vec::new();
+                        for __id in __modifier_id {
+                            if let Token::OpenParenthesis = __id {
+                                opened_bracket += 1;
+                                if opened_bracket > 1 {
+                                    _collection.push(__id);
+                                }
+                            } else if let Token::CloseParenthesis = __id {
+                                opened_bracket -= 1;
+                                if opened_bracket == 0 {
+                                    break;
+                                } else {
+                                    _collection.push(__id);
+                                }
+                            } else {
+                                _collection.push(__id);
+                            }
+                        }
+
+                        let splitted = _collection
+                            .split(|pred| pred == &&Token::Coma)
+                            .collect::<Vec<_>>();
+                        let mut __modifier_args: Vec<String> = Vec::new();
+                        for __lex_collection in splitted {
+                            if __lex_collection.is_empty() {
+                                continue;
+                            }
+
+                            let mut _stringified = String::new();
+                            for _lex in __lex_collection {
+                                _stringified.push_str(&detokenize(_lex));
+                            }
+
+                            if _stringified.is_empty() {
+                                continue;
+                            }
+
+                            __modifier_args.push(_stringified);
+                        }
+                        function_modifiers.push(ModifierCall {
+                            identifier: _identifier.to_owned(),
+                            arguments: Some(__modifier_args),
+                        });
+                        skip = index + _collection.len() + 2;
+                    } else {
+                        function_modifiers.push(ModifierCall {
+                            identifier: _identifier.to_owned(),
+                            arguments: None,
+                        })
+                    }
+                } else {
+                    function_modifiers.push(ModifierCall {
+                        identifier: _identifier.to_owned(),
+                        arguments: None,
+                    })
+                }
+            }
+            _ => (),
+        }
+    }
+
+    println!("{:?}", function_modifiers);
+
     let mut function_override: bool = false;
     let mut function_virtual: bool = false;
     let mut gasless: bool = false;
@@ -961,6 +1047,7 @@ fn extract_function_header(
         r#virtual: function_virtual,
         visibility: function_visibility,
         arguments: function_arguments,
+        modifiers: function_modifiers,
     };
 
     structured
