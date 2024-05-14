@@ -715,12 +715,10 @@ pub fn validate_variable(
             value = Some(_string_value);
         } else {
             if !is_custom_error && !is_event {
-                // println!("{:?}", text);
                 let semicolon_token_position =
                     tokens.iter().position(|pred| pred == &Token::SemiColon);
                 if let Some(_position) = semicolon_token_position {
                     let slice_equal_token = &tokens[.._position];
-                    // println!("{:?}", &slice_equal_token[slice_equal_token.len() - 1]);
                     if let Token::Identifier(_var_name) =
                         &slice_equal_token[slice_equal_token.len() - 1]
                     {

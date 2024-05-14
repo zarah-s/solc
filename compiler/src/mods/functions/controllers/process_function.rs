@@ -166,7 +166,6 @@ pub fn extract_functions(
             ),
 
             Token::Interface => {
-                // println!("{:#?}", tokens);
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
                 let interface_definition: &[Token] = &tokens[..start_index.unwrap() + 1];
                 let mut interface_name = String::new();
@@ -260,8 +259,6 @@ pub fn extract_functions(
                         _other => combo.push(_other.clone()),
                     }
                 }
-
-                // println!("{:#?}", brace_seperated);
 
                 let variants = [semicolon_seperated, brace_seperated].concat();
                 let mut interface_events_and_errors: Vec<LineDescriptions> = Vec::new();
@@ -430,7 +427,6 @@ pub fn extract_functions(
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
 
                 let function_definition: &[Token] = &tokens[..start_index.unwrap()];
-                // println!("{:?}", function_definition);
                 let arguments =
                     prepare_and_get_function_args(function_definition, custom_data_types, enums);
                 let close_paren_index = function_definition
@@ -773,7 +769,6 @@ fn extract_contract_headers(
             match splited {
                 Token::Identifier(_identifier) => contract_inheritance.push(_identifier.clone()),
                 _ => {
-                    println!("{:?} {:?}", splits, splited);
                     print_error("Unprocessible entity for contract inheritance");
                 }
             }
@@ -1397,7 +1392,6 @@ fn extract_function_block(
     mappings: &Vec<MappingIdentifier>,
 ) -> Vec<FunctionArm> {
     let mut full_block: Vec<FunctionArm> = Vec::new();
-    // println!("{:?}", arms);
     for block in arms {
         let initial = block[0];
         match initial {
@@ -1416,43 +1410,25 @@ fn extract_function_block(
                 } else {
                     if let Token::OpenParenthesis = &block[1] {
                         let mut args: Vec<String> = Vec::new();
-                        let tkns = &block[2..block.len() - 2].to_vec();
+                        let tkns = &block[2..block.len() - 2]
+                            .split(|pred| pred == &&Token::Coma)
+                            .collect::<Vec<_>>();
 
-                        let mut skip = 0;
-                        for (index, arg) in tkns.iter().enumerate() {
-                            if skip > index {
+                        for __token_collection in tkns {
+                            if __token_collection.is_empty() {
                                 continue;
                             }
-                            match arg {
-                                Token::Identifier(_id) => {
-                                    args.push(_id.to_string());
-                                }
-                                Token::Coma => (),
-                                Token::OpenBraces => {
-                                    print_error("Named arguments not supported");
-                                }
-                                __other => {
-                                    let mut comb = String::new();
-                                    let coma_index = &tkns[index..]
-                                        .iter()
-                                        .position(|pred| pred == &&Token::Coma);
-                                    if let Some(_index) = coma_index {
-                                        for cmb in &tkns[index..index + *_index] {
-                                            comb.push_str(&detokenize(cmb))
-                                        }
-                                        skip = index + *_index;
-                                    } else {
-                                        for cmb in &tkns[index..tkns.len()] {
-                                            comb.push_str(&detokenize(cmb))
-                                        }
-                                        skip = index + tkns.len();
-                                    }
 
-                                    if !comb.trim().is_empty() {
-                                        args.push(comb);
-                                    }
-                                }
+                            let mut stringified = String::new();
+                            for __token in __token_collection.iter() {
+                                stringified.push_str(&detokenize(__token));
                             }
+
+                            if stringified.is_empty() {
+                                continue;
+                            }
+
+                            args.push(stringified);
                         }
 
                         full_block.push(FunctionArm::FunctionCall(FunctionCall {
@@ -2207,7 +2183,6 @@ fn extract_function_block(
                 match block[block.len() - 1] {
                     Token::SemiColon => (),
                     _ => {
-                        // println!("{:?}", block);
                         print_error("Missing ;");
                     }
                 }
@@ -2272,7 +2247,6 @@ fn extract_function_block(
                                 line: 0,
                             })
                         }
-                        // println!("{:?} ====>>>> {:?}", positions, line_descriptors);
                         line_descriptors.push(LineDescriptions {
                             text: "}".to_string(),
                             line: 0,
@@ -2302,8 +2276,6 @@ fn extract_function_block(
                 } else if let Token::Msg = _token {
                     extract_low_level_call(block, &mut full_block);
                 } else {
-                    // println!("{:?}", _token);
-
                     print_error(&format!("Unexpected identifier \"{}\"", detokenize(_token)))
                 }
             }
@@ -2348,9 +2320,6 @@ fn extract_low_level_call(block: &Vec<&Token>, full_block: &mut Vec<FunctionArm>
         }
         match &block[_index..][1] {
             Token::Identifier(_identifier) => {
-                // if _identifier != "sender" {
-                //     print_error(&format!("Unknown variant \"{_identifier}\""))
-                // } else {
                 let pos = block.len()
                     - block
                         .iter()
@@ -2360,12 +2329,9 @@ fn extract_low_level_call(block: &Vec<&Token>, full_block: &mut Vec<FunctionArm>
                     - 1;
 
                 let _variants = &block[pos..];
-                // println!("{:?} ", _variants);
-                // panic!("{:?}", _variants);
                 match _variants[1] {
                     Token::Identifier(__identifier) => {
                         if __identifier != "call" && __identifier != "delegatecall" {
-                            println!("{}", __identifier);
                             print_error("Use \"call\" or \"delegatecall\" for low level calls");
                         } else {
                             let mut raw_data: Option<[String; 2]> = None;
@@ -2461,8 +2427,6 @@ fn extract_function_variable(
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
 ) -> Option<VariableIdentifier> {
-    // println!("{:?}", block);
-
     let mut text = String::new();
     for strr in block {
         text.push_str(&format!("{} ", &detokenize(strr)))
@@ -2654,8 +2618,6 @@ fn extract_function_scope_variable(
                     value,
                 }))
             } else {
-                // println!("{:?}", _var);
-
                 if block.contains(&&Token::Push) {
                     let value_start_index = block.iter().position(|pred| pred == &&Token::Push);
                     let mut value = String::new();
