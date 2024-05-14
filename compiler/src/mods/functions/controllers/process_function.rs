@@ -2364,12 +2364,16 @@ fn extract_low_level_call(block: &Vec<&Token>, full_block: &mut Vec<FunctionArm>
                 // panic!("{:?}", _variants);
                 match _variants[1] {
                     Token::Identifier(__identifier) => {
-                        if __identifier != "call" {
-                            print_error("Use \"call\" for low level calls");
+                        if __identifier != "call" && __identifier != "delegatecall" {
+                            println!("{}", __identifier);
+                            print_error("Use \"call\" or \"delegatecall\" for low level calls");
                         } else {
                             let mut raw_data: Option<[String; 2]> = None;
                             let mut _final = 0;
                             if let Token::OpenBraces = _variants[2] {
+                                if __identifier != "delegatecall" {
+                                    print_error("Cannot set option \"value\" for delegatecall.")
+                                }
                                 let close_brace_index = _variants
                                     .iter()
                                     .position(|pred| pred == &&Token::CloseBraces);
@@ -2432,7 +2436,11 @@ fn extract_low_level_call(block: &Vec<&Token>, full_block: &mut Vec<FunctionArm>
                                 address,
                                 arguments: vec![__stringified],
                                 raw_data,
-                                r#type: CallIdentifierType::Call,
+                                r#type: if __identifier == "delegatecall" {
+                                    CallIdentifierType::Delegatecall
+                                } else {
+                                    CallIdentifierType::Call
+                                },
                             };
                             full_block.push(FunctionArm::CallIdentifier(structured));
                         }
