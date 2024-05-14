@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+contract Test {
+    function oi() external {}
+}
+
 contract FunctionModifier {
     // We will use these variables to demonstrate how to use
     // modifiers.
@@ -30,9 +34,19 @@ contract FunctionModifier {
         _;
     }
 
+    struct Str {
+        address name;
+    }
+
     function changeOwner(
-        address _newOwner
+        address _newOwner,
+        Str memory test,
+        address oi
     ) public onlyOwner validAddress(address(0)) {
+        test.name = msg.sender;
+        oi = msg.sender;
+        Test(oi).oi();
+        _newOwner = address(0);
         owner = _newOwner;
     }
 

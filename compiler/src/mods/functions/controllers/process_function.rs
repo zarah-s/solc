@@ -8,7 +8,8 @@ use crate::mods::{
         },
         helpers::helpers::{
             detokenize, extract_data_location_from_token, extract_integer_types_from_token,
-            print_error, validate_expression, validate_identifier_regex, validate_variable,
+            lex_to_token, print_error, validate_expression, validate_identifier_regex,
+            validate_variable,
         },
     },
     types::types::{
@@ -409,6 +410,7 @@ pub fn extract_functions(
 
                 let arms: Vec<FunctionArm> = extract_function_arms(
                     &function_body.to_vec(),
+                    &arguments,
                     custom_data_types,
                     global_variables,
                     enums,
@@ -519,6 +521,7 @@ pub fn extract_functions(
 
                 let arms: Vec<FunctionArm> = extract_function_arms(
                     &function_body.to_vec(),
+                    &arguments,
                     custom_data_types,
                     global_variables,
                     enums,
@@ -559,6 +562,7 @@ pub fn extract_functions(
 
                 let arms: Vec<FunctionArm> = extract_function_arms(
                     &function_body.to_vec(),
+                    &arguments,
                     custom_data_types,
                     global_variables,
                     enums,
@@ -598,6 +602,7 @@ pub fn extract_functions(
 
                 let arms: Vec<FunctionArm> = extract_function_arms(
                     &function_body.to_vec(),
+                    &arguments,
                     custom_data_types,
                     global_variables,
                     enums,
@@ -684,6 +689,7 @@ pub fn extract_functions(
                 let function_body = &tokens[function_body_start_index.unwrap()..];
                 let arms: Vec<FunctionArm> = extract_function_arms(
                     &function_body.to_vec(),
+                    &Vec::new(),
                     custom_data_types,
                     global_variables,
                     enums,
@@ -808,16 +814,17 @@ fn extract_full_function(
     let function_definition: &[Token] = &tokens[..start_index.unwrap()];
     let function_header =
         extract_function_header(function_definition, &tokens[1], custom_data_types, enums);
-
+    // println!("{:#?}", function_header);
     let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
     if let None = function_body_start_index {
         print_error(&format!("Unprocessible entity",));
     }
 
     let function_body = &tokens[function_body_start_index.unwrap()..];
-
+    let function_args = &function_header.arguments;
     let arms: Vec<FunctionArm> = extract_function_arms(
         &function_body.to_vec(),
+        &function_args,
         custom_data_types,
         global_variables,
         enums,
@@ -1336,12 +1343,14 @@ fn extract_return_types(
 
 fn extract_function_arms(
     body: &Vec<Token>,
+    function_args: &Vec<Argument>,
     custom_data_types: &Vec<&str>,
     global_variables: &Vec<VariableIdentifier>,
     enums: &Vec<&str>,
     local_vars: Vec<&VariableIdentifier>,
     mappings: &Vec<MappingIdentifier>,
 ) -> Vec<FunctionArm> {
+    // println!("{:?}", function_args);
     let mut arms: Vec<Vec<&Token>> = Vec::new();
     let mut combined: Vec<&Token> = Vec::new();
     let mut opened_packet = 0;
@@ -1460,6 +1469,7 @@ fn extract_function_arms(
 
     extract_function_block(
         &joined_conditionals,
+        function_args,
         custom_data_types,
         enums,
         global_variables,
@@ -1467,9 +1477,9 @@ fn extract_function_arms(
         mappings,
     )
 }
-
 fn extract_function_block(
     arms: &Vec<Vec<&Token>>,
+    function_args: &Vec<Argument>,
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
     global_variables: &Vec<VariableIdentifier>,
@@ -1495,9 +1505,46 @@ fn extract_function_block(
                 } else {
                     if let Token::OpenParenthesis = &block[1] {
                         let mut args: Vec<String> = Vec::new();
-                        let tkns = &block[2..block.len() - 2]
-                            .split(|pred| pred == &&Token::Coma)
-                            .collect::<Vec<_>>();
+                        let mut variant = String::new();
+                        let mut has_variant = false;
+                        let mut variant_index = 0;
+                        {
+                            let mut opened_paren_count = 0;
+                            for (index, blk) in block.iter().enumerate() {
+                                if let Token::OpenParenthesis = blk {
+                                    opened_paren_count += 1;
+                                }
+                                if let Token::CloseParenthesis = blk {
+                                    opened_paren_count -= 1;
+                                }
+
+                                if opened_paren_count == 0 {
+                                    if let Token::Dot = blk {
+                                        has_variant = true;
+                                        variant_index = index + 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if has_variant {
+                            if let Token::Identifier(_id) = block[variant_index] {
+                                variant.push_str(_id);
+                            } else {
+                                print_error("Unprocessible variant");
+                            }
+                        }
+
+                        let tkns = if has_variant {
+                            block[variant_index + 2..block.len() - 2]
+                                .split(|pred| pred == &&Token::Coma)
+                                .collect::<Vec<_>>()
+                        } else {
+                            block[2..block.len() - 2]
+                                .split(|pred| pred == &&Token::Coma)
+                                .collect::<Vec<_>>()
+                        };
 
                         for __token_collection in tkns {
                             if __token_collection.is_empty() {
@@ -1518,6 +1565,7 @@ fn extract_function_block(
 
                         full_block.push(FunctionArm::FunctionCall(FunctionCall {
                             arguments: args,
+                            variant: if has_variant { Some(variant) } else { None },
                             identifier: _identifier.to_owned(),
                         }));
                     } else {
@@ -1568,7 +1616,60 @@ fn extract_function_block(
                                 global_variables.iter().map(|pred| &pred.name).collect();
                             let global_mappings: Vec<String> =
                                 mappings.iter().map(|pred| pred.name.to_owned()).collect();
-                            if global_variables_identifiers.contains(&_identifier) {
+                            if function_args
+                                .iter()
+                                .map(|pred| &pred.name_)
+                                .collect::<Vec<_>>()
+                                .contains(&_identifier)
+                            {
+                                let arg = function_args
+                                    .iter()
+                                    .find(|pred| pred.name_ == *_identifier)
+                                    .unwrap();
+                                let mut r#type = VariableType::Variable;
+
+                                if !DATA_TYPES.contains(&arg.type_.as_str()) {
+                                    if custom_data_types.contains(&arg.type_.as_str()) {
+                                        if enums.contains(&_identifier.as_str()) {
+                                            r#type = VariableType::Enum
+                                        } else {
+                                            r#type = VariableType::Struct
+                                        }
+                                    } else {
+                                        r#type = VariableType::Contract
+                                    }
+                                }
+                                let var = VariableIdentifier {
+                                    data_type: lex_to_token(&arg.type_),
+                                    index: None,
+                                    is_array: arg.is_array,
+                                    mutability: if arg.location.is_none() {
+                                        Token::Mutable
+                                    } else {
+                                        if let Token::Memory = arg.location.clone().unwrap() {
+                                            Token::Mutable
+                                        } else {
+                                            Token::Immutable
+                                        }
+                                    },
+                                    name: arg.name_.to_string(),
+                                    size: arg.size.clone(),
+                                    storage_location: arg.location.clone(),
+                                    type_: r#type,
+                                    value: None,
+                                    visibility: Token::Private,
+                                };
+
+                                let function_scope_variable = extract_function_scope_variable(
+                                    Some(&var),
+                                    None,
+                                    block,
+                                    _identifier,
+                                );
+                                if let Some(_) = function_scope_variable {
+                                    full_block.push(function_scope_variable.unwrap());
+                                }
+                            } else if global_variables_identifiers.contains(&_identifier) {
                                 let var = global_variables
                                     .iter()
                                     .find(|pred| pred.name == _identifier.to_string());
@@ -1652,6 +1753,7 @@ fn extract_function_block(
 
                     let __arms = extract_function_arms(
                         &batched,
+                        function_args,
                         custom_data_types,
                         global_variables,
                         enums,
@@ -1773,6 +1875,7 @@ fn extract_function_block(
                                 }
                                 let __arm: Vec<FunctionArm> = extract_function_arms(
                                     &batched,
+                                    function_args,
                                     custom_data_types,
                                     global_variables,
                                     enums,
@@ -1796,6 +1899,7 @@ fn extract_function_block(
                                 }
                                 let __arm: Vec<FunctionArm> = extract_function_arms(
                                     &batched,
+                                    function_args,
                                     custom_data_types,
                                     global_variables,
                                     enums,
@@ -1826,6 +1930,7 @@ fn extract_function_block(
 
                                 let __arm: Vec<FunctionArm> = extract_function_arms(
                                     &batched,
+                                    function_args,
                                     custom_data_types,
                                     global_variables,
                                     enums,
@@ -2175,6 +2280,7 @@ fn extract_function_block(
 
                     let __arms = extract_function_arms(
                         &batched,
+                        function_args,
                         custom_data_types,
                         global_variables,
                         enums,
