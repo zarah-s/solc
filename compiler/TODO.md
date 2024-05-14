@@ -24,6 +24,6 @@ function test() public {
 }
 ```
 
-- [] implement modifier to function header
+- [x] implement modifier to function header
 - [] target function arguments in function arm
 - [] implement emit to event

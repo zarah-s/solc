@@ -956,8 +956,6 @@ fn extract_function_header(
         }
     }
 
-    println!("{:?}", function_modifiers);
-
     let mut function_override: bool = false;
     let mut function_virtual: bool = false;
     let mut gasless: bool = false;
