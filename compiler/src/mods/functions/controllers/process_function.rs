@@ -15,11 +15,11 @@ use crate::mods::{
     types::types::{
         Argument, Assert, CallIdentifier, CallIdentifierType, ConditionalType, Conditionals,
         ConstructorIdentifier, ConstructorInheritanceInitialization, CronIdentifier, Delete, ElIf,
-        FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall, FunctionHeader,
-        FunctionIdentifier, FunctionMutability, FunctionsIdentifier, InterfaceIdentifier,
-        InterfaceVariants, LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier,
-        ModifierCall, ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return,
-        ReturnType, Revert, RevertType, Token, TuppleAssignment, VariableAssign,
+        EventEmitter, FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall,
+        FunctionHeader, FunctionIdentifier, FunctionMutability, FunctionsIdentifier,
+        InterfaceIdentifier, InterfaceVariants, LineDescriptions, Loop, LoopType, MappingAssign,
+        MappingIdentifier, ModifierCall, ModifierIdentifier, OpenedBraceType, ReceiveIdentifier,
+        Require, Return, ReturnType, Revert, RevertType, Token, TuppleAssignment, VariableAssign,
         VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
     },
 };
@@ -1730,6 +1730,46 @@ fn extract_function_block(
                         }
                     }
                 }
+            }
+            Token::Emit => {
+                match block[block.len() - 1] {
+                    Token::SemiColon => (),
+                    _ => {
+                        print_error("Expecting \";\"");
+                    }
+                }
+                let mut event_identifier = String::new();
+                let mut values: Vec<String> = Vec::new();
+                if let Token::Identifier(_identifier) = block[1] {
+                    event_identifier.push_str(&_identifier);
+                } else {
+                    print_error("Unprocessible entity for emit");
+                }
+                if let Token::OpenParenthesis = block[2] {
+                    let splitted_value_fields = &block[3..block.len() - 2]
+                        .split(|pred| pred == &&Token::Coma)
+                        .collect::<Vec<_>>();
+
+                    for value_field_collection in splitted_value_fields {
+                        if value_field_collection.is_empty() {
+                            continue;
+                        }
+                        let mut stringified = String::new();
+                        for _value in value_field_collection.iter() {
+                            stringified.push_str(&detokenize(_value));
+                        }
+
+                        values.push(stringified);
+                    }
+                } else {
+                    print_error("Unprocessible entity for emit");
+                }
+
+                let structured = FunctionArm::EventEmitter(EventEmitter {
+                    identifier: event_identifier,
+                    values,
+                });
+                full_block.push(structured);
             }
             Token::While => {
                 let open_brace_index = block.iter().position(|pred| pred == &&Token::OpenBraces);

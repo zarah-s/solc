@@ -61,11 +61,15 @@ contract FunctionModifier {
         locked = false;
     }
 
+    event Transfered(address indexed user, uint indexed amount);
+
     function decrement(uint256 i) public noReentrancy {
         x -= i;
 
         if (i > 1) {
             decrement(i - 1);
         }
+
+        emit Transfered(msg.sender, 1);
     }
 }

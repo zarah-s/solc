@@ -3,6 +3,7 @@
 pub enum Token {
     Identifier(String),
     Contract,
+    Emit,
     Modifier,
     Interface,
     Revert,
@@ -417,9 +418,16 @@ pub struct Conditionals {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct EventEmitter {
+    pub identifier: String,
+    pub values: Vec<String>,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum FunctionArm {
     VariableIdentifier(VariableIdentifier),
     VariableAssign(VariableAssign),
+    EventEmitter(EventEmitter),
     MappingAssign(MappingAssign),
     CallIdentifier(CallIdentifier),
     TuppleAssignment(TuppleAssignment),
