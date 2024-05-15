@@ -62,6 +62,7 @@ contract FunctionModifier {
     }
 
     event Transfered(address indexed user, uint indexed amount);
+    error CUSTOM_ERROR();
 
     function decrement(uint256 i) public noReentrancy {
         x -= i;
