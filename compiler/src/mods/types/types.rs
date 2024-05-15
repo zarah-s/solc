@@ -4,6 +4,7 @@ pub enum Token {
     Identifier(String),
     Contract,
     Emit,
+    Indexed,
     Modifier,
     Interface,
     Revert,
@@ -99,6 +100,17 @@ pub struct StructTypes {
     pub name_: String,
     pub size: Option<String>,
     pub is_array: bool,
+}
+
+#[derive(Debug)]
+pub struct EventIdentifierVariants {
+    pub indexed: bool,
+    pub variant: String,
+}
+#[derive(Debug)]
+pub struct EventIdentifier {
+    pub identifier: String,
+    pub variants: Vec<EventIdentifierVariants>,
 }
 
 #[derive(Debug)]
@@ -236,8 +248,8 @@ pub struct ContractIdentifier {
     pub mappings: Vec<MappingIdentifier>,
     pub enums: Vec<EnumIdentifier>,
     pub structs: Vec<StructIdentifier>,
-    pub custom_errors: Vec<String>,
-    pub events: Vec<String>,
+    pub custom_errors: Vec<CustomErrorIdentifier>,
+    pub events: Vec<EventIdentifier>,
     pub functions: Vec<FunctionsIdentifier>,
 }
 
@@ -276,8 +288,8 @@ pub struct InterfaceIdentifier {
     pub inheritance: Option<Vec<String>>,
     pub enums: Vec<EnumIdentifier>,
     pub structs: Vec<StructIdentifier>,
-    pub custom_errors: Vec<String>,
-    pub events: Vec<String>,
+    pub custom_errors: Vec<CustomErrorIdentifier>,
+    pub events: Vec<EventIdentifier>,
     pub functions: Vec<FunctionHeader>,
 }
 
@@ -291,7 +303,13 @@ pub struct FunctionHeader {
     pub r#override: bool,
     pub r#virtual: bool,
     pub arguments: Vec<Argument>,
-    pub modifiers: Vec<ModifierCall>,
+    pub modifiers: Option<Vec<ModifierCall>>,
+}
+
+#[derive(Debug)]
+pub struct CustomErrorIdentifier {
+    pub identifier: String,
+    pub args: Option<Vec<String>>,
 }
 
 #[derive(Debug)]

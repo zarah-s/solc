@@ -241,10 +241,9 @@ mod tests {
             let contents = get_file_contents("test/files/vars/Error.sol").await;
             let (_, _errs, _, _) =
                 extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
-            assert_eq!(
-                _errs[0],
-                "error InsufficientBalance(uint256 balance, uint256 withdrawAmount);"
-            );
+            assert_eq!(_errs[0].identifier, "InsufficientBalance");
+            assert_eq!(_errs[0].args.as_ref().unwrap().len(), 2);
+            assert_eq!(_errs[0].args.as_ref().unwrap()[0], "uint256");
         }
 
         #[tokio::test]
@@ -252,10 +251,7 @@ mod tests {
             let contents = get_file_contents("test/files/vars/Event.sol").await;
             let (_, _, _, _events) =
                 extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
-            assert_eq!(
-                _events[0],
-                "event BuyShares(address indexed user,uint indexed amount,uint8 indexed shares);"
-            );
+            assert_eq!(_events[0].identifier, "BuyShares");
         }
 
         #[tokio::test]
@@ -1179,7 +1175,7 @@ mod tests {
             let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
             get_interfaces("test/files/interface/I6.sol", &mut interfaces).await;
             assert_eq!(interfaces[0].custom_errors.len(), 2);
-            assert_eq!(interfaces[0].custom_errors[0], "error Err();");
+            assert_eq!(interfaces[0].custom_errors[0].identifier, "Err");
         }
 
         #[tokio::test]

@@ -30,7 +30,7 @@ contract Error {
     }
 
     // custom error
-    error InsufficientBalance(uint256 balance, uint256 withdrawAmount);
+    error InsufficientBalance(uint256, uint256);
     event BuyShares(
         address indexed user,
         uint indexed amount,
@@ -40,10 +40,7 @@ contract Error {
     function testCustomError(uint256 _withdrawAmount) public view {
         uint256 bal = address(this).balance;
         if (bal < _withdrawAmount) {
-            revert InsufficientBalance({
-                balance: bal,
-                withdrawAmount: _withdrawAmount
-            });
+            revert InsufficientBalance(bal, _withdrawAmount);
         }
     }
 }

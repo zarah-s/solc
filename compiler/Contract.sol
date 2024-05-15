@@ -5,6 +5,14 @@ contract Test {
     function oi() external {}
 }
 
+interface IT {
+    event Transfered(
+        address indexed sender,
+        address receiver,
+        uint indexed amount
+    );
+}
+
 contract FunctionModifier {
     // We will use these variables to demonstrate how to use
     // modifiers.
@@ -61,8 +69,16 @@ contract FunctionModifier {
         locked = false;
     }
 
-    event Transfered(address indexed user, uint indexed amount);
+    event Transfered(
+        address indexed sender,
+        address receiver,
+        uint indexed amount
+    );
+    event Eventdd(address indexed owner);
+
     error CUSTOM_ERROR();
+
+    error ANOTHER_CUSTOM_ERROR(address, string);
 
     function decrement(uint256 i) public noReentrancy {
         x -= i;
