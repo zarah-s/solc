@@ -27,5 +27,5 @@ function test() public {
 - [x] implement modifier to function header
 - [x] target function arguments in function arm
 - [x] implement emit to event
-- [] parse events to AST
-- [] parse errors to AST
+- [x] parse events to AST
+- [x] parse errors to AST

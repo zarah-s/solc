@@ -14,13 +14,14 @@ use crate::mods::{
     },
     types::types::{
         Argument, Assert, CallIdentifier, CallIdentifierType, ConditionalType, Conditionals,
-        ConstructorIdentifier, ConstructorInheritanceInitialization, CronIdentifier, Delete, ElIf,
-        EventEmitter, FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall,
-        FunctionHeader, FunctionIdentifier, FunctionMutability, FunctionsIdentifier,
-        InterfaceIdentifier, InterfaceVariants, LineDescriptions, Loop, LoopType, MappingAssign,
-        MappingIdentifier, ModifierCall, ModifierIdentifier, OpenedBraceType, ReceiveIdentifier,
-        Require, Return, ReturnType, Revert, RevertType, Token, TuppleAssignment, VariableAssign,
-        VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
+        ConstructorIdentifier, ConstructorInheritanceInitialization, CronIdentifier,
+        CustomErrorIdentifier, Delete, ElIf, EventEmitter, EventIdentifier, FallbackIdentifier,
+        FunctionArm, FunctionArmType, FunctionCall, FunctionHeader, FunctionIdentifier,
+        FunctionMutability, FunctionsIdentifier, InterfaceIdentifier, InterfaceVariants,
+        LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier, ModifierCall,
+        ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType,
+        Revert, RevertType, Token, TuppleAssignment, VariableAssign, VariableAssignOperation,
+        VariableAssignType, VariableIdentifier, VariableType,
     },
 };
 
@@ -74,9 +75,6 @@ pub fn extract_functions(
         if raw.contains("{") {
             let characters = raw.chars();
             for character in characters {
-                // if let OpenedBraceType::Interface = opened_braces_type {
-                //     print_error("Cannot define \"interface\" in contract");
-                // }
                 if character == '{' {
                     if let OpenedBraceType::Contract = opened_braces_type {
                         let lexems = LineDescriptions::to_token(raw);
@@ -288,7 +286,7 @@ pub fn extract_functions(
                             let mut stringified_data = String::new();
 
                             for spl_token in &split {
-                                stringified_data.push_str(&detokenize(&spl_token));
+                                stringified_data.push_str(&format!("{} ", &detokenize(&spl_token)));
                             }
                             if let Token::Enum = split[0] {
                                 interface_enums.push(LineDescriptions {
@@ -344,7 +342,6 @@ pub fn extract_functions(
 
                 let _custom_data_types_identifiers: Vec<&str> =
                     [enum_identifiers.clone(), struct_identifiers].concat();
-
                 let (_, _custom_errors, _, _events) = extract_global_elements(
                     &interface_events_and_errors,
                     &Vec::new(),
@@ -814,7 +811,6 @@ fn extract_full_function(
     let function_definition: &[Token] = &tokens[..start_index.unwrap()];
     let function_header =
         extract_function_header(function_definition, &tokens[1], custom_data_types, enums);
-    // println!("{:#?}", function_header);
     let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
     if let None = function_body_start_index {
         print_error(&format!("Unprocessible entity",));
@@ -845,7 +841,6 @@ fn extract_function_header(
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
 ) -> FunctionHeader {
-    // println!("{:?}", function_definition);
     let function_name = match &name {
         Token::Identifier(_val) => {
             let validated = validate_identifier_regex(_val, 0);
@@ -1052,7 +1047,11 @@ fn extract_function_header(
         r#virtual: function_virtual,
         visibility: function_visibility,
         arguments: function_arguments,
-        modifiers: function_modifiers,
+        modifiers: if function_modifiers.is_empty() {
+            None
+        } else {
+            Some(function_modifiers)
+        },
     };
 
     structured
@@ -1100,7 +1099,6 @@ fn extract_function_params(
                     if !enums.contains(&detokenize(&splited_param[0]).as_str()) {
                         is_primitive = false;
                     }
-                    // is_primitive = false;
 
                     type_ = Some(format!(
                         "{}",
@@ -1350,7 +1348,6 @@ fn extract_function_arms(
     local_vars: Vec<&VariableIdentifier>,
     mappings: &Vec<MappingIdentifier>,
 ) -> Vec<FunctionArm> {
-    // println!("{:?}", function_args);
     let mut arms: Vec<Vec<&Token>> = Vec::new();
     let mut combined: Vec<&Token> = Vec::new();
     let mut opened_packet = 0;
@@ -2485,9 +2482,9 @@ fn extract_function_block(
 
                         let (__variables, _, _, _): (
                             Vec<VariableIdentifier>,
-                            Vec<String>,
+                            Vec<CustomErrorIdentifier>,
                             Vec<MappingIdentifier>,
-                            Vec<String>,
+                            Vec<EventIdentifier>,
                         ) = extract_global_elements(
                             &line_descriptors,
                             custom_data_types,
@@ -2644,7 +2641,6 @@ fn extract_low_level_call(block: &Vec<&Token>, full_block: &mut Vec<FunctionArm>
                     }
                     _ => print_error("Unprocessible entity"),
                 }
-                // }
             }
             _ => print_error("Unprocessible entity"),
         }

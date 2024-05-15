@@ -1,7 +1,10 @@
 use crate::mods::{
-    constants::constants::SYMBOLS,
-    functions::helpers::helpers::{print_error, validate_variable},
-    types::types::{LineDescriptions, MappingIdentifier, OpenedBraceType, VariableIdentifier},
+    constants::constants::{DATA_TYPES, SYMBOLS},
+    functions::helpers::helpers::{detokenize, print_error, validate_variable},
+    types::types::{
+        CustomErrorIdentifier, EventIdentifier, EventIdentifierVariants, LineDescriptions,
+        MappingIdentifier, OpenedBraceType, Token, VariableIdentifier,
+    },
 };
 
 pub fn extract_global_elements(
@@ -11,13 +14,13 @@ pub fn extract_global_elements(
     variable_positions: Vec<Option<u8>>,
 ) -> (
     Vec<VariableIdentifier>,
-    Vec<String>,
+    Vec<CustomErrorIdentifier>,
     Vec<MappingIdentifier>,
-    Vec<String>,
+    Vec<EventIdentifier>,
 ) {
     let mut global_variables: Vec<VariableIdentifier> = Vec::new();
-    let mut custom_errors: Vec<String> = Vec::new();
-    let mut events: Vec<String> = Vec::new();
+    let mut custom_errors: Vec<CustomErrorIdentifier> = Vec::new();
+    let mut events: Vec<EventIdentifier> = Vec::new();
     let mut mappings: Vec<MappingIdentifier> = Vec::new();
 
     let mut opened_braces = 0;
@@ -65,11 +68,11 @@ pub fn extract_global_elements(
 
         if opened_braces == 1 {
             if let OpenedBraceType::Contract = opened_brace_type {
-                if !sst.text.contains("fallback")
-                    && !sst.text.contains("receive")
-                    && !sst.text.contains("cron")
-                    && !sst.text.contains("function")
-                    && !sst.text.contains("modifier")
+                if !sst.text.starts_with("fallback")
+                    && !sst.text.starts_with("receive")
+                    && !sst.text.starts_with("cron")
+                    && !sst.text.starts_with("function")
+                    && !sst.text.starts_with("modifier")
                 {
                     if !SYMBOLS.contains(&sst.text.as_str()) {
                         if !sst.text.starts_with("contract") {
@@ -126,7 +129,6 @@ pub fn extract_global_elements(
                 } else {
                 }
             }
-
             validated = validate_variable(
                 variable,
                 custom_data_types,
@@ -138,11 +140,138 @@ pub fn extract_global_elements(
         if let Some(_raw) = validated.0 {
             global_variables.push(_raw);
         } else if let Some(_custom_err) = validated.1 {
-            custom_errors.push(_custom_err)
+            let _custom_errors_tokens: Vec<Token> = LineDescriptions::to_token(&_custom_err);
+            let mut error_identifier = String::new();
+            let mut args: Vec<String> = Vec::new();
+            match &_custom_errors_tokens[0] {
+                Token::Error => (),
+                _other => print_error(&format!(
+                    "Expecting \"error\" but found {}",
+                    detokenize(&_other)
+                )),
+            }
+
+            match &_custom_errors_tokens[1] {
+                Token::Identifier(___identifier) => {
+                    error_identifier.push_str(&___identifier);
+                }
+                _ => print_error("Unprocessible entity for custom error"),
+            }
+
+            let _args_definitions = &_custom_errors_tokens[3.._custom_errors_tokens.len() - 2]
+                .split(|pred| pred == &Token::Coma)
+                .collect::<Vec<_>>();
+
+            for _arg_collection in _args_definitions {
+                if _arg_collection.is_empty() {
+                    continue;
+                }
+
+                let mut stringified_variant = String::new();
+                if _arg_collection.len() > 1 {
+                    print_error("Unprocessible entity for error... Only accept type")
+                }
+                for _arg in _arg_collection.iter() {
+                    let val = detokenize(_arg);
+                    if !DATA_TYPES.contains(&val.as_str()) {
+                        print_error(&format!("Invalid type \"{}\" for custom error", val))
+                    }
+                    stringified_variant.push_str(&val);
+                }
+
+                args.push(stringified_variant);
+            }
+
+            let structured = CustomErrorIdentifier {
+                identifier: error_identifier,
+                args: if args.is_empty() { None } else { Some(args) },
+            };
+
+            custom_errors.push(structured)
         } else if let Some(_mapping) = validated.2 {
             mappings.push(_mapping)
         } else if let Some(_event) = validated.3 {
-            events.push(_event)
+            let _custom_event_tokens: Vec<Token> = LineDescriptions::to_token(&_event);
+            let mut event_identifier = String::new();
+            let mut variants: Vec<EventIdentifierVariants> = Vec::new();
+            match &_custom_event_tokens[0] {
+                Token::Event => (),
+                _other => print_error(&format!(
+                    "Expecting \"event\" but found {}",
+                    detokenize(&_other)
+                )),
+            }
+
+            match &_custom_event_tokens[1] {
+                Token::Identifier(___identifier) => {
+                    event_identifier.push_str(&___identifier);
+                }
+                _ => print_error("Unprocessible entity for custom error"),
+            }
+
+            let _args_definitions = &_custom_event_tokens[3.._custom_event_tokens.len() - 2]
+                .split(|pred| pred == &Token::Coma)
+                .collect::<Vec<_>>();
+
+            for _arg_collection in _args_definitions {
+                if _arg_collection.is_empty() {
+                    continue;
+                }
+
+                let mut indexed = false;
+                let mut variant = String::new();
+                let mut r#type = String::new();
+                {
+                    let val = detokenize(&_arg_collection[0]);
+                    if !DATA_TYPES.contains(&val.as_str()) {
+                        print_error(&format!("Invalid type \"{}\" for event", val))
+                    } else {
+                        r#type.push_str(&val);
+                    }
+                }
+
+                if _arg_collection.len() == 2 {
+                    match &_arg_collection[1] {
+                        Token::Identifier(__id) => {
+                            variant.push_str(&__id);
+                        }
+                        _other => print_error(&format!(
+                            "Unprocessible entity \"{}\" for event",
+                            detokenize(&_other)
+                        )),
+                    }
+                } else if _arg_collection.len() == 3 {
+                    match &_arg_collection[1] {
+                        Token::Indexed => {
+                            indexed = true;
+                        }
+
+                        _other => print_error(&format!(
+                            "Unprocessible entity \"{}\" for event",
+                            detokenize(&_other)
+                        )),
+                    }
+
+                    match &_arg_collection[2] {
+                        Token::Identifier(__id) => {
+                            variant.push_str(&__id);
+                        }
+                        _other => print_error(&format!(
+                            "Unprocessible entity \"{}\" for event",
+                            detokenize(&_other)
+                        )),
+                    }
+                }
+                let structured_variants = EventIdentifierVariants { indexed, variant };
+                variants.push(structured_variants);
+            }
+
+            let structured = EventIdentifier {
+                identifier: event_identifier,
+                variants,
+            };
+
+            events.push(structured)
         }
     }
 
