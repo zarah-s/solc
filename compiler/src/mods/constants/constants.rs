@@ -33,9 +33,10 @@ pub const DATA_TYPES: [&str; 32] = [
     "address[]",
 ];
 
-pub const KEYWORDS: [&str; 51] = [
+pub const KEYWORDS: [&str; 52] = [
     "contract",
     "mapping",
+    "abstract",
     "indexed",
     "wei",
     "emit",

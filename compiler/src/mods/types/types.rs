@@ -3,6 +3,7 @@
 pub enum Token {
     Identifier(String),
     Contract,
+    Abstract,
     Emit,
     Indexed,
     Modifier,
@@ -241,9 +242,22 @@ pub enum FunctionsIdentifier {
 }
 
 #[derive(Debug)]
-pub struct ContractIdentifier {
+pub enum ContractType {
+    Abstract,
+    Main,
+    None,
+}
+
+#[derive(Debug)]
+pub struct ContractHeader {
     pub identifier: String,
     pub inheritance: Option<Vec<String>>,
+    pub r#type: ContractType,
+}
+
+#[derive(Debug)]
+pub struct ContractIdentifier {
+    pub header: ContractHeader,
     pub state_variables: Vec<VariableIdentifier>,
     pub mappings: Vec<MappingIdentifier>,
     pub enums: Vec<EnumIdentifier>,
@@ -258,6 +272,7 @@ pub enum OpenedBraceType {
     None,
     Struct,
     Callback,
+    Abstract,
     Modifier,
     Function,
     Receive,

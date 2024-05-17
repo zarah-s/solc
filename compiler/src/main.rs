@@ -11,7 +11,9 @@ use mods::{
         process_struct::extract_struct, strip_comments::strip_comments,
         structure_to_line_descriptors::structure_to_line_descriptors,
     },
-    types::types::{ContractIdentifier, InterfaceIdentifier, LineDescriptions, Token},
+    types::types::{
+        ContractIdentifier, ContractType, InterfaceIdentifier, LineDescriptions, Token,
+    },
 };
 use tokio::io;
 
@@ -62,7 +64,8 @@ async fn main() -> Result<(), io::Error> {
         }
     }
 
-    let mut contract_construct: Vec<ContractIdentifier> = Vec::new();
+    let mut abstract_contracts: Vec<ContractIdentifier> = Vec::new();
+    let mut main_contracts: Vec<ContractIdentifier> = Vec::new();
     let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
 
     for _joined in joined {
@@ -88,7 +91,7 @@ async fn main() -> Result<(), io::Error> {
             &enum_identifiers,
             Vec::new(),
         );
-        let (functions, contract_identifier, contract_inheritance) = extract_functions(
+        let (functions, contract_header) = extract_functions(
             &_joined,
             &custom_data_types_identifiers,
             &state_variables,
@@ -97,14 +100,9 @@ async fn main() -> Result<(), io::Error> {
             &mut interfaces,
         );
 
-        if !contract_identifier.trim().is_empty() {
+        if !contract_header.identifier.trim().is_empty() {
             let contract_identifier = ContractIdentifier {
-                identifier: contract_identifier,
-                inheritance: if contract_inheritance.is_empty() {
-                    None
-                } else {
-                    Some(contract_inheritance)
-                },
+                header: contract_header,
                 custom_errors,
                 enums: extracted_enums,
                 events,
@@ -113,13 +111,19 @@ async fn main() -> Result<(), io::Error> {
                 state_variables,
                 structs: structs_tree,
             };
-            contract_construct.push(contract_identifier)
+
+            if let ContractType::Main = contract_identifier.header.r#type {
+                main_contracts.push(contract_identifier)
+            } else if let ContractType::Abstract = contract_identifier.header.r#type {
+                abstract_contracts.push(contract_identifier)
+            }
+            // contract_construct.push(contract_identifier)
         }
     }
 
     println!(
-        "===>>> INTERFACES ===>>>\n{:#?}\n\n ===>>> CONTRACTS ===>>>\n{:#?}",
-        interfaces, contract_construct
+        "===>>> INTERFACES ===>>>\n\n{:#?}\n\n\n ===>>> ABSTRACT CONTRACTS ===>>>\n\n{:#?}\n\n\n ===>>> MAIN CONTRACTS ===>>>\n\n{:#?}",
+        interfaces, abstract_contracts,main_contracts
     );
 
     let end_time = time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);

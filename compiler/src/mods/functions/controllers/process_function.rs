@@ -14,14 +14,14 @@ use crate::mods::{
     },
     types::types::{
         Argument, Assert, CallIdentifier, CallIdentifierType, ConditionalType, Conditionals,
-        ConstructorIdentifier, ConstructorInheritanceInitialization, CronIdentifier,
-        CustomErrorIdentifier, Delete, ElIf, EventEmitter, EventIdentifier, FallbackIdentifier,
-        FunctionArm, FunctionArmType, FunctionCall, FunctionHeader, FunctionIdentifier,
-        FunctionMutability, FunctionsIdentifier, InterfaceIdentifier, InterfaceVariants,
-        LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier, ModifierCall,
-        ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType,
-        Revert, RevertType, Token, TuppleAssignment, VariableAssign, VariableAssignOperation,
-        VariableAssignType, VariableIdentifier, VariableType,
+        ConstructorIdentifier, ConstructorInheritanceInitialization, ContractHeader, ContractType,
+        CronIdentifier, CustomErrorIdentifier, Delete, ElIf, EventEmitter, EventIdentifier,
+        FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall, FunctionHeader,
+        FunctionIdentifier, FunctionMutability, FunctionsIdentifier, InterfaceIdentifier,
+        InterfaceVariants, LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier,
+        ModifierCall, ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return,
+        ReturnType, Revert, RevertType, Token, TuppleAssignment, VariableAssign,
+        VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
     },
 };
 
@@ -34,7 +34,7 @@ pub fn extract_functions(
     enums: &Vec<&str>,
     mappings: &Vec<MappingIdentifier>,
     interfaces: &mut Vec<InterfaceIdentifier>,
-) -> (Vec<FunctionsIdentifier>, String, Vec<String>) {
+) -> (Vec<FunctionsIdentifier>, ContractHeader) {
     let mut opened_braces = 0;
     let mut opened_braces_type = OpenedBraceType::None;
     let mut processed_data: Vec<Vec<LineDescriptions>> = Vec::new();
@@ -42,12 +42,13 @@ pub fn extract_functions(
     let mut function_identifiers: Vec<FunctionsIdentifier> = Vec::new();
     let mut contract_definition = String::new();
     let mut contract_name = String::new();
+    let mut contract_type = ContractType::None;
     let mut contract_inheritance: Vec<String> = Vec::new();
     for line in data {
         let raw = &line.text;
 
         if raw.starts_with("function") {
-            if let OpenedBraceType::Contract = opened_braces_type {
+            if let OpenedBraceType::Contract | OpenedBraceType::Abstract = opened_braces_type {
                 opened_braces_type = OpenedBraceType::Function;
             }
         } else if raw.starts_with("constructor") {
@@ -60,6 +61,8 @@ pub fn extract_functions(
             opened_braces_type = OpenedBraceType::Cron;
         } else if raw.starts_with("contract") {
             opened_braces_type = OpenedBraceType::Contract;
+        } else if raw.starts_with("abstract") {
+            opened_braces_type = OpenedBraceType::Abstract;
         } else if raw.starts_with("modifier") {
             opened_braces_type = OpenedBraceType::Modifier;
         } else if raw.starts_with("interface") {
@@ -68,7 +71,7 @@ pub fn extract_functions(
             opened_braces_type = OpenedBraceType::Contract;
         }
 
-        if let OpenedBraceType::Contract = opened_braces_type {
+        if let OpenedBraceType::Contract | OpenedBraceType::Abstract = opened_braces_type {
             contract_definition.push_str(&raw);
         }
 
@@ -76,13 +79,16 @@ pub fn extract_functions(
             let characters = raw.chars();
             for character in characters {
                 if character == '{' {
-                    if let OpenedBraceType::Contract = opened_braces_type {
+                    if let OpenedBraceType::Contract | OpenedBraceType::Abstract =
+                        opened_braces_type
+                    {
                         let lexems = LineDescriptions::to_token(raw);
                         if opened_braces == 0 {
                             extract_contract_headers(
                                 lexems,
                                 &mut contract_name,
                                 &mut contract_inheritance,
+                                &mut contract_type,
                             );
                         }
                     }
@@ -173,6 +179,7 @@ pub fn extract_functions(
                     interface_definition.to_vec(),
                     &mut interface_name,
                     &mut interface_inheritance,
+                    &mut ContractType::Abstract,
                 );
                 let function_body_start_index =
                     tokens.iter().position(|pred| pred == &Token::OpenBraces);
@@ -708,7 +715,18 @@ pub fn extract_functions(
         }
     }
 
-    (function_identifiers, contract_name, contract_inheritance)
+    (
+        function_identifiers,
+        ContractHeader {
+            identifier: contract_name,
+            inheritance: if contract_inheritance.is_empty() {
+                None
+            } else {
+                Some(contract_inheritance)
+            },
+            r#type: contract_type,
+        },
+    )
 }
 
 fn prepare_and_get_function_args(
@@ -751,14 +769,30 @@ fn extract_contract_headers(
     lexems: Vec<Token>,
     contract_name: &mut String,
     contract_inheritance: &mut Vec<String>,
+    contract_type: &mut ContractType,
 ) {
-    match &lexems[1] {
-        Token::Identifier(_identifier) => {
-            *contract_name = _identifier.to_owned();
-        }
-        _ => {
-            print_error("Invalid contract identifier");
-        }
+    match &lexems[0] {
+        Token::Contract | Token::Interface => match &lexems[1] {
+            Token::Identifier(_identifier) => {
+                *contract_type = ContractType::Main;
+                *contract_name = _identifier.to_owned();
+            }
+            _ => {
+                print_error("Invalid contract identifier");
+            }
+        },
+
+        Token::Abstract => match &lexems[2] {
+            Token::Identifier(_identifier) => {
+                *contract_type = ContractType::Abstract;
+                *contract_name = _identifier.to_owned();
+            }
+            _ => {
+                print_error("Invalid contract identifier");
+            }
+        },
+
+        _ => print_error("Unprocessibble entity for contract header"),
     }
 
     if lexems.contains(&Token::Is) {
@@ -777,11 +811,21 @@ fn extract_contract_headers(
             }
         }
     } else {
-        if lexems.len() != 3 {
-            if let Token::CloseBraces = lexems[3] {
-                //nothing
-            } else {
-                print_error("Unprocessible entity for contract definition");
+        if let Token::Contract | Token::Interface = lexems[0] {
+            if lexems.len() != 3 {
+                if let Token::CloseBraces = lexems[3] {
+                    //nothing
+                } else {
+                    print_error("Unprocessible entity for contract definition");
+                }
+            }
+        } else {
+            if lexems.len() != 4 {
+                if let Token::CloseBraces = lexems[4] {
+                    //nothing
+                } else {
+                    print_error("Unprocessible entity for contract definition");
+                }
             }
         }
     }

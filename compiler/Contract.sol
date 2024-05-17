@@ -6,6 +6,8 @@ contract Test {
 }
 
 interface IT {
+    error ANOTHER_CUSTOM_ERROR(address, string);
+
     event Transfered(
         address indexed sender,
         address receiver,
@@ -13,7 +15,7 @@ interface IT {
     );
 }
 
-contract FunctionModifier {
+abstract contract FunctionModifier {
     // We will use these variables to demonstrate how to use
     // modifiers.
     address public owner;

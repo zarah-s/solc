@@ -30,6 +30,8 @@ pub fn extract_global_elements(
     for sst in data {
         if sst.text.starts_with("contract") {
             opened_brace_type = OpenedBraceType::Contract;
+        } else if sst.text.starts_with("abstract") {
+            opened_brace_type = OpenedBraceType::Abstract;
         } else if sst.text.starts_with("constructor") {
             opened_brace_type = OpenedBraceType::Callback;
         } else if sst.text.starts_with("fallback") {
@@ -67,7 +69,7 @@ pub fn extract_global_elements(
         }
 
         if opened_braces == 1 {
-            if let OpenedBraceType::Contract = opened_brace_type {
+            if let OpenedBraceType::Contract | OpenedBraceType::Abstract = opened_brace_type {
                 if !sst.text.starts_with("fallback")
                     && !sst.text.starts_with("receive")
                     && !sst.text.starts_with("cron")
