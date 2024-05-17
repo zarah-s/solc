@@ -31,3 +31,4 @@ function test() public {
 - [x] parse errors to AST
 - [] handle imports
 - [] distinguish abstract contract from contract
+- [] parse libraries
