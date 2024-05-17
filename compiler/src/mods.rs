@@ -38,7 +38,8 @@ mod tests {
             strip_comments, structure_to_line_descriptors,
         },
         types::types::{
-            ContractHeader, FunctionsIdentifier, InterfaceIdentifier, LineDescriptions,
+            ContractHeader, FunctionsIdentifier, InterfaceIdentifier, LibraryIdentifier,
+            LineDescriptions,
         },
     };
 
@@ -1215,7 +1216,11 @@ mod tests {
     async fn process_function(
         path: &str,
         interfaces: &mut Vec<InterfaceIdentifier>,
-    ) -> (Vec<FunctionsIdentifier>, ContractHeader) {
+    ) -> (
+        Vec<FunctionsIdentifier>,
+        ContractHeader,
+        Vec<LibraryIdentifier>,
+    ) {
         let contents = get_file_contents(path).await;
         let structs_tree = extract_struct(&contents);
         let struct_identifiers: Vec<&str> = structs_tree

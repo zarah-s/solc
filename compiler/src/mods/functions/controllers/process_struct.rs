@@ -10,7 +10,7 @@ use crate::mods::{
 pub fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
     let extracted_structs = extract_custom_data_types_tokens(&Token::Struct, data);
     let mut struct_identifier: Vec<StructIdentifier> = Vec::new();
-
+    // println!("{:?}", extracted_structs);
     for struct_inst in extracted_structs {
         let mut _identifier: Option<String> = None;
         if let Token::Identifier(_id) = &struct_inst[1] {

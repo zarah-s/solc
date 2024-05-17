@@ -4,7 +4,10 @@ use crate::mods::{
     constants::constants::{DATA_TYPES, KEYWORDS, SYMBOLS},
     functions::{
         controllers::{
-            process_enum::extract_enum, process_state_variables::extract_global_elements,
+            process_enum::extract_enum,
+            process_state_variables::{
+                extract_global_elements, process_custom_error, process_event,
+            },
         },
         helpers::helpers::{
             detokenize, extract_data_location_from_token, extract_integer_types_from_token,
@@ -15,12 +18,13 @@ use crate::mods::{
     types::types::{
         Argument, Assert, CallIdentifier, CallIdentifierType, ConditionalType, Conditionals,
         ConstructorIdentifier, ConstructorInheritanceInitialization, ContractHeader, ContractType,
-        CronIdentifier, CustomErrorIdentifier, Delete, ElIf, EventEmitter, EventIdentifier,
-        FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall, FunctionHeader,
-        FunctionIdentifier, FunctionMutability, FunctionsIdentifier, InterfaceIdentifier,
-        InterfaceVariants, LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier,
-        ModifierCall, ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return,
-        ReturnType, Revert, RevertType, Token, TuppleAssignment, VariableAssign,
+        CronIdentifier, CustomErrorIdentifier, Delete, ElIf, EnumIdentifier, EventEmitter,
+        EventIdentifier, FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall,
+        FunctionHeader, FunctionIdentifier, FunctionMutability, FunctionsIdentifier,
+        InterfaceIdentifier, InterfaceVariants, LibraryIdentifier, LineDescriptions, Loop,
+        LoopType, MappingAssign, MappingIdentifier, ModifierCall, ModifierIdentifier,
+        OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType, Revert, RevertType,
+        StructIdentifier, TerminationType, Token, TuppleAssignment, VariableAssign,
         VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
     },
 };
@@ -34,8 +38,13 @@ pub fn extract_functions(
     enums: &Vec<&str>,
     mappings: &Vec<MappingIdentifier>,
     interfaces: &mut Vec<InterfaceIdentifier>,
-) -> (Vec<FunctionsIdentifier>, ContractHeader) {
+) -> (
+    Vec<FunctionsIdentifier>,
+    ContractHeader,
+    Vec<LibraryIdentifier>,
+) {
     let mut opened_braces = 0;
+    let mut libraries: Vec<LibraryIdentifier> = Vec::new();
     let mut opened_braces_type = OpenedBraceType::None;
     let mut processed_data: Vec<Vec<LineDescriptions>> = Vec::new();
     let mut combined = Vec::new();
@@ -48,7 +57,10 @@ pub fn extract_functions(
         let raw = &line.text;
 
         if raw.starts_with("function") {
-            if let OpenedBraceType::Contract | OpenedBraceType::Abstract = opened_braces_type {
+            if let OpenedBraceType::Library = opened_braces_type {
+                opened_braces_type = OpenedBraceType::Library;
+            } else if let OpenedBraceType::Contract | OpenedBraceType::Abstract = opened_braces_type
+            {
                 opened_braces_type = OpenedBraceType::Function;
             }
         } else if raw.starts_with("constructor") {
@@ -64,11 +76,15 @@ pub fn extract_functions(
         } else if raw.starts_with("abstract") {
             opened_braces_type = OpenedBraceType::Abstract;
         } else if raw.starts_with("modifier") {
-            opened_braces_type = OpenedBraceType::Modifier;
+            if let OpenedBraceType::Library = opened_braces_type {
+                opened_braces_type = OpenedBraceType::Library;
+            } else {
+                opened_braces_type = OpenedBraceType::Modifier;
+            }
         } else if raw.starts_with("interface") {
             opened_braces_type = OpenedBraceType::Interface;
-        } else if raw.starts_with("contract") {
-            opened_braces_type = OpenedBraceType::Contract;
+        } else if raw.starts_with("library") {
+            opened_braces_type = OpenedBraceType::Library;
         }
 
         if let OpenedBraceType::Contract | OpenedBraceType::Abstract = opened_braces_type {
@@ -103,27 +119,36 @@ pub fn extract_functions(
                 if character == '}' {
                     opened_braces -= 1;
                     if opened_braces == 1 {
-                        if let OpenedBraceType::Function
-                        | OpenedBraceType::Constructor
-                        | OpenedBraceType::Fallback
-                        | OpenedBraceType::Cron
-                        | OpenedBraceType::Modifier
-                        | OpenedBraceType::Receive = opened_braces_type
-                        {
-                            opened_braces_type = OpenedBraceType::Contract;
-                            combined.push(line.clone());
+                        if let OpenedBraceType::Library = opened_braces_type {
+                            // TODO: NOTHING
+                        } else {
+                            if let OpenedBraceType::Function
+                            | OpenedBraceType::Constructor
+                            | OpenedBraceType::Fallback
+                            | OpenedBraceType::Cron
+                            | OpenedBraceType::Modifier
+                            | OpenedBraceType::Receive = opened_braces_type
+                            {
+                                opened_braces_type = OpenedBraceType::Contract;
+                                combined.push(line.clone());
 
-                            processed_data.push(combined.clone());
-                            combined.clear();
+                                processed_data.push(combined.clone());
+                                combined.clear();
+                            }
                         }
+                        break;
                     } else if opened_braces == 0 {
-                        if let OpenedBraceType::Interface = opened_braces_type {
+                        if let OpenedBraceType::Interface | OpenedBraceType::Library =
+                            opened_braces_type
+                        {
                             opened_braces_type = OpenedBraceType::None;
                             combined.push(line.clone());
 
                             processed_data.push(combined.clone());
                             combined.clear();
                         }
+
+                        break;
                     }
                 }
             }
@@ -133,6 +158,7 @@ pub fn extract_functions(
         | OpenedBraceType::Constructor
         | OpenedBraceType::Receive
         | OpenedBraceType::Cron
+        | OpenedBraceType::Library
         | OpenedBraceType::Modifier
         | OpenedBraceType::Interface
         | OpenedBraceType::Fallback = opened_braces_type
@@ -159,7 +185,7 @@ pub fn extract_functions(
 
     for single_stringified in &stringified {
         let tokens = LineDescriptions::to_token(single_stringified.as_str());
-
+        // println!("{:#?}", tokens);
         match tokens[0] {
             Token::Function => extract_full_function(
                 custom_data_types,
@@ -169,6 +195,271 @@ pub fn extract_functions(
                 &tokens,
                 &mut function_identifiers,
             ),
+
+            Token::Library => {
+                let mut identifier = String::new();
+                let mut library_events: Vec<EventIdentifier> = Vec::new();
+                let mut library_custom_error: Vec<CustomErrorIdentifier> = Vec::new();
+                let mut library_functions: Vec<FunctionsIdentifier> = Vec::new();
+                let mut library_structs: Vec<StructIdentifier> = Vec::new();
+                let mut library_variables: Vec<VariableIdentifier> = Vec::new();
+                let mut library_enums: Vec<EnumIdentifier> = Vec::new();
+                if let Token::Identifier(__identifier) = &tokens[1] {
+                    identifier.push_str(&__identifier);
+                } else {
+                    print_error("Expecting name for library")
+                }
+
+                let library_arm = &tokens[3..tokens.len() - 1];
+                let mut opened_braces = 0;
+                let mut termination_type = TerminationType::None;
+                let mut combo: Vec<Vec<Token>> = Vec::new();
+                {
+                    let mut sub: Vec<Token> = Vec::new();
+                    for (index, arg) in library_arm.iter().enumerate() {
+                        if let Token::Event | Token::Error = arg {
+                            if index > 0 {
+                                let prev = library_arm.get(index - 1);
+                                if let Some(_prev) = prev {
+                                    if let Token::SemiColon | Token::CloseBraces = _prev {
+                                        if !sub.is_empty() {
+                                            combo.push(sub.clone());
+                                            sub.clear();
+                                        }
+                                    }
+                                }
+                            }
+                            termination_type = TerminationType::Semicolon;
+                        } else if let Token::Struct
+                        | Token::Modifier
+                        | Token::Enum
+                        | Token::Function = arg
+                        {
+                            if index > 0 {
+                                let prev = library_arm.get(index - 1);
+                                if let Some(_prev) = prev {
+                                    if let Token::SemiColon | Token::CloseBraces = _prev {
+                                        if !sub.is_empty() {
+                                            combo.push(sub.clone());
+                                            sub.clear();
+                                        }
+                                    }
+                                }
+                            }
+                            termination_type = TerminationType::Braces;
+                        }
+
+                        sub.push(arg.clone());
+                        if let Token::OpenBraces = arg {
+                            opened_braces += 1;
+                        }
+
+                        if let Token::OpenParenthesis = arg {
+                            if let TerminationType::Semicolon = termination_type {
+                                opened_braces += 1;
+                            }
+                        }
+                        if let Token::CloseBraces = arg {
+                            opened_braces -= 1;
+                            if opened_braces == 0 {
+                                if let TerminationType::Braces = termination_type {
+                                    combo.push(sub.clone());
+                                    sub.clear();
+                                    termination_type = TerminationType::None;
+                                }
+                            }
+                        }
+
+                        if let Token::SemiColon = arg {
+                            if opened_braces - 1 == 0 {
+                                if let TerminationType::Semicolon = termination_type {
+                                    opened_braces -= 1;
+                                    combo.push(sub.clone());
+                                    sub.clear();
+                                    termination_type = TerminationType::None;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let mut skipped_sort: Vec<usize> = Vec::new();
+
+                let mut sorted_: Vec<Vec<Token>> = Vec::new();
+
+                {
+                    for (index, __combo) in combo.iter().enumerate() {
+                        if let Token::Modifier | Token::Function = &__combo[0] {
+                            skipped_sort.push(index);
+                        } else {
+                            sorted_.push(__combo.clone())
+                        }
+                    }
+
+                    for _skipped in skipped_sort {
+                        sorted_.push(combo[_skipped].clone())
+                    }
+                }
+
+                drop(combo);
+
+                // println!("{:#?}", sorted_);
+
+                for arm in sorted_ {
+                    match &arm[0] {
+                        Token::Error => {
+                            let mut stringified = String::new();
+                            for __arm in arm {
+                                stringified.push_str(&detokenize(&__arm));
+                            }
+                            let custom_error = process_custom_error(stringified);
+                            library_custom_error.push(custom_error);
+                            // println!("{:#?}", custom_error);
+                        }
+
+                        Token::Modifier => {
+                            let library_custom_data_types = [
+                                library_enums
+                                    .iter()
+                                    .map(|pred| pred.identifier.as_str())
+                                    .collect::<Vec<_>>(),
+                                library_structs
+                                    .iter()
+                                    .map(|pred| pred.identifier.as_str())
+                                    .collect::<Vec<_>>(),
+                            ]
+                            .concat();
+                            process_modifier(
+                                &arm,
+                                &library_custom_data_types,
+                                &library_enums
+                                    .iter()
+                                    .map(|pred| pred.identifier.as_str())
+                                    .collect::<Vec<_>>(),
+                                &library_variables,
+                                &Vec::new(),
+                                &mut library_functions,
+                            );
+                        }
+                        Token::Event => {
+                            let mut stringified = String::new();
+                            for __arm in arm {
+                                stringified.push_str(&format!("{} ", detokenize(&__arm)));
+                            }
+                            let event = process_event(stringified);
+                            library_events.push(event);
+                            // println!("{:#?}", event);
+                        }
+                        Token::Struct => {
+                            let mut stringified = String::new();
+                            for __arm in arm {
+                                stringified.push_str(&format!("{} ", detokenize(&__arm)));
+                            }
+
+                            let structs = extract_struct(&vec![LineDescriptions {
+                                line: 0,
+                                text: format!("contract{}{}{}", "{", stringified, "}"),
+                            }]);
+
+                            for r#struct in structs {
+                                library_structs.push(r#struct);
+                            }
+                            // println!("{:#?}", structs);
+                        }
+
+                        Token::Enum => {
+                            let mut stringified = String::new();
+                            for __arm in arm {
+                                stringified.push_str(&format!("{} ", detokenize(&__arm)));
+                            }
+
+                            let enums = extract_enum(&vec![LineDescriptions {
+                                line: 0,
+                                text: format!("contract{}{}{}", "{", stringified, "}"),
+                            }]);
+
+                            // println!("{:?}", enums);
+
+                            for r#enum in enums {
+                                library_enums.push(r#enum);
+                            }
+                        }
+                        Token::Function => {
+                            let library_custom_data_types = [
+                                library_enums
+                                    .iter()
+                                    .map(|pred| pred.identifier.as_str())
+                                    .collect::<Vec<_>>(),
+                                library_structs
+                                    .iter()
+                                    .map(|pred| pred.identifier.as_str())
+                                    .collect::<Vec<_>>(),
+                            ]
+                            .concat();
+                            extract_full_function(
+                                &library_custom_data_types,
+                                &library_variables,
+                                &library_enums
+                                    .iter()
+                                    .map(|pred| pred.identifier.as_str())
+                                    .collect::<Vec<_>>(),
+                                &Vec::new(),
+                                &arm,
+                                &mut library_functions,
+                            );
+                        }
+                        _other => {
+                            let mut stringified = String::new();
+                            for __arm in &arm {
+                                stringified.push_str(&format!("{} ", detokenize(&__arm)));
+                            }
+                            if DATA_TYPES.contains(&detokenize(&_other).as_str()) {
+                                let var = validate_variable(
+                                    LineDescriptions {
+                                        text: stringified,
+                                        line: 0,
+                                    },
+                                    &Vec::new(),
+                                    &Vec::new(),
+                                    false,
+                                    None,
+                                );
+
+                                if var.0.is_none() {
+                                    print_error("Unprocessible entity for library constant")
+                                }
+                                let unwrapped_var = var.0.unwrap();
+
+                                if unwrapped_var.is_array {
+                                    print_error("Only constants of value type and byte array type are implemented")
+                                }
+                                match unwrapped_var.mutability {
+                                    Token::Constant => (),
+                                    _ => print_error("Only constants of value type and byte array type are implemented")
+                                }
+
+                                library_variables.push(unwrapped_var);
+                            } else {
+                                print_error("Only constants of value type and byte array type are implemented")
+                            }
+                        }
+                    }
+                }
+
+                let library_identifier = LibraryIdentifier {
+                    identifier,
+                    constants: library_variables,
+                    custom_errors: library_custom_error,
+                    enums: library_enums,
+                    events: library_events,
+                    functions: library_functions,
+                    structs: library_structs,
+                };
+
+                libraries.push(library_identifier)
+
+                // panic!("{:#?}", library_identifier);
+            }
 
             Token::Interface => {
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
@@ -382,53 +673,14 @@ pub fn extract_functions(
                 };
                 interfaces.push(structured);
             }
-            Token::Modifier => {
-                let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
-                let mut arguments: Vec<Argument> = Vec::new();
-                let mut identifier = String::new();
-                let function_definition: &[Token] = &tokens[..start_index.unwrap()];
-
-                match &function_definition[1] {
-                    Token::Identifier(_identifier) => {
-                        identifier = _identifier.to_owned();
-                    }
-                    _ => {
-                        print_error("Unprocessible entity for modifier name");
-                    }
-                }
-                if let Token::OpenParenthesis = &function_definition[2] {
-                    arguments = prepare_and_get_function_args(
-                        function_definition,
-                        custom_data_types,
-                        enums,
-                    );
-                }
-
-                let function_body_start_index =
-                    tokens.iter().position(|pred| pred == &Token::OpenBraces);
-                if let None = function_body_start_index {
-                    print_error(&format!("Unprocessible entity",));
-                }
-
-                let function_body = &tokens[function_body_start_index.unwrap()..];
-
-                let arms: Vec<FunctionArm> = extract_function_arms(
-                    &function_body.to_vec(),
-                    &arguments,
-                    custom_data_types,
-                    global_variables,
-                    enums,
-                    Vec::new(),
-                    mappings,
-                );
-
-                let structured = ModifierIdentifier {
-                    arguments,
-                    arms,
-                    name: identifier,
-                };
-                function_identifiers.push(FunctionsIdentifier::ModifierIdentifier(structured));
-            }
+            Token::Modifier => process_modifier(
+                &tokens,
+                custom_data_types,
+                enums,
+                global_variables,
+                mappings,
+                &mut function_identifiers,
+            ),
             Token::Constructor => {
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
 
@@ -726,7 +978,58 @@ pub fn extract_functions(
             },
             r#type: contract_type,
         },
+        libraries,
     )
+}
+
+fn process_modifier(
+    tokens: &Vec<Token>,
+    custom_data_types: &Vec<&str>,
+    enums: &Vec<&str>,
+    global_variables: &Vec<VariableIdentifier>,
+    mappings: &Vec<MappingIdentifier>,
+    function_identifiers: &mut Vec<FunctionsIdentifier>,
+) {
+    let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+    let mut arguments: Vec<Argument> = Vec::new();
+    let mut identifier = String::new();
+    let function_definition: &[Token] = &tokens[..start_index.unwrap()];
+
+    match &function_definition[1] {
+        Token::Identifier(_identifier) => {
+            identifier = _identifier.to_owned();
+        }
+        _ => {
+            print_error("Unprocessible entity for modifier name");
+        }
+    }
+    if let Token::OpenParenthesis = &function_definition[2] {
+        arguments = prepare_and_get_function_args(function_definition, custom_data_types, enums);
+    }
+
+    let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
+    if let None = function_body_start_index {
+        print_error(&format!("Unprocessible entity",));
+    }
+
+    let function_body = &tokens[function_body_start_index.unwrap()..];
+
+    let arms: Vec<FunctionArm> = extract_function_arms(
+        &function_body.to_vec(),
+        &arguments,
+        custom_data_types,
+        global_variables,
+        enums,
+        Vec::new(),
+        mappings,
+    );
+
+    let structured = ModifierIdentifier {
+        arguments,
+        arms,
+        name: identifier,
+    };
+    function_identifiers.push(FunctionsIdentifier::ModifierIdentifier(structured));
 }
 
 fn prepare_and_get_function_args(

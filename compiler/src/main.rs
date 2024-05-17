@@ -12,7 +12,8 @@ use mods::{
         structure_to_line_descriptors::structure_to_line_descriptors,
     },
     types::types::{
-        ContractIdentifier, ContractType, InterfaceIdentifier, LineDescriptions, Token,
+        ContractIdentifier, ContractType, InterfaceIdentifier, LibraryIdentifier, LineDescriptions,
+        Token,
     },
 };
 use tokio::io;
@@ -66,6 +67,7 @@ async fn main() -> Result<(), io::Error> {
 
     let mut abstract_contracts: Vec<ContractIdentifier> = Vec::new();
     let mut main_contracts: Vec<ContractIdentifier> = Vec::new();
+    let mut libraries: Vec<LibraryIdentifier> = Vec::new();
     let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
 
     for _joined in joined {
@@ -91,7 +93,7 @@ async fn main() -> Result<(), io::Error> {
             &enum_identifiers,
             Vec::new(),
         );
-        let (functions, contract_header) = extract_functions(
+        let (functions, contract_header, _libraries) = extract_functions(
             &_joined,
             &custom_data_types_identifiers,
             &state_variables,
@@ -99,7 +101,9 @@ async fn main() -> Result<(), io::Error> {
             &mappings,
             &mut interfaces,
         );
-
+        for _library in _libraries {
+            libraries.push(_library);
+        }
         if !contract_header.identifier.trim().is_empty() {
             let contract_identifier = ContractIdentifier {
                 header: contract_header,
@@ -122,8 +126,8 @@ async fn main() -> Result<(), io::Error> {
     }
 
     println!(
-        "===>>> INTERFACES ===>>>\n\n{:#?}\n\n\n ===>>> ABSTRACT CONTRACTS ===>>>\n\n{:#?}\n\n\n ===>>> MAIN CONTRACTS ===>>>\n\n{:#?}",
-        interfaces, abstract_contracts,main_contracts
+        "===>>> INTERFACES ===>>>\n\n{:#?}\n\n\n ===>>> LIBRARIES ===>>>\n\n{:#?}\n\n\n ===>>> ABSTRACT CONTRACTS ===>>>\n\n{:#?}\n\n\n ===>>> MAIN CONTRACTS ===>>>\n\n{:#?}",
+        interfaces,libraries, abstract_contracts,main_contracts
     );
 
     let end_time = time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);

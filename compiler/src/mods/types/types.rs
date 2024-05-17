@@ -3,6 +3,7 @@
 pub enum Token {
     Identifier(String),
     Contract,
+    Library,
     Abstract,
     Emit,
     Indexed,
@@ -93,6 +94,12 @@ pub enum Token {
     Ampersand,
     True,
     False,
+}
+
+pub enum TerminationType {
+    Semicolon,
+    None,
+    Braces,
 }
 
 #[derive(Debug, Clone)]
@@ -242,6 +249,17 @@ pub enum FunctionsIdentifier {
 }
 
 #[derive(Debug)]
+pub struct LibraryIdentifier {
+    pub identifier: String,
+    pub constants: Vec<VariableIdentifier>,
+    pub enums: Vec<EnumIdentifier>,
+    pub structs: Vec<StructIdentifier>,
+    pub custom_errors: Vec<CustomErrorIdentifier>,
+    pub events: Vec<EventIdentifier>,
+    pub functions: Vec<FunctionsIdentifier>,
+}
+
+#[derive(Debug)]
 pub enum ContractType {
     Abstract,
     Main,
@@ -271,6 +289,7 @@ pub struct ContractIdentifier {
 pub enum OpenedBraceType {
     None,
     Struct,
+    Library,
     Callback,
     Abstract,
     Modifier,
