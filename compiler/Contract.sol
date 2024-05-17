@@ -87,6 +87,6 @@ contract FunctionModifier {
             decrement(i - 1);
         }
 
-        emit Transfered(msg.sender, 1);
+        emit Transfered(msg.sender, address(0), 1);
     }
 }
