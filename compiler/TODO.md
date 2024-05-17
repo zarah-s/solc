@@ -29,6 +29,6 @@ function test() public {
 - [x] implement emit to event
 - [x] parse events to AST
 - [x] parse errors to AST
+- [x] distinguish abstract contract from contract
+- [x] parse libraries
 - [] handle imports
-- [] distinguish abstract contract from contract
-- [] parse libraries

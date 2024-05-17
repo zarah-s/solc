@@ -6,6 +6,7 @@ contract Test {
 }
 
 interface IT {
+    error ANOTHER_CUSTOM_ERROR(address, string);
     event Transfered(
         address indexed sender,
         address receiver,
@@ -13,7 +14,40 @@ interface IT {
     );
 }
 
-contract FunctionModifier {
+library Lib {
+    modifier onlyOwner(address owner) {
+        require(msg.sender == owner, "Not owner");
+        // Underscore is a special character only used inside
+        // a function modifier and it tells Solidity to
+        // execute the rest of the code.
+        _;
+    }
+
+    function oi() external {
+        //
+    }
+
+    enum Status {
+        Success,
+        Fail
+    }
+
+    error ANOTHER_CUSTOM_ERROR(address, string);
+    uint constant vard = 1;
+
+    // bytes[] constant bb = [""];
+    // LibStr constant str = LibStr({name: "adsfs"});
+    event Transfered(
+        address indexed sender,
+        address receiver,
+        uint indexed amount
+    );
+    struct LibStr {
+        address name;
+    }
+}
+
+abstract contract FunctionModifier {
     // We will use these variables to demonstrate how to use
     // modifiers.
     address public owner;
