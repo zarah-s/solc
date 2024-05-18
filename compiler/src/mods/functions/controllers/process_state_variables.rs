@@ -77,7 +77,7 @@ pub fn extract_global_elements(
                     && !sst.text.starts_with("modifier")
                 {
                     if !SYMBOLS.contains(&sst.text.as_str()) {
-                        if !sst.text.starts_with("contract") {
+                        if !sst.text.starts_with("contract") && !sst.text.starts_with("abstract") {
                             let splited: Vec<&str> = sst.text.split(";").collect();
                             let mut local_combo = String::new();
                             if splited[splited.len() - 1].trim().is_empty() {
