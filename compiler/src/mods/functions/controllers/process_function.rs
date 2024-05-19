@@ -2004,14 +2004,40 @@ fn extract_function_block(
                                     visibility: Token::Private,
                                 };
 
-                                let function_scope_variable = extract_function_scope_variable(
-                                    Some(&var),
-                                    None,
-                                    block,
-                                    _identifier,
-                                );
-                                if let Some(_) = function_scope_variable {
-                                    full_block.push(function_scope_variable.unwrap());
+                                if let Token::Address = var.data_type {
+                                    let mut text = String::new();
+                                    for strr in block {
+                                        text.push_str(&format!("{} ", &detokenize(strr)))
+                                    }
+
+                                    if text.contains("call") || text.contains("delegatecall") {
+                                        extract_low_level_call(
+                                            block,
+                                            &mut full_block,
+                                            arg.payable_address,
+                                        );
+                                    } else {
+                                        let function_scope_variable =
+                                            extract_function_scope_variable(
+                                                Some(&var),
+                                                None,
+                                                block,
+                                                _identifier,
+                                            );
+                                        if let Some(_) = function_scope_variable {
+                                            full_block.push(function_scope_variable.unwrap());
+                                        }
+                                    }
+                                } else {
+                                    let function_scope_variable = extract_function_scope_variable(
+                                        Some(&var),
+                                        None,
+                                        block,
+                                        _identifier,
+                                    );
+                                    if let Some(_) = function_scope_variable {
+                                        full_block.push(function_scope_variable.unwrap());
+                                    }
                                 }
                             } else if global_variables_identifiers.contains(&_identifier) {
                                 let var = global_variables
@@ -2761,19 +2787,26 @@ fn extract_function_block(
                         print_error("Missing ;");
                     }
                 }
+
                 if DATA_TYPES.contains(&detokenize(_token).as_str()) {
                     let mut text = String::new();
                     for strr in block {
                         text.push_str(&format!("{} ", &detokenize(strr)))
                     }
                     let mut is_call = false;
+                    // println!("{:?}", block);
                     if let Token::Address | Token::Msg | Token::Payable = block[0] {
                         if text.contains("call") || text.contains("delegatecall") {
                             is_call = true;
                         }
                     }
                     if is_call {
-                        extract_low_level_call(block, &mut full_block)
+                        let is_payable = if let Token::Payable = block[0] {
+                            true
+                        } else {
+                            false
+                        };
+                        extract_low_level_call(block, &mut full_block, is_payable)
                     } else {
                         let variable = extract_function_variable(&block, custom_data_types, enums);
                         if let None = variable {
@@ -2848,8 +2881,13 @@ fn extract_function_block(
                     }
                 } else if let Token::CloseBraces = _token {
                     //
-                } else if let Token::Msg = _token {
-                    extract_low_level_call(block, &mut full_block);
+                } else if let Token::Msg | Token::Payable = _token {
+                    let is_payable = if let Token::Payable = _token {
+                        true
+                    } else {
+                        false
+                    };
+                    extract_low_level_call(block, &mut full_block, is_payable);
                 } else {
                     print_error(&format!("Unexpected identifier \"{}\"", detokenize(_token)))
                 }
@@ -2859,16 +2897,24 @@ fn extract_function_block(
     full_block
 }
 
-fn extract_low_level_call(block: &Vec<&Token>, full_block: &mut Vec<FunctionArm>) {
+fn extract_low_level_call(
+    block: &Vec<&Token>,
+    full_block: &mut Vec<FunctionArm>,
+    initial_payable_value: bool,
+) {
     let next_variant_index = block.iter().position(|pred| pred == &&Token::Dot);
     if let Some(_index) = next_variant_index {
         let mut address = String::new();
         let _call_variant = &block[.._index];
+        let mut payable = initial_payable_value;
+        if block.contains(&&Token::Payable) {
+            payable = true;
+        }
         match _call_variant[0] {
             Token::Msg => {
                 address.push_str("msg.sender");
             }
-            Token::Identifier(_id) => {}
+            Token::Identifier(_id) => address.push_str(&_id),
             _ => {
                 let mut opened_bracket = 0;
 
@@ -2975,6 +3021,7 @@ fn extract_low_level_call(block: &Vec<&Token>, full_block: &mut Vec<FunctionArm>
                             }
                             let structured = CallIdentifier {
                                 address,
+                                payable,
                                 arguments: vec![__stringified],
                                 raw_data,
                                 r#type: if __identifier == "delegatecall" {
