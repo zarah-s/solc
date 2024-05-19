@@ -6,6 +6,7 @@ pub enum Token {
     Library,
     Abstract,
     Emit,
+    Payable,
     Indexed,
     Modifier,
     Interface,
@@ -57,7 +58,6 @@ pub enum Token {
     Uint256,
     Receive,
     Fallback,
-    Payable,
     Cron,
     Gasless,
     Int8,
@@ -233,6 +233,7 @@ pub enum CallIdentifierType {
 #[derive(Debug, PartialEq)]
 pub struct CallIdentifier {
     pub address: String,
+    pub payable: bool,
     pub arguments: Vec<String>,
     pub raw_data: Option<[String; 2]>,
     pub r#type: CallIdentifierType,

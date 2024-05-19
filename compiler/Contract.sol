@@ -23,8 +23,10 @@ library Lib {
         _;
     }
 
-    function oi() external {
-        //
+    function test(address payable _user) public {
+        // val = 123;
+        bytes memory b = "";
+        _user.call(b);
     }
 
     enum Status {
