@@ -114,7 +114,6 @@ pub fn extract_global_elements(
     }
     let mut skip = 0;
     for variable in variables {
-        // println!("{:?}", variable);
         let validated: (
             Option<VariableIdentifier>,
             Option<String>,

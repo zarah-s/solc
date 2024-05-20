@@ -5,15 +5,9 @@ use std::{
 mod mods;
 
 use mods::{
-    functions::controllers::{
-        process_enum::extract_enum, process_file_contents::process_file_contents,
-        process_function::extract_functions, process_state_variables::extract_global_elements,
-        process_struct::extract_struct, strip_comments::strip_comments,
-        structure_to_line_descriptors::structure_to_line_descriptors,
-    },
+    functions::controllers::sub_main::compile_source_code,
     types::types::{
-        ContractIdentifier, ContractType, InterfaceIdentifier, LibraryIdentifier, LineDescriptions,
-        Token,
+        ContractIdentifier, InterfaceIdentifier, LibraryIdentifier, LineDescriptions, Token,
     },
 };
 use tokio::io;
@@ -24,106 +18,19 @@ async fn main() -> Result<(), io::Error> {
     /* GET ENVIRONMENT ARGUMENTS */
     let args: Vec<String> = env::args().collect();
 
-    /* LINES DESCRIPTION CONTAINING LINE NUMBER */
-    let mut lines_: Vec<LineDescriptions> = Vec::new();
-    let mut stripped_comments = String::new();
-    let mut file_contents = String::new();
-    let _ = process_file_contents(args, &mut file_contents).await?;
-
-    structure_to_line_descriptors(&file_contents, &mut lines_);
-
-    strip_comments(&lines_, &mut stripped_comments);
-    let structured_stripped_compilable_contents: Vec<LineDescriptions> =
-        LineDescriptions::to_struct(stripped_comments);
-
-    let mut opened_braces = 0;
-    let mut combo: Vec<LineDescriptions> = Vec::new();
-    let mut joined: Vec<Vec<LineDescriptions>> = Vec::new();
-    for data in structured_stripped_compilable_contents {
-        let raw = &data.text;
-        combo.push(data.clone());
-
-        if raw.contains("{") {
-            for character in raw.chars() {
-                if character == '{' {
-                    opened_braces += 1;
-                }
-            }
-        }
-
-        if raw.contains("}") {
-            for character in raw.chars() {
-                if character == '}' {
-                    opened_braces -= 1;
-
-                    if opened_braces == 0 {
-                        joined.push(combo.clone());
-                        combo.clear();
-                    }
-                }
-            }
-        }
-    }
-
     let mut abstract_contracts: Vec<ContractIdentifier> = Vec::new();
     let mut main_contracts: Vec<ContractIdentifier> = Vec::new();
     let mut libraries: Vec<LibraryIdentifier> = Vec::new();
     let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
 
-    for _joined in joined {
-        let extracted_enums = extract_enum(&_joined);
-
-        let structs_tree = extract_struct(&_joined);
-        let struct_identifiers: Vec<&str> = structs_tree
-            .iter()
-            .map(|pred| pred.identifier.as_str())
-            .collect();
-
-        let enum_identifiers: Vec<&str> = extracted_enums
-            .iter()
-            .map(|pred| pred.identifier.as_str())
-            .collect();
-
-        let custom_data_types_identifiers: Vec<&str> =
-            [enum_identifiers.clone(), struct_identifiers].concat();
-
-        let (state_variables, custom_errors, mappings, events) = extract_global_elements(
-            &_joined,
-            &custom_data_types_identifiers,
-            &enum_identifiers,
-            Vec::new(),
-        );
-        let (functions, contract_header, _libraries) = extract_functions(
-            &_joined,
-            &custom_data_types_identifiers,
-            &state_variables,
-            &enum_identifiers,
-            &mappings,
-            &mut interfaces,
-        );
-        for _library in _libraries {
-            libraries.push(_library);
-        }
-        if !contract_header.identifier.trim().is_empty() {
-            let contract_identifier = ContractIdentifier {
-                header: contract_header,
-                custom_errors,
-                enums: extracted_enums,
-                events,
-                functions,
-                mappings,
-                state_variables,
-                structs: structs_tree,
-            };
-
-            if let ContractType::Main = contract_identifier.header.r#type {
-                main_contracts.push(contract_identifier)
-            } else if let ContractType::Abstract = contract_identifier.header.r#type {
-                abstract_contracts.push(contract_identifier)
-            }
-            // contract_construct.push(contract_identifier)
-        }
-    }
+    let _ = compile_source_code(
+        args,
+        &mut abstract_contracts,
+        &mut main_contracts,
+        &mut libraries,
+        &mut interfaces,
+    )
+    .await?;
 
     println!(
         "===>>> INTERFACES ===>>>\n\n{:#?}\n\n\n ===>>> LIBRARIES ===>>>\n\n{:#?}\n\n\n ===>>> ABSTRACT CONTRACTS ===>>>\n\n{:#?}\n\n\n ===>>> MAIN CONTRACTS ===>>>\n\n{:#?}",
