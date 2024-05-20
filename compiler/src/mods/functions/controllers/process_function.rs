@@ -185,7 +185,6 @@ pub fn extract_functions(
 
     for single_stringified in &stringified {
         let tokens = LineDescriptions::to_token(single_stringified.as_str());
-        // println!("{:#?}", tokens);
         match tokens[0] {
             Token::Function => extract_full_function(
                 custom_data_types,
@@ -303,8 +302,6 @@ pub fn extract_functions(
 
                 drop(combo);
 
-                // println!("{:#?}", sorted_);
-
                 for arm in sorted_ {
                     match &arm[0] {
                         Token::Error => {
@@ -314,7 +311,6 @@ pub fn extract_functions(
                             }
                             let custom_error = process_custom_error(stringified);
                             library_custom_error.push(custom_error);
-                            // println!("{:#?}", custom_error);
                         }
 
                         Token::Modifier => {
@@ -348,7 +344,6 @@ pub fn extract_functions(
                             }
                             let event = process_event(stringified);
                             library_events.push(event);
-                            // println!("{:#?}", event);
                         }
                         Token::Struct => {
                             let mut stringified = String::new();
@@ -364,7 +359,6 @@ pub fn extract_functions(
                             for r#struct in structs {
                                 library_structs.push(r#struct);
                             }
-                            // println!("{:#?}", structs);
                         }
 
                         Token::Enum => {
@@ -377,8 +371,6 @@ pub fn extract_functions(
                                 line: 0,
                                 text: format!("contract{}{}{}", "{", stringified, "}"),
                             }]);
-
-                            // println!("{:?}", enums);
 
                             for r#enum in enums {
                                 library_enums.push(r#enum);
@@ -457,8 +449,6 @@ pub fn extract_functions(
                 };
 
                 libraries.push(library_identifier)
-
-                // panic!("{:#?}", library_identifier);
             }
 
             Token::Interface => {
@@ -1117,7 +1107,7 @@ fn extract_contract_headers(
         if let Token::Contract | Token::Interface = lexems[0] {
             if lexems.len() != 3 {
                 if let Token::CloseBraces = lexems[3] {
-                    //nothing
+                    //TODO: NOTHING
                 } else {
                     print_error("Unprocessible entity for contract definition");
                 }
@@ -1125,7 +1115,7 @@ fn extract_contract_headers(
         } else {
             if lexems.len() != 4 {
                 if let Token::CloseBraces = lexems[4] {
-                    //nothing
+                    //TODO: NOTHING
                 } else {
                     print_error("Unprocessible entity for contract definition");
                 }
@@ -2202,7 +2192,7 @@ fn extract_function_block(
                             let backward_index = block.get(index - 1);
                             if let Some(_idx) = backward_index {
                                 if let Token::If = _idx {
-                                    //
+                                    // TODO: NOTHING
                                 } else {
                                     conditional_type = ConditionalType::If;
                                 }
@@ -2717,7 +2707,7 @@ fn extract_function_block(
                 for __blk in block {
                     if opened_count > 0 {
                         if let Token::CloseParenthesis = __blk {
-                            //
+                            // TODO: NOTHING
                         } else {
                             msg.push_str(&detokenize(__blk))
                         }
@@ -2748,7 +2738,7 @@ fn extract_function_block(
                     for __blk in block {
                         if opened_count > 0 {
                             if let Token::CloseParenthesis = __blk {
-                                //
+                                // TODO: NOTHING
                             } else {
                                 msg.push_str(&detokenize(__blk))
                             }
@@ -2794,7 +2784,6 @@ fn extract_function_block(
                         text.push_str(&format!("{} ", &detokenize(strr)))
                     }
                     let mut is_call = false;
-                    // println!("{:?}", block);
                     if let Token::Address | Token::Msg | Token::Payable = block[0] {
                         if text.contains("call") || text.contains("delegatecall") {
                             is_call = true;
@@ -2880,7 +2869,7 @@ fn extract_function_block(
                         print_error(&format!("Expecting \")\"",))
                     }
                 } else if let Token::CloseBraces = _token {
-                    //
+                    // TODO: NOTHING
                 } else if let Token::Msg | Token::Payable = _token {
                     let is_payable = if let Token::Payable = _token {
                         true
@@ -2931,7 +2920,7 @@ fn extract_low_level_call(
 
                     if opened_bracket > 0 {
                         if let Token::OpenParenthesis = __variant {
-                            // nothing
+                            // TODO: NOTHING
                         } else {
                             address.push_str(&detokenize(&__variant))
                         }

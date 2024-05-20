@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
+import "./test/files/vars/Error.sol";
 
 contract Test {
     function oi() external {}

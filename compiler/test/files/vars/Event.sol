@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-contract Error {
+contract Event {
     function testRequire(uint256 _i) public pure {
         // Require should be used to validate conditions such as:
         // - inputs

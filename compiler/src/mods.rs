@@ -12,6 +12,7 @@ pub mod functions {
     }
 
     pub mod controllers {
+
         pub mod process_enum;
         pub mod process_file_contents;
         pub mod process_function;
@@ -19,6 +20,7 @@ pub mod functions {
         pub mod process_struct;
         pub mod strip_comments;
         pub mod structure_to_line_descriptors;
+        pub mod sub_main;
     }
 }
 
