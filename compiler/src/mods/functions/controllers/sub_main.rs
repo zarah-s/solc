@@ -20,16 +20,38 @@ pub async fn compile_source_code(
     main_contracts: &mut Vec<ContractIdentifier>,
     libraries: &mut Vec<LibraryIdentifier>,
     interfaces: &mut Vec<InterfaceIdentifier>,
+    compiled_files: &mut Vec<String>,
 ) -> Result<(), std::io::Error> {
-    let root_folder = Path::new(&args[1]);
-
+    let file_path = &args[1];
+    let root_folder = Path::new(&file_path);
+    if compiled_files.contains(
+        &root_folder
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string(),
+    ) {
+        print_error(&format!(
+            "{:?} has already been imported",
+            root_folder.file_name().unwrap()
+        ))
+    }
+    compiled_files.push(
+        root_folder
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string(),
+    );
     let mut lines_: Vec<LineDescriptions> = Vec::new();
     let mut stripped_comments = String::new();
     let mut file_contents = String::new();
     let _result = process_file_contents(args.clone(), &mut file_contents).await;
     match _result {
         Ok(_) => (),
-        Err(err) => panic!("{}", err),
+        Err(err) => panic!("{} {}", err, file_path),
     }
     structure_to_line_descriptors(&file_contents, &mut lines_);
 
@@ -100,6 +122,7 @@ pub async fn compile_source_code(
                 main_contracts,
                 libraries,
                 interfaces,
+                compiled_files,
             )
             .await;
         })
