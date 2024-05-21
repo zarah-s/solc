@@ -22,15 +22,18 @@ async fn main() -> Result<(), io::Error> {
     let mut main_contracts: Vec<ContractIdentifier> = Vec::new();
     let mut libraries: Vec<LibraryIdentifier> = Vec::new();
     let mut interfaces: Vec<InterfaceIdentifier> = Vec::new();
-
+    let mut compiled_files: Vec<String> = Vec::new();
     let _ = compile_source_code(
         args,
         &mut abstract_contracts,
         &mut main_contracts,
         &mut libraries,
         &mut interfaces,
+        &mut compiled_files,
     )
     .await?;
+
+    drop(compiled_files);
 
     println!(
         "===>>> INTERFACES ===>>>\n\n{:#?}\n\n\n ===>>> LIBRARIES ===>>>\n\n{:#?}\n\n\n ===>>> ABSTRACT CONTRACTS ===>>>\n\n{:#?}\n\n\n ===>>> MAIN CONTRACTS ===>>>\n\n{:#?}",
