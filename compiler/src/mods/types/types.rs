@@ -6,6 +6,8 @@ pub enum Token {
     Library,
     Abstract,
     Emit,
+    Call,
+    Delegatecall,
     Payable,
     Indexed,
     Modifier,
@@ -513,7 +515,7 @@ pub struct Loop {
     pub identifier: Option<String>,
     pub value: Option<String>,
     pub condition: String,
-    pub op: Option<String>,
+    pub iterator: Option<String>,
     pub arms: Vec<FunctionArm>,
     pub r#type: LoopType,
 }

@@ -28,7 +28,7 @@ library Lib {
     function test(address payable _user) public {
         // val = 123;
         bytes memory b = "";
-        _user.call(b);
+        address(_user).call{value: 1}(b);
     }
 
     enum Status {
@@ -51,7 +51,7 @@ library Lib {
     }
 }
 
-abstract contract FunctionModifier {
+contract FunctionModifier {
     // We will use these variables to demonstrate how to use
     // modifiers.
     address public owner;
@@ -82,6 +82,7 @@ abstract contract FunctionModifier {
 
     struct Str {
         address name;
+        bytes callback;
     }
 
     function changeOwner(
@@ -90,6 +91,7 @@ abstract contract FunctionModifier {
         address oi
     ) public onlyOwner validAddress(address(0)) {
         test.name = msg.sender;
+        test.name.call(test.callback);
         oi = msg.sender;
         Test(oi).oi();
         _newOwner = address(0);

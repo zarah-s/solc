@@ -32,3 +32,6 @@ function test() public {
 - [x] distinguish abstract contract from contract
 - [x] parse libraries
 - [x] handle imports
+- [] implement libraries elements to contract
+- [] parse conditional arguments
+- [] parse assignment values

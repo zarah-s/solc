@@ -1090,8 +1090,8 @@ fn extract_contract_headers(
 
     if lexems.contains(&Token::Is) {
         let index_for_is_keyword = lexems.iter().position(|pred| pred == &Token::Is);
-        let yo = &lexems[index_for_is_keyword.unwrap() + 1..&lexems.len() - 1];
-        let splits = yo
+        let lexem_slice = &lexems[index_for_is_keyword.unwrap() + 1..&lexems.len() - 1];
+        let splits = lexem_slice
             .split(|pred| pred == &Token::Coma)
             .collect::<Vec<_>>()
             .concat();
@@ -1995,12 +1995,30 @@ fn extract_function_block(
                                 };
 
                                 if let Token::Address = var.data_type {
-                                    let mut text = String::new();
-                                    for strr in block {
-                                        text.push_str(&format!("{} ", &detokenize(strr)))
+                                    if block.contains(&&Token::Call)
+                                        || block.contains(&&Token::Delegatecall)
+                                    {
+                                        extract_low_level_call(
+                                            block,
+                                            &mut full_block,
+                                            arg.payable_address,
+                                        );
+                                    } else {
+                                        let function_scope_variable =
+                                            extract_function_scope_variable(
+                                                Some(&var),
+                                                None,
+                                                block,
+                                                _identifier,
+                                            );
+                                        if let Some(_) = function_scope_variable {
+                                            full_block.push(function_scope_variable.unwrap());
+                                        }
                                     }
-
-                                    if text.contains("call") || text.contains("delegatecall") {
+                                } else if let VariableType::Struct = var.type_ {
+                                    if block.contains(&&Token::Call)
+                                        || block.contains(&&Token::Delegatecall)
+                                    {
                                         extract_low_level_call(
                                             block,
                                             &mut full_block,
@@ -2165,7 +2183,7 @@ fn extract_function_block(
                         arms: __arms,
                         condition: _condition,
                         identifier: None,
-                        op: None,
+                        iterator: None,
                         value: None,
                         r#type: LoopType::While,
                     });
@@ -2609,7 +2627,7 @@ fn extract_function_block(
                 let mut _value: Option<String> = None;
                 let mut __identifier: String = String::new();
                 let mut _condition = String::new();
-                let mut _operation = String::new();
+                let mut _iterator = String::new();
                 if let Some(_open_brace_index) = open_brace_index {
                     let condition_block = &block[2.._open_brace_index - 1];
 
@@ -2664,7 +2682,7 @@ fn extract_function_block(
                     }
 
                     for __op in splitted[2] {
-                        _operation.push_str(&detokenize(__op));
+                        _iterator.push_str(&detokenize(__op));
                     }
 
                     let mut batched: Vec<Token> = Vec::new();
@@ -2692,7 +2710,7 @@ fn extract_function_block(
                         arms: __arms,
                         condition: _condition,
                         identifier: Some(__identifier),
-                        op: Some(_operation),
+                        iterator: Some(_iterator),
                         value: _value,
                         r#type: LoopType::For,
                     });
@@ -2785,7 +2803,7 @@ fn extract_function_block(
                     }
                     let mut is_call = false;
                     if let Token::Address | Token::Msg | Token::Payable = block[0] {
-                        if text.contains("call") || text.contains("delegatecall") {
+                        if block.contains(&&Token::Call) || block.contains(&&Token::Delegatecall) {
                             is_call = true;
                         }
                     }
@@ -2895,6 +2913,7 @@ fn extract_low_level_call(
     if let Some(_index) = next_variant_index {
         let mut address = String::new();
         let _call_variant = &block[.._index];
+        let mut call_index = 0;
         let mut payable = initial_payable_value;
         if block.contains(&&Token::Payable) {
             payable = true;
@@ -2903,127 +2922,106 @@ fn extract_low_level_call(
             Token::Msg => {
                 address.push_str("msg.sender");
             }
-            Token::Identifier(_id) => address.push_str(&_id),
             _ => {
-                let mut opened_bracket = 0;
+                let _call_position = block
+                    .iter()
+                    .position(|pred| pred == &&Token::Call || pred == &&Token::Delegatecall);
+                call_index = _call_position.unwrap();
+                let _slice = &block[.._call_position.unwrap() - 1];
 
-                for __variant in block {
-                    if let Token::OpenParenthesis = __variant {
-                        opened_bracket += 1;
+                for __variant in _slice {
+                    match __variant {
+                        Token::Identifier(_id) => address.push_str(_id),
+                        Token::Dot => address.push_str(&detokenize(&__variant)),
+                        _ => (),
                     }
-                    if let Token::CloseParenthesis = __variant {
-                        opened_bracket -= 1;
-                        if opened_bracket == 0 {
-                            break;
-                        }
-                    }
-
-                    if opened_bracket > 0 {
-                        if let Token::OpenParenthesis = __variant {
-                            // TODO: NOTHING
-                        } else {
-                            address.push_str(&detokenize(&__variant))
-                        }
+                    if let Token::OpenParenthesis | Token::CloseParenthesis = __variant {
+                        // TODO: NOTHING
+                    } else {
                     }
                 }
             }
         }
-        match &block[_index..][1] {
-            Token::Identifier(_identifier) => {
-                let pos = block.len()
-                    - block
-                        .iter()
-                        .rev()
-                        .position(|pred| pred == &&Token::Dot)
-                        .unwrap()
-                    - 1;
 
-                let _variants = &block[pos..];
-                match _variants[1] {
-                    Token::Identifier(__identifier) => {
-                        if __identifier != "call" && __identifier != "delegatecall" {
-                            print_error("Use \"call\" or \"delegatecall\" for low level calls");
-                        } else {
-                            let mut raw_data: Option<[String; 2]> = None;
-                            let mut _final = 0;
-                            if let Token::OpenBraces = _variants[2] {
-                                if __identifier != "delegatecall" {
-                                    print_error("Cannot set option \"value\" for delegatecall.")
-                                }
-                                let close_brace_index = _variants
-                                    .iter()
-                                    .position(|pred| pred == &&Token::CloseBraces);
-                                if let Some(__index) = close_brace_index {
-                                    _final = __index;
-                                    let _raw_data = &_variants[2 + 1..__index];
-                                    let mut stringified = String::new();
+        let _variants = &block[call_index - 1..];
 
-                                    for __raw in _raw_data {
-                                        match __raw {
-                                            Token::Identifier(___identifier) => {
-                                                stringified.push_str(&___identifier);
-                                            }
-                                            _other => {
-                                                if SYMBOLS.contains(&detokenize(&_other).as_str()) {
-                                                    stringified.push_str(&detokenize(&_other));
-                                                } else {
-                                                    print_error("Expecting identifier")
-                                                }
-                                            }
-                                        }
-                                    }
-                                    let split = stringified.split(":").collect::<Vec<_>>();
-                                    if split.len() != 2 {
-                                        print_error("Unprocessible Entity");
-                                    } else {
-                                        if split[0] != "value" {
-                                            print_error("Expecting \"value\"");
-                                        } else {
-                                            raw_data =
-                                                Some([split[0].to_owned(), split[1].to_owned()]);
-                                        }
-                                    }
-                                } else {
-                                    print_error("Unprocessible entity");
-                                }
-                            }
-
-                            let __args_variants = if _final == 0 {
-                                &_variants[3.._variants.len() - 2]
-                            } else {
-                                &_variants[_final + 2.._variants.len() - 2]
-                            };
-
-                            if __args_variants.is_empty() {
-                                print_error("Expecting args for \"call\"");
-                            }
-
-                            let main_args = if let Token::Quotation = __args_variants[0] {
-                                &__args_variants[1..__args_variants.len() - 1]
-                            } else {
-                                __args_variants
-                            };
-                            let mut __stringified = String::new();
-
-                            for _main_arg in main_args {
-                                __stringified.push_str(&detokenize(&_main_arg));
-                            }
-                            let structured = CallIdentifier {
-                                address,
-                                payable,
-                                arguments: vec![__stringified],
-                                raw_data,
-                                r#type: if __identifier == "delegatecall" {
-                                    CallIdentifierType::Delegatecall
-                                } else {
-                                    CallIdentifierType::Call
-                                },
-                            };
-                            full_block.push(FunctionArm::CallIdentifier(structured));
-                        }
+        match _variants[1] {
+            Token::Call | Token::Delegatecall => {
+                let mut raw_data: Option<[String; 2]> = None;
+                let mut _final = 0;
+                if let Token::OpenBraces = _variants[2] {
+                    if let Token::Delegatecall = _variants[1] {
+                        print_error("Cannot set option \"value\" for delegatecall.")
                     }
-                    _ => print_error("Unprocessible entity"),
+                    let close_brace_index = _variants
+                        .iter()
+                        .position(|pred| pred == &&Token::CloseBraces);
+                    if let Some(__index) = close_brace_index {
+                        _final = __index;
+                        let _raw_data = &_variants[2 + 1..__index];
+                        let mut stringified = String::new();
+
+                        for __raw in _raw_data {
+                            match __raw {
+                                Token::Identifier(___identifier) => {
+                                    stringified.push_str(&___identifier);
+                                }
+                                _other => {
+                                    if SYMBOLS.contains(&detokenize(&_other).as_str()) {
+                                        stringified.push_str(&detokenize(&_other));
+                                    } else {
+                                        print_error("Expecting identifier")
+                                    }
+                                }
+                            }
+                        }
+                        let split = stringified.split(":").collect::<Vec<_>>();
+                        if split.len() != 2 {
+                            print_error("Unprocessible Entity");
+                        } else {
+                            if split[0] != "value" {
+                                print_error("Expecting \"value\"");
+                            } else {
+                                raw_data = Some([split[0].to_owned(), split[1].to_owned()]);
+                            }
+                        }
+                    } else {
+                        print_error("Unprocessible entity");
+                    }
                 }
+
+                let __args_variants = if _final == 0 {
+                    &_variants[3.._variants.len() - 2]
+                } else {
+                    &_variants[_final + 2.._variants.len() - 2]
+                };
+
+                if __args_variants.is_empty() {
+                    print_error("Expecting args for \"call\"");
+                }
+
+                let main_args = if let Token::Quotation = __args_variants[0] {
+                    &__args_variants[1..__args_variants.len() - 1]
+                } else {
+                    __args_variants
+                };
+                let mut __stringified = String::new();
+
+                for _main_arg in main_args {
+                    __stringified.push_str(&detokenize(&_main_arg));
+                }
+                let structured = CallIdentifier {
+                    address,
+                    payable,
+                    arguments: vec![__stringified],
+                    raw_data,
+                    r#type: if let Token::Delegatecall = _variants[1] {
+                        CallIdentifierType::Delegatecall
+                    } else {
+                        CallIdentifierType::Call
+                    },
+                };
+                full_block.push(FunctionArm::CallIdentifier(structured));
             }
             _ => print_error("Unprocessible entity"),
         }
