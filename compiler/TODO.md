@@ -32,6 +32,7 @@ function test() public {
 - [x] distinguish abstract contract from contract
 - [x] parse libraries
 - [x] handle imports
+- [] target this address for `Test(oi).oi()`
 - [] implement libraries elements to contract
 - [] parse conditional arguments
 - [] parse assignment values

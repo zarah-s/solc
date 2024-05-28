@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use crate::mods::{
     functions::helpers::helpers::print_error,
@@ -20,31 +20,58 @@ pub async fn compile_source_code(
     main_contracts: &mut Vec<ContractIdentifier>,
     libraries: &mut Vec<LibraryIdentifier>,
     interfaces: &mut Vec<InterfaceIdentifier>,
-    compiled_files: &mut Vec<String>,
+    import_tree: &mut HashMap<String, Vec<String>>,
+    compiled: &mut [Vec<String>; 4],
 ) -> Result<(), std::io::Error> {
     let file_path = &args[1];
     let root_folder = Path::new(&file_path);
-    if compiled_files.contains(
-        &root_folder
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string(),
-    ) {
-        print_error(&format!(
-            "{:?} has already been imported",
-            root_folder.file_name().unwrap()
-        ))
+    let parent_folder = Path::new(&args[0]);
+
+    {
+        for key in import_tree.keys() {
+            let entries = import_tree.get(key);
+            if let Some(_entries) = entries {
+                let mut current_index = 0;
+                for (index, __entry) in _entries.iter().enumerate() {
+                    if current_index != index {
+                        if *__entry == _entries[current_index] {
+                            print_error("Recursive imports")
+                        }
+                    }
+                }
+                current_index += 1;
+                if current_index != 0 {}
+            }
+        }
     }
-    compiled_files.push(
-        root_folder
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string(),
-    );
+
+    let root = &root_folder
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let parent_root = &parent_folder
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    {
+        let find = import_tree.get(parent_root);
+        let mut data = Vec::new();
+
+        if find.is_some() {
+            for i in find.unwrap() {
+                data.push(i.clone())
+            }
+        }
+        data.push(root.to_string());
+
+        import_tree.insert(parent_root.to_string(), data);
+    }
+
     let mut lines_: Vec<LineDescriptions> = Vec::new();
     let mut stripped_comments = String::new();
     let mut file_contents = String::new();
@@ -115,14 +142,16 @@ pub async fn compile_source_code(
 
     for __import in imports {
         let joined = root_folder.parent().unwrap().join(&__import);
+
         let _ = Box::pin(async {
             let _ = compile_source_code(
-                vec![String::new(), joined.to_str().unwrap().to_string()],
+                vec![root.to_string(), joined.to_str().unwrap().to_string()],
                 abstract_contracts,
                 main_contracts,
                 libraries,
                 interfaces,
-                compiled_files,
+                import_tree,
+                compiled,
             )
             .await;
         })
@@ -130,6 +159,39 @@ pub async fn compile_source_code(
     }
 
     for _joined in joined {
+        {
+            let mut should_compile = true;
+            for __joined in &_joined {
+                if __joined.text.starts_with("contract")
+                    || __joined.text.starts_with("library")
+                    || __joined.text.starts_with("interface")
+                {
+                    let splitted = __joined.text.split(" ").collect::<Vec<_>>();
+                    if __joined.text.starts_with("contract") {
+                        if compiled[0].contains(&splitted[1].to_string()) {
+                            should_compile = false
+                        }
+                    } else if __joined.text.starts_with("interface") {
+                        if compiled[1].contains(&splitted[1].to_string()) {
+                            should_compile = false
+                        }
+                    } else if __joined.text.starts_with("library") {
+                        if compiled[2].contains(&splitted[1].to_string()) {
+                            should_compile = false
+                        }
+                    }
+                } else if __joined.text.starts_with("abstract") {
+                    let splitted = __joined.text.split(" ").collect::<Vec<_>>();
+                    if compiled[3].contains(&splitted[1].to_string()) {
+                        should_compile = false
+                    }
+                }
+            }
+
+            if !should_compile {
+                continue;
+            }
+        }
         let extracted_enums = extract_enum(&_joined);
 
         let structs_tree = extract_struct(&_joined);
@@ -159,8 +221,11 @@ pub async fn compile_source_code(
             &enum_identifiers,
             &mappings,
             interfaces,
+            &mut compiled[1],
         );
+
         for _library in _libraries {
+            compiled[2].push(_library.identifier.to_string());
             libraries.push(_library);
         }
         if !contract_header.identifier.trim().is_empty() {
@@ -175,6 +240,7 @@ pub async fn compile_source_code(
                 structs: structs_tree,
             };
 
+            compiled[3].push(contract_identifier.header.identifier.to_string());
             if let ContractType::Main = contract_identifier.header.r#type {
                 main_contracts.push(contract_identifier)
             } else if let ContractType::Abstract = contract_identifier.header.r#type {

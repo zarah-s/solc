@@ -7,6 +7,7 @@ contract Event {
         // - inputs
         // - conditions before execution
         // - return values from calls to other functions
+        string memory yo = string.concat("Hello", "world");
         require(_i > 10, "Input must be greater than 10");
     }
 

@@ -38,6 +38,7 @@ pub fn extract_functions(
     enums: &Vec<&str>,
     mappings: &Vec<MappingIdentifier>,
     interfaces: &mut Vec<InterfaceIdentifier>,
+    compiled_interfaces: &mut Vec<String>,
 ) -> (
     Vec<FunctionsIdentifier>,
     ContractHeader,
@@ -462,6 +463,11 @@ pub fn extract_functions(
                     &mut interface_inheritance,
                     &mut ContractType::Abstract,
                 );
+                if compiled_interfaces.contains(&interface_name) {
+                    continue;
+                } else {
+                    compiled_interfaces.push(interface_name.to_string())
+                }
                 let function_body_start_index =
                     tokens.iter().position(|pred| pred == &Token::OpenBraces);
                 if let None = function_body_start_index {
