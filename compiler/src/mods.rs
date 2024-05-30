@@ -441,6 +441,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &mut Vec::new(),
+                &mut Vec::new(),
             );
 
             assert_eq!(functions.0.len(), 4)
@@ -457,6 +458,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &mut Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -470,6 +472,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
                 &mut Vec::new(),
             );
         }
@@ -487,6 +490,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &mut Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -500,6 +504,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
                 &mut Vec::new(),
             );
 
@@ -526,6 +531,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &mut Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -539,6 +545,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
                 &mut Vec::new(),
             );
         }
@@ -556,6 +563,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &mut Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -571,6 +579,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
                 &mut Vec::new(),
             );
         }
@@ -588,6 +597,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &mut Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -602,6 +612,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &mut Vec::new(),
+                &mut Vec::new(),
             );
         }
 
@@ -614,6 +625,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
                 &mut Vec::new(),
             );
 
@@ -647,6 +659,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &mut Vec::new(),
+                &mut Vec::new(),
             );
 
             for (i, _fn) in fns.0.iter().enumerate() {
@@ -675,6 +688,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &mut Vec::new(),
+                &mut Vec::new(),
             );
 
             for (i, _fn) in fns.0.iter().enumerate() {
@@ -697,6 +711,7 @@ mod tests {
                 &Vec::new(),
                 &Vec::new(),
                 &Vec::new(),
+                &mut Vec::new(),
                 &mut Vec::new(),
             );
 
@@ -1250,6 +1265,7 @@ mod tests {
             &enum_identifiers,
             &_maps,
             interfaces,
+            &mut Vec::new(),
         );
         fns
     }
