@@ -20,12 +20,13 @@ use crate::mods::{
         ConstructorIdentifier, ConstructorInheritanceInitialization, ContractHeader, ContractType,
         CronIdentifier, CustomErrorIdentifier, Delete, ElIf, EnumIdentifier, EventEmitter,
         EventIdentifier, FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall,
-        FunctionHeader, FunctionIdentifier, FunctionMutability, FunctionsIdentifier,
-        InterfaceIdentifier, InterfaceVariants, LibraryIdentifier, LineDescriptions, Loop,
-        LoopType, MappingAssign, MappingIdentifier, ModifierCall, ModifierIdentifier,
-        OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType, Revert, RevertType,
-        StructIdentifier, TerminationType, Token, TuppleAssignment, VariableAssign,
-        VariableAssignOperation, VariableAssignType, VariableIdentifier, VariableType,
+        FunctionCallType, FunctionHeader, FunctionIdentifier, FunctionMutability,
+        FunctionsIdentifier, InterfaceIdentifier, InterfaceVariants, LibraryIdentifier,
+        LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier, ModifierCall,
+        ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType,
+        Revert, RevertType, StructIdentifier, TerminationType, Token, TuppleAssignment,
+        VariableAssign, VariableAssignOperation, VariableAssignType, VariableIdentifier,
+        VariableType,
     },
 };
 
@@ -1844,70 +1845,7 @@ fn extract_function_block(
                     full_block.push(FunctionArm::VariableIdentifier(variable.unwrap()));
                 } else {
                     if let Token::OpenParenthesis = &block[1] {
-                        let mut args: Vec<String> = Vec::new();
-                        let mut variant = String::new();
-                        let mut has_variant = false;
-                        let mut variant_index = 0;
-                        {
-                            let mut opened_paren_count = 0;
-                            for (index, blk) in block.iter().enumerate() {
-                                if let Token::OpenParenthesis = blk {
-                                    opened_paren_count += 1;
-                                }
-                                if let Token::CloseParenthesis = blk {
-                                    opened_paren_count -= 1;
-                                }
-
-                                if opened_paren_count == 0 {
-                                    if let Token::Dot = blk {
-                                        has_variant = true;
-                                        variant_index = index + 1;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        if has_variant {
-                            if let Token::Identifier(_id) = block[variant_index] {
-                                variant.push_str(_id);
-                            } else {
-                                print_error("Unprocessible variant");
-                            }
-                        }
-
-                        let tkns = if has_variant {
-                            block[variant_index + 2..block.len() - 2]
-                                .split(|pred| pred == &&Token::Coma)
-                                .collect::<Vec<_>>()
-                        } else {
-                            block[2..block.len() - 2]
-                                .split(|pred| pred == &&Token::Coma)
-                                .collect::<Vec<_>>()
-                        };
-
-                        for __token_collection in tkns {
-                            if __token_collection.is_empty() {
-                                continue;
-                            }
-
-                            let mut stringified = String::new();
-                            for __token in __token_collection.iter() {
-                                stringified.push_str(&detokenize(__token));
-                            }
-
-                            if stringified.is_empty() {
-                                continue;
-                            }
-
-                            args.push(stringified);
-                        }
-
-                        full_block.push(FunctionArm::FunctionCall(FunctionCall {
-                            arguments: args,
-                            variant: if has_variant { Some(variant) } else { None },
-                            identifier: _identifier.to_owned(),
-                        }));
+                        extract_function_call(_identifier, &mut full_block, block);
                     } else {
                         let mut local_variables_identifiers: Vec<&String> = Vec::new();
                         for ___local_var in &local_vars {
@@ -1939,14 +1877,18 @@ fn extract_function_block(
                                 .iter()
                                 .find(|pred| pred.name == _identifier.to_string());
                             if let Some(_var) = var {
-                                let function_scope_variable = extract_function_scope_variable(
-                                    Some(_var),
-                                    None,
-                                    block,
-                                    _identifier,
-                                );
-                                if let Some(_) = function_scope_variable {
-                                    full_block.push(function_scope_variable.unwrap())
+                                if _var.type_ == VariableType::Contract {
+                                    extract_function_call(_identifier, &mut full_block, block);
+                                } else {
+                                    let function_scope_variable = extract_function_scope_variable(
+                                        Some(_var),
+                                        None,
+                                        block,
+                                        _identifier,
+                                    );
+                                    if let Some(_) = function_scope_variable {
+                                        full_block.push(function_scope_variable.unwrap())
+                                    }
                                 }
                             } else {
                                 print_error(&format!("Unidentifined variable \"{}\"", _identifier))
@@ -2000,73 +1942,83 @@ fn extract_function_block(
                                     visibility: Token::Private,
                                 };
 
-                                if let Token::Address = var.data_type {
-                                    if block.contains(&&Token::Call)
-                                        || block.contains(&&Token::Delegatecall)
-                                    {
-                                        extract_low_level_call(
-                                            block,
-                                            &mut full_block,
-                                            arg.payable_address,
-                                        );
-                                    } else {
-                                        let function_scope_variable =
-                                            extract_function_scope_variable(
-                                                Some(&var),
-                                                None,
-                                                block,
-                                                _identifier,
-                                            );
-                                        if let Some(_) = function_scope_variable {
-                                            full_block.push(function_scope_variable.unwrap());
-                                        }
-                                    }
-                                } else if let VariableType::Struct = var.type_ {
-                                    if block.contains(&&Token::Call)
-                                        || block.contains(&&Token::Delegatecall)
-                                    {
-                                        extract_low_level_call(
-                                            block,
-                                            &mut full_block,
-                                            arg.payable_address,
-                                        );
-                                    } else {
-                                        let function_scope_variable =
-                                            extract_function_scope_variable(
-                                                Some(&var),
-                                                None,
-                                                block,
-                                                _identifier,
-                                            );
-                                        if let Some(_) = function_scope_variable {
-                                            full_block.push(function_scope_variable.unwrap());
-                                        }
-                                    }
+                                if let VariableType::Contract = var.type_ {
+                                    extract_function_call(_identifier, &mut full_block, block);
                                 } else {
-                                    let function_scope_variable = extract_function_scope_variable(
-                                        Some(&var),
-                                        None,
-                                        block,
-                                        _identifier,
-                                    );
-                                    if let Some(_) = function_scope_variable {
-                                        full_block.push(function_scope_variable.unwrap());
+                                    if let Token::Address = var.data_type {
+                                        if block.contains(&&Token::Call)
+                                            || block.contains(&&Token::Delegatecall)
+                                        {
+                                            extract_low_level_call(
+                                                block,
+                                                &mut full_block,
+                                                arg.payable_address,
+                                            );
+                                        } else {
+                                            let function_scope_variable =
+                                                extract_function_scope_variable(
+                                                    Some(&var),
+                                                    None,
+                                                    block,
+                                                    _identifier,
+                                                );
+                                            if let Some(_) = function_scope_variable {
+                                                full_block.push(function_scope_variable.unwrap());
+                                            }
+                                        }
+                                    } else if let VariableType::Struct = var.type_ {
+                                        if block.contains(&&Token::Call)
+                                            || block.contains(&&Token::Delegatecall)
+                                        {
+                                            extract_low_level_call(
+                                                block,
+                                                &mut full_block,
+                                                arg.payable_address,
+                                            );
+                                        } else {
+                                            let function_scope_variable =
+                                                extract_function_scope_variable(
+                                                    Some(&var),
+                                                    None,
+                                                    block,
+                                                    _identifier,
+                                                );
+                                            if let Some(_) = function_scope_variable {
+                                                full_block.push(function_scope_variable.unwrap());
+                                            }
+                                        }
+                                    } else {
+                                        let function_scope_variable =
+                                            extract_function_scope_variable(
+                                                Some(&var),
+                                                None,
+                                                block,
+                                                _identifier,
+                                            );
+                                        if let Some(_) = function_scope_variable {
+                                            full_block.push(function_scope_variable.unwrap());
+                                        }
                                     }
                                 }
                             } else if global_variables_identifiers.contains(&_identifier) {
-                                let var = global_variables
-                                    .iter()
-                                    .find(|pred| pred.name == _identifier.to_string());
-
+                                let var =
+                                    global_variables.iter().find(|pred: &&VariableIdentifier| {
+                                        pred.name == _identifier.to_string()
+                                    });
                                 if let Some(_var) = var {
-                                    let function_scope_variable = extract_function_scope_variable(
-                                        Some(_var),
-                                        None,
-                                        block,
-                                        _identifier,
-                                    );
-                                    if let Some(_) = function_scope_variable {
-                                        full_block.push(function_scope_variable.unwrap());
+                                    if let VariableType::Contract = _var.type_ {
+                                        extract_function_call(_identifier, &mut full_block, block);
+                                    } else {
+                                        let function_scope_variable =
+                                            extract_function_scope_variable(
+                                                Some(_var),
+                                                None,
+                                                block,
+                                                _identifier,
+                                            );
+                                        if let Some(_) = function_scope_variable {
+                                            full_block.push(function_scope_variable.unwrap());
+                                        }
                                     }
                                 } else {
                                     print_error(&format!(
@@ -2109,7 +2061,15 @@ fn extract_function_block(
                                     print_error("Expecting \";\" for break");
                                 }
                             } else {
-                                print_error(&format!("Unidentifined variable \"{}\"", _identifier))
+                                let variable =
+                                    extract_function_variable(&block, custom_data_types, enums);
+                                if let None = variable {
+                                    print_error("OOPS!!!");
+                                }
+
+                                full_block.push(FunctionArm::VariableIdentifier(variable.unwrap()));
+                                // println!("{:?}", block);
+                                // print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                             }
                         }
                     }
@@ -2908,6 +2868,105 @@ fn extract_function_block(
         }
     }
     full_block
+}
+
+fn extract_function_call(
+    _identifier: &String,
+    full_block: &mut Vec<FunctionArm>,
+    block: &Vec<&Token>,
+) {
+    let mut args: Vec<String> = Vec::new();
+    let mut variant = String::new();
+    let mut has_variant = false;
+    let mut variant_index = 0;
+    let mut contract_address: Option<String> = None;
+
+    {
+        let mut opened_paren_count = 0;
+        for (index, blk) in block.iter().enumerate() {
+            if let Token::OpenParenthesis = blk {
+                opened_paren_count += 1;
+            }
+            if let Token::CloseParenthesis = blk {
+                opened_paren_count -= 1;
+                // println!("{:?} ===>>> {:?}", index, blk);
+            }
+
+            if opened_paren_count == 0 {
+                if let Token::Dot = blk {
+                    has_variant = true;
+                    variant_index = index + 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    if has_variant {
+        {
+            if let Token::Dot = block[2] {
+                let close_paren_index = &block
+                    .iter()
+                    .position(|pred| pred == &&Token::CloseParenthesis);
+                if let Some(_close_paren_index) = close_paren_index {
+                    let address_slice = &block[2..*_close_paren_index];
+
+                    let mut stringified_address = String::new();
+                    for __address_slice in address_slice {
+                        stringified_address.push_str(&detokenize(&__address_slice));
+                    }
+
+                    contract_address = Some(stringified_address);
+                }
+            } else {
+                contract_address = Some(_identifier.to_string());
+            }
+        }
+
+        if let Token::Identifier(_id) = block[variant_index] {
+            variant.push_str(_id);
+        } else {
+            print_error("Unprocessible variant");
+        }
+    }
+
+    let tkns = if has_variant {
+        block[variant_index + 2..block.len() - 2]
+            .split(|pred| pred == &&Token::Coma)
+            .collect::<Vec<_>>()
+    } else {
+        block[2..block.len() - 2]
+            .split(|pred| pred == &&Token::Coma)
+            .collect::<Vec<_>>()
+    };
+
+    for __token_collection in tkns {
+        if __token_collection.is_empty() {
+            continue;
+        }
+
+        let mut stringified = String::new();
+        for __token in __token_collection.iter() {
+            stringified.push_str(&detokenize(__token));
+        }
+
+        if stringified.is_empty() {
+            continue;
+        }
+
+        args.push(stringified);
+    }
+
+    full_block.push(FunctionArm::FunctionCall(FunctionCall {
+        arguments: args,
+        variant: if has_variant { Some(variant) } else { None },
+        identifier: _identifier.to_owned(),
+        r#type: if contract_address.is_none() {
+            FunctionCallType::Local
+        } else {
+            FunctionCallType::Contract(contract_address.unwrap())
+        },
+    }));
 }
 
 fn extract_low_level_call(

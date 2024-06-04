@@ -12,8 +12,8 @@ pub fn strip_comments(lines_: &Vec<LineDescriptions>, _stripped_comments: &mut S
 
     /* STRIP INLINE COMMENTS */
     for stripped_comment in stripped_comments.iter() {
-        let comment_index = stripped_comment.text.find("//");
-        let doc_str_index = stripped_comment.text.find("/*");
+        let comment_index: Option<usize> = stripped_comment.text.find("//");
+        let doc_str_index: Option<usize> = stripped_comment.text.find("/*");
         if let Some(index_value) = comment_index {
             stripped_inline_comments.push(LineDescriptions {
                 text: stripped_comment.text[..index_value].trim().to_string(),
@@ -44,7 +44,7 @@ pub fn strip_comments(lines_: &Vec<LineDescriptions>, _stripped_comments: &mut S
     /* JOIN STRIPPED INLINE COMMENTS */
     let joined_stripped_vec: Vec<String> = stripped_inline_comments
         .iter()
-        .map(|f| f.to_owned().to_string())
+        .map(|f: &LineDescriptions| f.to_owned().to_string())
         .collect();
 
     for sst in &joined_stripped_vec {
@@ -55,8 +55,8 @@ pub fn strip_comments(lines_: &Vec<LineDescriptions>, _stripped_comments: &mut S
     while _stripped_comments.contains(&"/*".to_string())
         || _stripped_comments.contains(&"*/".to_string())
     {
-        let str_start_index = _stripped_comments.find("/*");
-        let str_end_index = _stripped_comments.find("*/");
+        let str_start_index: Option<usize> = _stripped_comments.find("/*");
+        let str_end_index: Option<usize> = _stripped_comments.find("*/");
 
         if let Some(index_) = str_start_index {
             if let Some(_index) = str_end_index {

@@ -434,10 +434,17 @@ pub struct Return {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum FunctionCallType {
+    Contract(String),
+    Local,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct FunctionCall {
     pub identifier: String,
     pub variant: Option<String>,
     pub arguments: Vec<String>,
+    pub r#type: FunctionCallType,
 }
 
 #[derive(Debug, PartialEq)]
