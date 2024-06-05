@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "./test/files/vars/Error.sol";
-import "./IT.sol";
+// import "./test/files/vars/Error.sol";
+// import "./IT.sol";
 
 // import "./Contract.sol";
 
@@ -12,49 +12,49 @@ contract Test {
     function oi() external {}
 }
 
-// interface IT {
-//     error ANOTHER_CUSTOM_ERROR(address, string);
-//     event Transfered(
-//         address indexed sender,
-//         address receiver,
-//         uint indexed amount
-//     );
-// }
+interface IT {
+    error ANOTHER_CUSTOM_ERROR(address, string);
+    event Transfered(
+        address indexed sender,
+        address receiver,
+        uint indexed amount
+    );
+}
 
-// library Lib {
-//     modifier onlyOwner(address owner) {
-//         require(msg.sender == owner, "Not owner");
-//         // Underscore is a special character only used inside
-//         // a function modifier and it tells Solidity to
-//         // execute the rest of the code.
-//         _;
-//     }
+library Lib {
+    modifier onlyOwner(address owner) {
+        require(msg.sender == owner, "Not owner");
+        // Underscore is a special character only used inside
+        // a function modifier and it tells Solidity to
+        // execute the rest of the code.
+        _;
+    }
 
-//     function test(address payable _user) public {
-//         // val = 123;
-//         bytes memory b = "";
-//         address(_user).call{value: 1}(b);
-//     }
+    function test(address payable _user) public {
+        // val = 123;
+        bytes memory b = "";
+        address(_user).call{value: 1}(b);
+    }
 
-//     enum Status {
-//         Success,
-//         Fail
-//     }
+    enum Status {
+        Success,
+        Fail
+    }
 
-//     error ANOTHER_CUSTOM_ERROR(address, string);
-//     uint constant vard = 1;
+    error ANOTHER_CUSTOM_ERROR(address, string);
+    uint constant vard = 1;
 
-//     // bytes[] constant bb = [""];
-//     // LibStr constant str = LibStr({name: "adsfs"});
-//     event Transfered(
-//         address indexed sender,
-//         address receiver,
-//         uint indexed amount
-//     );
-//     struct LibStr {
-//         address name;
-//     }
-// }
+    // bytes[] constant bb = [""];
+    // LibStr constant str = LibStr({name: "adsfs"});
+    event Transfered(
+        address indexed sender,
+        address receiver,
+        uint indexed amount
+    );
+    struct LibStr {
+        address name;
+    }
+}
 
 contract FunctionModifier {
     // We will use these variables to demonstrate how to use
@@ -93,12 +93,16 @@ contract FunctionModifier {
     function changeOwner(
         address _newOwner,
         Str memory test,
-        address oi
+        address oi,
+        // Test oi_contract
     ) public onlyOwner validAddress(address(0)) {
+        Test test_contract = new Test();
         test.name = msg.sender;
         test.name.call(test.callback);
         oi = msg.sender;
-        // Test(oi).oi();
+        // oi_contract.oi();
+        test_contract.oi();
+        Test(oi).oi();
         _newOwner = address(0);
         owner = _newOwner;
     }
