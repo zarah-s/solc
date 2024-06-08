@@ -101,9 +101,11 @@ contract FunctionModifier {
         bytes callback;
     }
 
+    function oii() public view returns (Lib.Str[(300 / 2) * 5] memory) {}
+
     function changeOwner(
         address _newOwner,
-        Lib.Status memory test,
+        Lib.Status[(300 / 2) * 5] memory test,
         address oi
     )
         public

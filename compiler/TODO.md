@@ -37,7 +37,7 @@ function test() public {
 - - [x] state variable identifier
 - - [x] local variable
 - - [x] argument type
-- - [] return type
+- - [x] return type
 - - [] event
 - - [] custom errors
 - [] parse conditional arguments
