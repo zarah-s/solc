@@ -40,6 +40,7 @@ pub fn extract_functions(
     mappings: &Vec<MappingIdentifier>,
     interfaces: &mut Vec<InterfaceIdentifier>,
     compiled_interfaces: &mut Vec<String>,
+    libraries_: &Vec<LibraryIdentifier>,
 ) -> (
     Vec<FunctionsIdentifier>,
     ContractHeader,
@@ -195,6 +196,7 @@ pub fn extract_functions(
                 mappings,
                 &tokens,
                 &mut function_identifiers,
+                libraries_,
             ),
 
             Token::Library => {
@@ -337,6 +339,7 @@ pub fn extract_functions(
                                 &library_variables,
                                 &Vec::new(),
                                 &mut library_functions,
+                                libraries_,
                             );
                         }
                         Token::Event => {
@@ -400,6 +403,7 @@ pub fn extract_functions(
                                 &Vec::new(),
                                 &arm,
                                 &mut library_functions,
+                                libraries_,
                             );
                         }
                         _other => {
@@ -417,6 +421,7 @@ pub fn extract_functions(
                                     &Vec::new(),
                                     false,
                                     None,
+                                    libraries_,
                                 );
 
                                 if var.0.is_none() {
@@ -642,6 +647,7 @@ pub fn extract_functions(
                     &Vec::new(),
                     &Vec::new(),
                     Vec::new(),
+                    libraries_,
                 );
 
                 for unprocessed in unprocessed_function_headers {
@@ -677,6 +683,7 @@ pub fn extract_functions(
                 global_variables,
                 mappings,
                 &mut function_identifiers,
+                libraries_,
             ),
             Token::Constructor => {
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
@@ -780,6 +787,7 @@ pub fn extract_functions(
                     enums,
                     Vec::new(),
                     mappings,
+                    libraries_,
                 );
 
                 let structured = ConstructorIdentifier {
@@ -821,6 +829,7 @@ pub fn extract_functions(
                     enums,
                     Vec::new(),
                     mappings,
+                    libraries_,
                 );
 
                 let structured = ReceiveIdentifier { arms };
@@ -861,6 +870,7 @@ pub fn extract_functions(
                     enums,
                     Vec::new(),
                     mappings,
+                    libraries_,
                 );
 
                 let structured = FallbackIdentifier { payable, arms };
@@ -948,6 +958,7 @@ pub fn extract_functions(
                     enums,
                     Vec::new(),
                     mappings,
+                    libraries_,
                 );
 
                 let structured = CronIdentifier {
@@ -986,6 +997,7 @@ fn process_modifier(
     global_variables: &Vec<VariableIdentifier>,
     mappings: &Vec<MappingIdentifier>,
     function_identifiers: &mut Vec<FunctionsIdentifier>,
+    libraries_: &Vec<LibraryIdentifier>,
 ) {
     let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
     let mut arguments: Vec<Argument> = Vec::new();
@@ -1019,6 +1031,7 @@ fn process_modifier(
         enums,
         Vec::new(),
         mappings,
+        libraries_,
     );
 
     let structured = ModifierIdentifier {
@@ -1138,6 +1151,7 @@ fn extract_full_function(
     mappings: &Vec<MappingIdentifier>,
     tokens: &Vec<Token>,
     function_identifiers: &mut Vec<FunctionsIdentifier>,
+    libraries_: &Vec<LibraryIdentifier>,
 ) {
     if let Token::OpenParenthesis = &tokens[2] {
     } else {
@@ -1170,6 +1184,7 @@ fn extract_full_function(
         enums,
         Vec::new(),
         mappings,
+        libraries_,
     );
 
     let structure: FunctionIdentifier = FunctionIdentifier {
@@ -1190,6 +1205,19 @@ fn extract_function_header(
             let validated = validate_identifier_regex(_val, 0);
             if validated {
                 _val
+            } else {
+                process::exit(1)
+            }
+        }
+        Token::Call | Token::Delegatecall => {
+            let validated = validate_identifier_regex(&detokenize(&name), 0);
+            if validated {
+                if *name == Token::Call {
+                    "call"
+                } else {
+                    "delegatecall"
+                }
+                // detokenize(&name).to_owned().as_str()
             } else {
                 process::exit(1)
             }
@@ -1691,6 +1719,7 @@ fn extract_function_arms(
     enums: &Vec<&str>,
     local_vars: Vec<&VariableIdentifier>,
     mappings: &Vec<MappingIdentifier>,
+    libraries_: &Vec<LibraryIdentifier>,
 ) -> Vec<FunctionArm> {
     let mut arms: Vec<Vec<&Token>> = Vec::new();
     let mut combined: Vec<&Token> = Vec::new();
@@ -1816,6 +1845,7 @@ fn extract_function_arms(
         global_variables,
         local_vars,
         mappings,
+        libraries_,
     )
 }
 fn extract_function_block(
@@ -1826,6 +1856,7 @@ fn extract_function_block(
     global_variables: &Vec<VariableIdentifier>,
     local_vars: Vec<&VariableIdentifier>,
     mappings: &Vec<MappingIdentifier>,
+    libraries_: &Vec<LibraryIdentifier>,
 ) -> Vec<FunctionArm> {
     let mut full_block: Vec<FunctionArm> = Vec::new();
     for block in arms {
@@ -1837,7 +1868,8 @@ fn extract_function_block(
                     _ => print_error("Missing ;"),
                 }
                 if custom_data_types.contains(&_identifier.as_str()) {
-                    let variable = extract_function_variable(&block, custom_data_types, enums);
+                    let variable =
+                        extract_function_variable(&block, custom_data_types, enums, libraries_);
                     if let None = variable {
                         print_error("OOPS!!!");
                     }
@@ -2061,14 +2093,17 @@ fn extract_function_block(
                                     print_error("Expecting \";\" for break");
                                 }
                             } else {
-                                let variable =
-                                    extract_function_variable(&block, custom_data_types, enums);
+                                let variable = extract_function_variable(
+                                    &block,
+                                    custom_data_types,
+                                    enums,
+                                    libraries_,
+                                );
                                 if let None = variable {
                                     print_error("OOPS!!!");
                                 }
 
                                 full_block.push(FunctionArm::VariableIdentifier(variable.unwrap()));
-                                // println!("{:?}", block);
                                 // print_error(&format!("Unidentifined variable \"{}\"", _identifier))
                             }
                         }
@@ -2143,6 +2178,7 @@ fn extract_function_block(
                         enums,
                         _local_vars,
                         mappings,
+                        libraries_,
                     );
 
                     let structured = FunctionArm::Loop(Loop {
@@ -2265,6 +2301,7 @@ fn extract_function_block(
                                     enums,
                                     _local_vars,
                                     mappings,
+                                    libraries_,
                                 );
                                 tree.arm = __arm;
 
@@ -2289,6 +2326,7 @@ fn extract_function_block(
                                     enums,
                                     _local_vars,
                                     mappings,
+                                    libraries_,
                                 );
 
                                 let last_len = tree.elif.len();
@@ -2320,6 +2358,7 @@ fn extract_function_block(
                                     enums,
                                     _local_vars,
                                     mappings,
+                                    libraries_,
                                 );
                                 tree.el = Some(__arm);
                                 batched.clear();
@@ -2670,6 +2709,7 @@ fn extract_function_block(
                         enums,
                         _local_vars,
                         mappings,
+                        libraries_,
                     );
 
                     let structured = FunctionArm::Loop(Loop {
@@ -2781,7 +2821,8 @@ fn extract_function_block(
                         };
                         extract_low_level_call(block, &mut full_block, is_payable)
                     } else {
-                        let variable = extract_function_variable(&block, custom_data_types, enums);
+                        let variable =
+                            extract_function_variable(&block, custom_data_types, enums, libraries_);
                         if let None = variable {
                             print_error("OOPS!!!");
                         }
@@ -2843,6 +2884,7 @@ fn extract_function_block(
                             custom_data_types,
                             enums,
                             positions,
+                            libraries_,
                         );
 
                         full_block.push(FunctionArm::TuppleAssignment(TuppleAssignment {
@@ -2889,7 +2931,6 @@ fn extract_function_call(
             }
             if let Token::CloseParenthesis = blk {
                 opened_paren_count -= 1;
-                // println!("{:?} ===>>> {:?}", index, blk);
             }
 
             if opened_paren_count == 0 {
@@ -3099,6 +3140,7 @@ fn extract_function_variable(
     block: &Vec<&Token>,
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
+    libraries_: &Vec<LibraryIdentifier>,
 ) -> Option<VariableIdentifier> {
     let mut text = String::new();
     for strr in block {
@@ -3111,6 +3153,7 @@ fn extract_function_variable(
         enums,
         true,
         None,
+        libraries_,
     );
     variable.0
 }
