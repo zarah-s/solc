@@ -220,32 +220,52 @@ mod tests {
         #[tokio::test]
         async fn test_variable_count() {
             let contents = get_file_contents("test/files/vars/Var.sol").await;
-            let (_vars, _, _, _) =
-                extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            let (_vars, _, _, _) = extract_global_elements(
+                &contents,
+                &Vec::new(),
+                &Vec::new(),
+                Vec::new(),
+                &Vec::new(),
+            );
             assert_eq!(_vars.len(), 2);
         }
 
         #[tokio::test]
         async fn test_custom_error_count() {
             let contents = get_file_contents("test/files/vars/Error.sol").await;
-            let (_, _errs, _, _) =
-                extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            let (_, _errs, _, _) = extract_global_elements(
+                &contents,
+                &Vec::new(),
+                &Vec::new(),
+                Vec::new(),
+                &Vec::new(),
+            );
             assert_eq!(_errs.len(), 1);
         }
 
         #[tokio::test]
         async fn test_event_count() {
             let contents = get_file_contents("test/files/vars/Event.sol").await;
-            let (_, _, _, _events) =
-                extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            let (_, _, _, _events) = extract_global_elements(
+                &contents,
+                &Vec::new(),
+                &Vec::new(),
+                Vec::new(),
+                &Vec::new(),
+            );
             assert_eq!(_events.len(), 1);
         }
 
         #[tokio::test]
         async fn test_custom_error_intergrity() {
             let contents = get_file_contents("test/files/vars/Error.sol").await;
-            let (_, _errs, _, _) =
-                extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            let (_, _errs, _, _) = extract_global_elements(
+                &contents,
+                &Vec::new(),
+                &Vec::new(),
+                Vec::new(),
+                &Vec::new(),
+            );
             assert_eq!(_errs[0].identifier, "InsufficientBalance");
             assert_eq!(_errs[0].args.as_ref().unwrap().len(), 2);
             assert_eq!(_errs[0].args.as_ref().unwrap()[0], "uint256");
@@ -254,16 +274,26 @@ mod tests {
         #[tokio::test]
         async fn test_event_intergrity() {
             let contents = get_file_contents("test/files/vars/Event.sol").await;
-            let (_, _, _, _events) =
-                extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            let (_, _, _, _events) = extract_global_elements(
+                &contents,
+                &Vec::new(),
+                &Vec::new(),
+                Vec::new(),
+                &Vec::new(),
+            );
             assert_eq!(_events[0].identifier, "BuyShares");
         }
 
         #[tokio::test]
         async fn test_mapping_count() {
             let contents = get_file_contents("test/files/vars/Map.sol").await;
-            let (_, _, _maps, _) =
-                extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            let (_, _, _maps, _) = extract_global_elements(
+                &contents,
+                &Vec::new(),
+                &Vec::new(),
+                Vec::new(),
+                &Vec::new(),
+            );
             assert_eq!(_maps.len(), 2);
         }
 
@@ -271,28 +301,28 @@ mod tests {
         #[should_panic(expected = "ERROR: Unprocessible entity on mapping")]
         async fn test_mapping_identifier() {
             let contents = get_file_contents("test/files/vars/Map1.sol").await;
-            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         #[should_panic(expected = "ERROR: Mapping can not be set to external")]
         async fn test_mapping_external_visibility() {
             let contents = get_file_contents("test/files/vars/Map2.sol").await;
-            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         #[should_panic(expected = "ERROR: Unprocessible entity on mapping")]
         async fn test_mapping_closing_parenthesis() {
             let contents = get_file_contents("test/files/vars/Map3.sol").await;
-            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         #[should_panic(expected = "ERROR: Invalid data type \"addresss\"")]
         async fn test_mapping_data_type() {
             let contents = get_file_contents("test/files/vars/Map4.sol").await;
-            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
@@ -325,8 +355,13 @@ mod tests {
                     },
                 },
             ];
-            let (_, _, _maps, _) =
-                extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            let (_, _, _maps, _) = extract_global_elements(
+                &contents,
+                &Vec::new(),
+                &Vec::new(),
+                Vec::new(),
+                &Vec::new(),
+            );
 
             for (i, _map) in _maps.iter().enumerate() {
                 let val = &expected[i];
@@ -338,14 +373,19 @@ mod tests {
         #[should_panic(expected = "ERROR: Missing \"]\" on line 8")]
         async fn test_variable_missing_close_bracket_for_arr_vars() {
             let contents = get_file_contents("test/files/vars/Var3.sol").await;
-            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         async fn test_variable_dynamic_arr() {
             let contents = get_file_contents("test/files/vars/Var6.sol").await;
-            let (_vars, _, _, _) =
-                extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            let (_vars, _, _, _) = extract_global_elements(
+                &contents,
+                &Vec::new(),
+                &Vec::new(),
+                Vec::new(),
+                &Vec::new(),
+            );
             assert_eq!(_vars[0].is_array, true);
             assert_eq!(_vars[0].size, None);
         }
@@ -353,8 +393,13 @@ mod tests {
         #[tokio::test]
         async fn test_variable_fixed_arr() {
             let contents = get_file_contents("test/files/vars/Var6.sol").await;
-            let (_vars, _, _, _) =
-                extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            let (_vars, _, _, _) = extract_global_elements(
+                &contents,
+                &Vec::new(),
+                &Vec::new(),
+                Vec::new(),
+                &Vec::new(),
+            );
             assert_eq!(_vars[1].is_array, true);
             assert_eq!(_vars[1].size, Some("10*10".to_string()));
         }
@@ -363,21 +408,26 @@ mod tests {
         #[should_panic(expected = "ERROR: Missing \"]\" on line 8")]
         async fn test_invalid_syntax_close_bracket_for_arr_vars() {
             let contents = get_file_contents("test/files/vars/Var4.sol").await;
-            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         #[should_panic(expected = "Unprocessible entity bool = false")]
         async fn test_var_identifier() {
             let contents = get_file_contents("test/files/vars/Var5.sol").await;
-            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new(), &Vec::new());
         }
 
         #[tokio::test]
         async fn test_variable_integrity() {
             let contents = get_file_contents("test/files/vars/Var.sol").await;
-            let (vars, _, _, _) =
-                extract_global_elements(&contents, &Vec::new(), &Vec::new(), Vec::new());
+            let (vars, _, _, _) = extract_global_elements(
+                &contents,
+                &Vec::new(),
+                &Vec::new(),
+                Vec::new(),
+                &Vec::new(),
+            );
             let expected_vars = vec![
                 VariableIdentifier {
                     index: None,
@@ -442,6 +492,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
 
             assert_eq!(functions.0.len(), 4)
@@ -459,6 +510,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
         }
 
@@ -474,6 +526,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
         }
 
@@ -491,6 +544,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
         }
 
@@ -506,6 +560,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
 
             for (i, _fn) in fns.0.iter().enumerate() {
@@ -532,6 +587,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
         }
 
@@ -547,6 +603,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
         }
 
@@ -564,6 +621,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
         }
 
@@ -581,6 +639,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
         }
 
@@ -598,6 +657,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
         }
 
@@ -613,6 +673,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
         }
 
@@ -627,6 +688,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
 
             match &functions.0[0] {
@@ -660,6 +722,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
 
             for (i, _fn) in fns.0.iter().enumerate() {
@@ -689,6 +752,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
 
             for (i, _fn) in fns.0.iter().enumerate() {
@@ -713,6 +777,7 @@ mod tests {
                 &Vec::new(),
                 &mut Vec::new(),
                 &mut Vec::new(),
+                &Vec::new(),
             );
 
             match &fns.0[0] {
@@ -1257,6 +1322,7 @@ mod tests {
             &custom_data_types_identifiers,
             &enum_identifiers,
             Vec::new(),
+            &Vec::new(),
         );
         let fns = extract_functions(
             &contents,
@@ -1266,6 +1332,7 @@ mod tests {
             &_maps,
             interfaces,
             &mut Vec::new(),
+            &Vec::new(),
         );
         fns
     }

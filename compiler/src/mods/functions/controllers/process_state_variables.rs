@@ -2,8 +2,8 @@ use crate::mods::{
     constants::constants::{DATA_TYPES, SYMBOLS},
     functions::helpers::helpers::{detokenize, print_error, validate_variable},
     types::types::{
-        CustomErrorIdentifier, EventIdentifier, EventIdentifierVariants, LineDescriptions,
-        MappingIdentifier, OpenedBraceType, Token, VariableIdentifier,
+        CustomErrorIdentifier, EventIdentifier, EventIdentifierVariants, LibraryIdentifier,
+        LineDescriptions, MappingIdentifier, OpenedBraceType, Token, VariableIdentifier,
     },
 };
 
@@ -12,6 +12,7 @@ pub fn extract_global_elements(
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
     variable_positions: Vec<Option<u8>>,
+    libraries: &Vec<LibraryIdentifier>,
 ) -> (
     Vec<VariableIdentifier>,
     Vec<CustomErrorIdentifier>,
@@ -122,7 +123,8 @@ pub fn extract_global_elements(
         );
 
         if variable_positions.is_empty() {
-            validated = validate_variable(variable, custom_data_types, enums, false, None);
+            validated =
+                validate_variable(variable, custom_data_types, enums, false, None, libraries);
         } else {
             for (__index, __position) in variable_positions[skip..].iter().enumerate() {
                 if __position.is_some() {
@@ -137,6 +139,7 @@ pub fn extract_global_elements(
                 enums,
                 false,
                 variable_positions[skip - 1],
+                libraries,
             );
         };
         if let Some(_raw) = validated.0 {

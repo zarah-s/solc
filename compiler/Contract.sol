@@ -1,25 +1,27 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+// // SPDX-License-Identifier: MIT
+// pragma solidity ^0.8.24;
 
-// import "./test/files/vars/Error.sol";
+// // import "./test/files/vars/Error.sol";
 // import "./IT.sol";
 
-// import "./Contract.sol";
+// // import "./Contract.sol";
 
-// import "./test/files/vars/Event.sol";
+// // import "./test/files/vars/Event.sol";
 
 contract Test {
+    mapping(address => Lib.Str) name;
+
     function oi() external {}
 }
 
-interface IT {
-    error ANOTHER_CUSTOM_ERROR(address, string);
-    event Transfered(
-        address indexed sender,
-        address receiver,
-        uint indexed amount
-    );
-}
+// interface IT {
+//     error ANOTHER_CUSTOM_ERROR(address, string);
+//     event Transfered(
+//         address indexed sender,
+//         address receiver,
+//         uint indexed amount
+//     );
+// }
 
 library Lib {
     modifier onlyOwner(address owner) {
@@ -28,6 +30,11 @@ library Lib {
         // a function modifier and it tells Solidity to
         // execute the rest of the code.
         _;
+    }
+
+    struct Str {
+        address name;
+        bytes callback;
     }
 
     function test(address payable _user) public {
@@ -63,6 +70,10 @@ contract FunctionModifier {
     uint256 public x = 10;
     bool public locked;
 
+    Lib.Str _sstr;
+
+    Lib.Status stats;
+
     constructor() {
         // Set the transaction sender as the owner of the contract.
         owner = msg.sender;
@@ -93,9 +104,13 @@ contract FunctionModifier {
     function changeOwner(
         address _newOwner,
         Str memory test,
-        address oi,
+        address oi
+    )
+        public
         // Test oi_contract
-    ) public onlyOwner validAddress(address(0)) {
+        onlyOwner
+        validAddress(address(0))
+    {
         Test test_contract = new Test();
         test.name = msg.sender;
         test.name.call(test.callback);

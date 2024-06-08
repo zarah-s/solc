@@ -1,6 +1,10 @@
 use crate::{
-    mods::types::types::{
-        Mapping, MappingIdentifier, MappingValue, OpenedBraceType, VariableIdentifier, VariableType,
+    mods::{
+        constants::constants::DATA_TYPES,
+        types::types::{
+            LibraryIdentifier, Mapping, MappingIdentifier, MappingValue, OpenedBraceType,
+            VariableIdentifier, VariableType,
+        },
     },
     LineDescriptions, Token,
 };
@@ -515,6 +519,7 @@ pub fn validate_variable(
     enums: &Vec<&str>,
     is_function_variable: bool,
     variable_position: Option<u8>,
+    libraries: &Vec<LibraryIdentifier>,
 ) -> (
     Option<VariableIdentifier>,
     Option<String>,
@@ -636,8 +641,52 @@ pub fn validate_variable(
             }
 
             if let None = data_type {
-                data_type = Some(tokens[0].clone());
-                type_ = VariableType::Contract;
+                if tokens[1] == Token::Dot {
+                    let find_library = libraries
+                        .iter()
+                        .find(|pred| &pred.identifier == _identifier);
+
+                    if let Some(_library) = find_library {
+                        if _library
+                            .structs
+                            .iter()
+                            .map(|pred| &pred.identifier)
+                            .collect::<Vec<_>>()
+                            .contains(&&detokenize(&tokens[2]))
+                        {
+                            if is_function_variable {
+                                is_primitive = false;
+                            }
+
+                            type_ = VariableType::Struct;
+                        } else if _library
+                            .enums
+                            .iter()
+                            .map(|pred| &pred.identifier)
+                            .collect::<Vec<_>>()
+                            .contains(&&detokenize(&tokens[2]))
+                        {
+                            type_ = VariableType::Enum;
+                        } else {
+                            print_error(&format!(
+                                "Undefined {} in {}",
+                                detokenize(&tokens[2]),
+                                _identifier
+                            ))
+                        }
+                        data_type = Some(Token::Identifier(format!(
+                            "{}{}{}",
+                            detokenize(&tokens[0]),
+                            detokenize(&tokens[1]),
+                            detokenize(&tokens[2])
+                        )));
+                    } else {
+                        print_error(&format!("Can't find library {}", _identifier))
+                    }
+                } else {
+                    data_type = Some(tokens[0].clone());
+                    type_ = VariableType::Contract;
+                }
             }
         } else {
             if let Token::Error = &tokens[0] {
@@ -769,6 +818,57 @@ pub fn validate_variable(
         }
         if is_event {
             return (None, None, None, Some(text.text));
+        }
+
+        {
+            let mut lib_custom_types: Vec<&String> = Vec::new();
+            let mut _lib_custom_type: Option<String> = None;
+            if detokenize(&data_type.clone().unwrap()).contains(".") {
+                let __custom_type =
+                    LineDescriptions::to_token(&detokenize(&data_type.clone().unwrap()));
+                _lib_custom_type = Some(detokenize(&__custom_type[2]));
+                let __library = libraries
+                    .iter()
+                    .find(|pred| pred.identifier == detokenize(&__custom_type[0]))
+                    .unwrap();
+
+                let ___lib_custom_types = vec![
+                    __library
+                        .enums
+                        .iter()
+                        .map(|pred| &pred.identifier)
+                        .collect::<Vec<_>>(),
+                    __library
+                        .structs
+                        .iter()
+                        .map(|pred| &pred.identifier)
+                        .collect::<Vec<_>>(),
+                ]
+                .concat();
+
+                for __type in ___lib_custom_types {
+                    lib_custom_types.push(__type)
+                }
+            }
+
+            if type_ != VariableType::Contract
+                && !DATA_TYPES.contains(&detokenize(&data_type.clone().unwrap()).as_str())
+                && !custom_data_types.contains(&detokenize(&data_type.clone().unwrap()).as_str())
+            {
+                if _lib_custom_type.is_some() {
+                    if !lib_custom_types.contains(&&_lib_custom_type.unwrap()) {
+                        print_error(&format!(
+                            "Unprocessible data type {:?}",
+                            detokenize(&data_type.clone().unwrap())
+                        ))
+                    }
+                } else {
+                    print_error(&format!(
+                        "Unprocessible data type {:?}",
+                        detokenize(&data_type.clone().unwrap())
+                    ))
+                }
+            }
         }
         let structured = VariableIdentifier {
             data_type: data_type.unwrap(),

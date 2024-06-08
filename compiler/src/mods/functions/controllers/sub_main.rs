@@ -213,6 +213,7 @@ pub async fn compile_source_code(
             &custom_data_types_identifiers,
             &enum_identifiers,
             Vec::new(),
+            &libraries,
         );
         let (functions, contract_header, _libraries) = extract_functions(
             &_joined,
@@ -222,6 +223,7 @@ pub async fn compile_source_code(
             &mappings,
             interfaces,
             &mut compiled[1],
+            &libraries,
         );
 
         for _library in _libraries {
