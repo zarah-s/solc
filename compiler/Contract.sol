@@ -113,6 +113,7 @@ contract FunctionModifier {
         onlyOwner
         validAddress(address(0))
     {
+        revert Lib.ANOTHER_CUSTOM_ERROR();
         Lib.Status stats;
         Test test_contract = new Test();
         test.name = msg.sender;
@@ -154,6 +155,6 @@ contract FunctionModifier {
             decrement(i - 1);
         }
 
-        emit Transfered(msg.sender, address(0), 1);
+        emit Lib.Transfered(msg.sender, address(0), 1);
     }
 }
