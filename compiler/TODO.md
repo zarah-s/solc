@@ -33,12 +33,12 @@ function test() public {
 - [x] parse libraries
 - [x] handle imports
 - [x] target this address for `Test(oi).oi()`
-- [] implement libraries elements to contract
+- [x] implement libraries elements to contract
 - - [x] state variable identifier
 - - [x] local variable
 - - [x] argument type
 - - [x] return type
 - - [x] event
-- - [] custom errors
+- - [x] custom errors
 - [] parse conditional arguments
 - [] parse assignment values

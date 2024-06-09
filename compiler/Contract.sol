@@ -113,6 +113,7 @@ contract FunctionModifier {
         onlyOwner
         validAddress(address(0))
     {
+        revert Lib.ANOTHER_CUSTOM_ERROR();
         Lib.Status stats;
         Test test_contract = new Test();
         test.name = msg.sender;

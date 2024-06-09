@@ -15,6 +15,7 @@ contract Event {
         // Revert is useful when the condition to check is complex.
         // This code does the exact same thing as the example above
         if (_i <= 10) {
+            revert Lib.ANOTHER_CUSTOM_ERROR();
             revert("Input must be greater than 10");
         }
     }
