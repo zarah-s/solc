@@ -1,12 +1,12 @@
-// // SPDX-License-Identifier: MIT
-// pragma solidity ^0.8.24;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
 
-// // import "./test/files/vars/Error.sol";
-// import "./IT.sol";
+import "./test/files/vars/Error.sol";
+import "./IT.sol";
 
-// // import "./Contract.sol";
+// import "./Contract.sol";
 
-// // import "./test/files/vars/Event.sol";
+import "./test/files/vars/Event.sol";
 
 contract Test {
     mapping(address => Lib.Str) name;
@@ -101,9 +101,11 @@ contract FunctionModifier {
         bytes callback;
     }
 
+    function oii() public view returns (Lib.Str[(300 / 2) * 5] memory) {}
+
     function changeOwner(
         address _newOwner,
-        Str memory test,
+        Lib.Status[(300 / 2) * 5] memory test,
         address oi
     )
         public
@@ -111,6 +113,7 @@ contract FunctionModifier {
         onlyOwner
         validAddress(address(0))
     {
+        Lib.Status stats;
         Test test_contract = new Test();
         test.name = msg.sender;
         test.name.call(test.callback);

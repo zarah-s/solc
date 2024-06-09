@@ -592,7 +592,7 @@ mod tests {
         }
 
         #[tokio::test]
-        #[should_panic(expected = "ERROR: Unprocessible entity \"uint257\"")]
+        #[should_panic(expected = "ERROR: Undefined type \"uint257\"")]
         async fn test_function_arg_data_type() {
             let contents = get_file_contents("test/files/function/Fn9.sol").await;
             extract_functions(

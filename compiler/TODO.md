@@ -35,9 +35,9 @@ function test() public {
 - [x] target this address for `Test(oi).oi()`
 - [] implement libraries elements to contract
 - - [x] state variable identifier
-- - [] local variable
-- - [] argument type
-- - [] return type
+- - [x] local variable
+- - [x] argument type
+- - [x] return type
 - - [] event
 - - [] custom errors
 - [] parse conditional arguments

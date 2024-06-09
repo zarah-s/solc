@@ -656,6 +656,7 @@ pub fn extract_functions(
                         &unprocessed[1],
                         &_custom_data_types_identifiers,
                         &enum_identifiers,
+                        libraries_,
                     );
 
                     functions_headers.push(function_header);
@@ -689,8 +690,12 @@ pub fn extract_functions(
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
 
                 let function_definition: &[Token] = &tokens[..start_index.unwrap()];
-                let arguments =
-                    prepare_and_get_function_args(function_definition, custom_data_types, enums);
+                let arguments = prepare_and_get_function_args(
+                    function_definition,
+                    custom_data_types,
+                    enums,
+                    libraries_,
+                );
                 let close_paren_index = function_definition
                     .iter()
                     .position(|pred| pred == &Token::CloseParenthesis);
@@ -800,8 +805,12 @@ pub fn extract_functions(
             Token::Receive => {
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
                 let function_definition: &[Token] = &tokens[..start_index.unwrap()];
-                let arguments =
-                    prepare_and_get_function_args(function_definition, custom_data_types, enums);
+                let arguments = prepare_and_get_function_args(
+                    function_definition,
+                    custom_data_types,
+                    enums,
+                    libraries_,
+                );
                 if !arguments.is_empty() {
                     print_error("Unprocessible entity for receive function. \"function does not support argument\"")
                 }
@@ -841,8 +850,12 @@ pub fn extract_functions(
                 let mut payable = false;
                 let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
                 let function_definition: &[Token] = &tokens[..start_index.unwrap()];
-                let arguments =
-                    prepare_and_get_function_args(function_definition, custom_data_types, enums);
+                let arguments = prepare_and_get_function_args(
+                    function_definition,
+                    custom_data_types,
+                    enums,
+                    libraries_,
+                );
                 if !arguments.is_empty() {
                     print_error("Unprocessible entity for fallback function. \"function does not support argument\"")
                 }
@@ -1013,7 +1026,12 @@ fn process_modifier(
         }
     }
     if let Token::OpenParenthesis = &function_definition[2] {
-        arguments = prepare_and_get_function_args(function_definition, custom_data_types, enums);
+        arguments = prepare_and_get_function_args(
+            function_definition,
+            custom_data_types,
+            enums,
+            libraries_,
+        );
     }
 
     let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
@@ -1046,6 +1064,7 @@ fn prepare_and_get_function_args(
     function_definition: &[Token],
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
+    libraries_: &Vec<LibraryIdentifier>,
 ) -> Vec<Argument> {
     let start_params = function_definition
         .iter()
@@ -1074,6 +1093,7 @@ fn prepare_and_get_function_args(
         function_definition,
         custom_data_types,
         enums,
+        libraries_,
     );
     function_arguments
 }
@@ -1167,8 +1187,13 @@ fn extract_full_function(
     let start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
 
     let function_definition: &[Token] = &tokens[..start_index.unwrap()];
-    let function_header =
-        extract_function_header(function_definition, &tokens[1], custom_data_types, enums);
+    let function_header = extract_function_header(
+        function_definition,
+        &tokens[1],
+        custom_data_types,
+        enums,
+        libraries_,
+    );
     let function_body_start_index = tokens.iter().position(|pred| pred == &Token::OpenBraces);
     if let None = function_body_start_index {
         print_error(&format!("Unprocessible entity",));
@@ -1199,6 +1224,7 @@ fn extract_function_header(
     name: &Token,
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
+    libraries_: &Vec<LibraryIdentifier>,
 ) -> FunctionHeader {
     let function_name = match &name {
         Token::Identifier(_val) => {
@@ -1337,7 +1363,7 @@ fn extract_function_header(
     let mut function_visibility = Token::Internal;
     let mut function_returns: Option<Vec<ReturnType>> = None;
     let function_arguments =
-        prepare_and_get_function_args(function_definition, custom_data_types, enums);
+        prepare_and_get_function_args(function_definition, custom_data_types, enums, libraries_);
 
     for visibility in [
         Token::Internal,
@@ -1356,10 +1382,21 @@ fn extract_function_header(
 
     if let Some(_returns_start_index) = returns_start_index {
         let returns_definition = &function_definition[_returns_start_index..];
-        let end_index = returns_definition
-            .iter()
-            .position(|pred| pred == &Token::CloseParenthesis);
-        if let None = end_index {
+        let mut opened_paren = 0;
+        let mut end_index: usize = 0;
+
+        for _ret_def in returns_definition {
+            end_index += 1;
+            if *_ret_def == Token::OpenParenthesis {
+                opened_paren += 1;
+            } else if *_ret_def == Token::CloseParenthesis {
+                opened_paren -= 1;
+                if opened_paren == 0 {
+                    break;
+                }
+            }
+        }
+        if end_index == 0 {
             let msg: Vec<String> = returns_definition
                 .iter()
                 .map(|pred| LineDescriptions::from_token_to_string(pred))
@@ -1377,7 +1414,7 @@ fn extract_function_header(
         }
 
         let splited_returns_block: Vec<&[Token]> = function_definition
-            [_returns_start_index + 2..end_index.unwrap() + _returns_start_index]
+            [_returns_start_index + 2..(end_index - 1) + _returns_start_index]
             .split(|pred| pred == &Token::Coma)
             .collect();
         function_returns = Some(extract_return_types(
@@ -1385,6 +1422,7 @@ fn extract_function_header(
             function_definition,
             custom_data_types,
             enums,
+            libraries_,
         ));
     }
 
@@ -1434,6 +1472,7 @@ fn extract_function_params(
     function_definition: &[Token],
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
+    libraries_: &Vec<LibraryIdentifier>,
 ) -> Vec<Argument> {
     let mut function_arguments: Vec<Argument> = Vec::new();
 
@@ -1454,6 +1493,8 @@ fn extract_function_params(
                 if splited_param.len() < 2 {
                     print_error(&format!("Invalid function argument {}", vec_.join(" ")))
                 }
+
+                // let lib_custom_data_types =
 
                 if DATA_TYPES
                     .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
@@ -1476,9 +1517,53 @@ fn extract_function_params(
                         "{}",
                         LineDescriptions::from_token_to_string(&splited_param[0],)
                     ));
+                } else if splited_param[1] == Token::Dot {
+                    let __library = libraries_
+                        .iter()
+                        .find(|pred| pred.identifier == detokenize(&splited_param[0]))
+                        .unwrap();
+
+                    let ___lib_custom_types = vec![
+                        __library
+                            .enums
+                            .iter()
+                            .map(|pred| &pred.identifier)
+                            .collect::<Vec<_>>(),
+                        __library
+                            .structs
+                            .iter()
+                            .map(|pred| &pred.identifier)
+                            .collect::<Vec<_>>(),
+                    ]
+                    .concat();
+                    if ___lib_custom_types
+                        .contains(&&LineDescriptions::from_token_to_string(&splited_param[2]))
+                    {
+                        if __library
+                            .structs
+                            .iter()
+                            .map(|pred| &pred.identifier)
+                            .collect::<Vec<_>>()
+                            .contains(&&detokenize(&splited_param[2]))
+                        {
+                            is_primitive = false;
+                        }
+
+                        type_ = Some(format!(
+                            "{}{}{}",
+                            detokenize(&splited_param[0]),
+                            detokenize(&splited_param[1]),
+                            detokenize(&splited_param[2])
+                        ));
+                    } else {
+                        print_error(&format!(
+                            "Undefined type \"{}\"",
+                            &LineDescriptions::from_token_to_string(&splited_param[2])
+                        ))
+                    }
                 } else {
                     print_error(&format!(
-                        "Unprocessible entity \"{}\"",
+                        "Undefined type \"{}\"",
                         &LineDescriptions::from_token_to_string(&splited_param[0])
                     ))
                 }
@@ -1511,6 +1596,38 @@ fn extract_function_params(
                                     text: "".to_string(),
                                 },
                             );
+                        }
+                    }
+                } else if let Token::Dot = splited_param[1] {
+                    if splited_param[3] == Token::OpenSquareBracket {
+                        is_array = true;
+                        is_primitive = false;
+                        let close_index = splited_param
+                            .iter()
+                            .position(|pred| pred == &Token::CloseSquareBracket);
+
+                        if let None = close_index {
+                            print_error(&format!(
+                                "Syntax error... Expecting a close bracket for {}",
+                                vec_.join(" ")
+                            ))
+                        } else {
+                            let slice = &splited_param[4..close_index.unwrap()];
+                            if !slice.is_empty() {
+                                let mut expression = String::new();
+                                for slc in slice {
+                                    let detokenized = LineDescriptions::from_token_to_string(slc);
+                                    expression.push_str(&detokenized);
+                                }
+
+                                size = validate_expression(
+                                    &expression,
+                                    LineDescriptions {
+                                        line: 0,
+                                        text: "".to_string(),
+                                    },
+                                );
+                            }
                         }
                     }
                 } else if let Some(_location) = extract_data_location_from_token(&splited_param[1])
@@ -1590,9 +1707,9 @@ fn extract_return_types(
     function_definition: &[Token],
     custom_data_types: &Vec<&str>,
     enums: &Vec<&str>,
+    libraries_: &Vec<LibraryIdentifier>,
 ) -> Vec<ReturnType> {
     let mut function_arguments: Vec<ReturnType> = Vec::new();
-
     for splited_param in splited_params_block {
         if !splited_param.is_empty() {
             let mut type_: Option<String> = None;
@@ -1616,23 +1733,65 @@ fn extract_return_types(
                     "{}",
                     LineDescriptions::from_token_to_string(&splited_param[0],)
                 ));
-            } else {
-                if custom_data_types
-                    .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
+            } else if custom_data_types
+                .contains(&LineDescriptions::from_token_to_string(&splited_param[0]).as_str())
+            {
+                if !enums.contains(&detokenize(&splited_param[0]).as_str()) {
+                    is_primitive = false;
+                }
+                type_ = Some(format!(
+                    "{}",
+                    LineDescriptions::from_token_to_string(&splited_param[0],)
+                ));
+            } else if splited_param[1] == Token::Dot {
+                let __library = libraries_
+                    .iter()
+                    .find(|pred| pred.identifier == detokenize(&splited_param[0]))
+                    .unwrap();
+
+                let ___lib_custom_types = vec![
+                    __library
+                        .enums
+                        .iter()
+                        .map(|pred| &pred.identifier)
+                        .collect::<Vec<_>>(),
+                    __library
+                        .structs
+                        .iter()
+                        .map(|pred| &pred.identifier)
+                        .collect::<Vec<_>>(),
+                ]
+                .concat();
+                if ___lib_custom_types
+                    .contains(&&LineDescriptions::from_token_to_string(&splited_param[2]))
                 {
-                    if !enums.contains(&detokenize(&splited_param[0]).as_str()) {
+                    if __library
+                        .structs
+                        .iter()
+                        .map(|pred| &pred.identifier)
+                        .collect::<Vec<_>>()
+                        .contains(&&detokenize(&splited_param[2]))
+                    {
                         is_primitive = false;
                     }
+
                     type_ = Some(format!(
-                        "{}",
-                        LineDescriptions::from_token_to_string(&splited_param[0],)
+                        "{}{}{}",
+                        detokenize(&splited_param[0]),
+                        detokenize(&splited_param[1]),
+                        detokenize(&splited_param[2])
                     ));
                 } else {
                     print_error(&format!(
-                        "Unprocessible entity \"{}\"",
-                        &LineDescriptions::from_token_to_string(&splited_param[0])
+                        "Undefined type \"{}\"",
+                        &LineDescriptions::from_token_to_string(&splited_param[2])
                     ))
                 }
+            } else {
+                print_error(&format!(
+                    "Unprocessible entity \"{}\"",
+                    &LineDescriptions::from_token_to_string(&splited_param[0])
+                ))
             }
 
             if splited_param.len() > 1 {
@@ -1659,6 +1818,40 @@ fn extract_return_types(
                                 text: "".to_string(),
                             },
                         );
+                    }
+                } else if let Token::Dot = splited_param[1] {
+                    if splited_param[3] == Token::OpenSquareBracket {
+                        is_array = true;
+                        is_primitive = false;
+                        let close_index = splited_param
+                            .iter()
+                            .position(|pred| pred == &Token::CloseSquareBracket);
+
+                        if let None = close_index {
+                            print_error(&format!(
+                                "Syntax error... Expecting a close bracket for {}",
+                                vec_.join(" ")
+                            ))
+                        } else {
+                            let slice = &splited_param[4..close_index.unwrap()];
+                            if !slice.is_empty() {
+                                let mut expression = String::new();
+                                for slc in slice {
+                                    let detokenized = LineDescriptions::from_token_to_string(slc);
+                                    expression.push_str(&detokenized);
+                                }
+
+                                // panic!("{:?}", expression);
+
+                                size = validate_expression(
+                                    &expression,
+                                    LineDescriptions {
+                                        line: 0,
+                                        text: "".to_string(),
+                                    },
+                                );
+                            }
+                        }
                     }
                 } else if let Some(_location) = extract_data_location_from_token(&splited_param[1])
                 {
