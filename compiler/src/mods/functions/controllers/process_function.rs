@@ -2333,6 +2333,22 @@ fn extract_function_block(
 
                         values.push(stringified);
                     }
+                } else if let Token::Dot = block[2] {
+                    let splitted_value_fields = &block[5..block.len() - 2]
+                        .split(|pred| pred == &&Token::Coma)
+                        .collect::<Vec<_>>();
+                    event_identifier = detokenize(block[3]);
+                    for value_field_collection in splitted_value_fields {
+                        if value_field_collection.is_empty() {
+                            continue;
+                        }
+                        let mut stringified = String::new();
+                        for _value in value_field_collection.iter() {
+                            stringified.push_str(&detokenize(_value));
+                        }
+
+                        values.push(stringified);
+                    }
                 } else {
                     print_error("Unprocessible entity for emit");
                 }

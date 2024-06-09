@@ -38,7 +38,7 @@ function test() public {
 - - [x] local variable
 - - [x] argument type
 - - [x] return type
-- - [] event
+- - [x] event
 - - [] custom errors
 - [] parse conditional arguments
 - [] parse assignment values

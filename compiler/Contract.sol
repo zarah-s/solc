@@ -154,6 +154,6 @@ contract FunctionModifier {
             decrement(i - 1);
         }
 
-        emit Transfered(msg.sender, address(0), 1);
+        emit Lib.Transfered(msg.sender, address(0), 1);
     }
 }
