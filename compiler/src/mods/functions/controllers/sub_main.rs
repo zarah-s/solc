@@ -23,6 +23,14 @@ pub async fn compile_source_code(
     import_tree: &mut HashMap<String, Vec<String>>,
     compiled: &mut [Vec<String>; 4],
 ) -> Result<(), std::io::Error> {
+    if args.len() < 2 {
+        print_error("Mising file path... Run cargo run <file-path>")
+    }
+
+    /* VALIDATE FILE FORMAT */
+    if args[1].split(".").last().unwrap() != "sol" {
+        print_error("Unsupported file... Expected \".sol\" file");
+    }
     let file_path = &args[1];
     let root_folder = Path::new(&file_path);
     let parent_folder = Path::new(&args[0]);
