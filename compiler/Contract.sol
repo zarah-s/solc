@@ -1,163 +1,54 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// import "./test/files/vars/Error.sol";
-// import "./IT.sol";
-
-// import "./Contract.sol";
-
-// import "./test/files/vars/Event.sol";
-
-contract Test {
-    mapping(address => Lib.Str) name;
-
-    function oi() external {}
-}
-
-// interface IT {
-//     error ANOTHER_CUSTOM_ERROR(address, string);
-//     event Transfered(
-//         address indexed sender,
-//         address receiver,
-//         uint indexed amount
-//     );
-// }
-
-library Lib {
-    modifier onlyOwner(address owner) {
-        require(msg.sender == owner, "Not owner");
-        // Underscore is a special character only used inside
-        // a function modifier and it tells Solidity to
-        // execute the rest of the code.
-        _;
-    }
-
-    struct Str {
-        address name;
-        bytes callback;
-    }
-
-    function test(address payable _user) public {
-        // val = 123;
-        bytes memory b = "";
-        address(_user).call{value: 1}(b);
-    }
-
-    enum Status {
-        Success,
-        Fail
-    }
-
-    error ANOTHER_CUSTOM_ERROR(address, string);
-    uint constant vard = 1;
-
-    // bytes[] constant bb = [""];
-    // LibStr constant str = LibStr({name: "adsfs"});
-    event Transfered(
-        address indexed sender,
-        address receiver,
-        uint indexed amount
-    );
-    struct LibStr {
-        address name;
+library Math {
+    function sqrt(uint256 y) internal pure returns (uint256) {
+        uint z;
+        if (y > 3) {
+            z = y;
+            uint256 x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        }
+        // else z = 0 (default value)
     }
 }
 
-contract FunctionModifier {
-    // We will use these variables to demonstrate how to use
-    // modifiers.
-    using Lib for Str[];
-    address public owner;
-    uint256 public x = 10;
-    bool public locked;
-
-    Lib.Str _sstr;
-
-    Lib.Status stats;
-
-    constructor() {
-        // Set the transaction sender as the owner of the contract.
-        owner = msg.sender;
+contract TestMath {
+    function testSquareRoot(uint256 x) public pure returns (uint256) {
+        return Math.sqrt(x);
     }
+}
 
-    // Modifier to check that the caller is the owner of
-    // the contract.
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Not owner");
-        // Underscore is a special character only used inside
-        // a function modifier and it tells Solidity to
-        // execute the rest of the code.
-        _;
+// Array function to delete element at index and re-organize the array
+// so that there are no gaps between the elements.
+library Array {
+    function remove(uint256[] storage arr, uint256 index) public {
+        // Move the last element into the place to delete
+        require(arr.length > 0, "Can'tc remove from empty array");
+        arr[index] = arr[arr.length - 1];
+        arr.pop();
     }
+}
 
-    // Modifiers can take inputs. This modifier checks that the
-    // address passed in is not the zero address.
-    modifier validAddress(address _addr) {
-        require(_addr != address(0), "Not valid address");
-        _;
-    }
+contract TestArray {
+    using Array for uint256[];
 
-    struct Str {
-        address name;
-        bytes callback;
-    }
+    uint256[] public arr;
 
-    function oii() public view returns (Lib.Str[(300 / 2) * 5] memory) {}
-
-    function changeOwner(
-        address _newOwner,
-        Lib.Status[(300 / 2) * 5] memory test,
-        address oi
-    )
-        public
-        // Test oi_contract
-        onlyOwner
-        validAddress(address(0))
-    {
-        revert Lib.ANOTHER_CUSTOM_ERROR();
-        Lib.Status stats;
-        Test test_contract = new Test();
-        test.name = msg.sender;
-        test.name.call(test.callback);
-        oi = msg.sender;
-        // oi_contract.oi();
-        test_contract.oi();
-        Test(oi).oi();
-        _newOwner = address(0);
-        owner = _newOwner;
-    }
-
-    // Modifiers can be called before and / or after a function.
-    // This modifier prevents a function from being called while
-    // it is still executing.
-    modifier noReentrancy() {
-        require(!locked, "No reentrancy");
-
-        locked = true;
-        _;
-        locked = false;
-    }
-
-    event Transfered(
-        address indexed sender,
-        address receiver,
-        uint indexed amount
-    );
-    event Eventdd(address indexed owner);
-
-    error CUSTOM_ERROR();
-
-    error ANOTHER_CUSTOM_ERROR(address, string);
-
-    function decrement(uint256 i) public noReentrancy {
-        x -= i;
-
-        if (i > 1) {
-            decrement(i - 1);
-        } else if (i < 1 - 3) {
-            //
+    function testArrayRemove() public {
+        for (uint256 i = 0; i < 3; i++) {
+            arr.push(i);
         }
 
-        emit Lib.Transfered(msg.sender, address(0), 1);
+        arr.remove(1);
+
+        assert(arr.length == 2);
+        assert(arr[0] == 0);
+        assert(arr[1] == 2);
     }
 }
