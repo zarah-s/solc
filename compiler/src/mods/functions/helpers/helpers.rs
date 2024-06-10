@@ -2,8 +2,8 @@ use crate::{
     mods::{
         constants::constants::DATA_TYPES,
         types::types::{
-            LibraryIdentifier, Mapping, MappingIdentifier, MappingValue, OpenedBraceType,
-            VariableIdentifier, VariableType,
+            LibraryIdentifier, LibraryImplementation, Mapping, MappingIdentifier, MappingValue,
+            OpenedBraceType, VariableIdentifier, VariableType,
         },
     },
     LineDescriptions, Token,
@@ -21,6 +21,7 @@ pub fn lex_to_token(input: &str) -> Token {
         "revert" => Token::Revert,
         " " => Token::Space,
         "emit" => Token::Emit,
+        "using" => Token::Using,
         "abstract" => Token::Abstract,
         "library" => Token::Library,
         "call" => Token::Call,
@@ -124,6 +125,7 @@ pub fn detokenize(input: &Token) -> String {
         Token::Contract => "contract".to_string(),
         Token::Emit => "emit".to_string(),
         Token::Call => "call".to_string(),
+        Token::Using => "using".to_string(),
         Token::Delegatecall => "delegatecall".to_string(),
         Token::Library => "library".to_string(),
         Token::Abstract => "abstract".to_string(),
@@ -610,6 +612,7 @@ pub fn validate_variable(
     Option<String>,
     Option<MappingIdentifier>,
     Option<String>,
+    Option<LibraryImplementation>,
 ) {
     let mut is_array = false;
     let mut size: Option<String> = None;
@@ -624,10 +627,62 @@ pub fn validate_variable(
     let mut storage: Option<Token> = None;
     let mut is_primitive = true;
     let tokens = LineDescriptions::to_token(&format!("{}", text.text));
+    if let Token::Using = &tokens[0] {
+        // panic!("{:?}", tokens);
+        let mut library = String::new();
+        let mut data_type = String::new();
+        let mut is_array = false;
+        let mut is_custom_data_type = false;
+        if tokens.len() < 5
+            || tokens[tokens.len() - 1] != Token::SemiColon
+            || tokens[2] != Token::For
+        {
+            print_error("Unprocessible entity for library implementation");
+        }
 
-    if let Token::Mapping = &tokens[0] {
+        if let Token::Identifier(_identifier) = &tokens[1] {
+            library.push_str(&_identifier);
+        } else {
+            print_error("Expecting identifier")
+        }
+
+        if DATA_TYPES.contains(&detokenize(&tokens[3]).as_str()) {
+            data_type = detokenize(&tokens[3]);
+        } else {
+            if let Token::Identifier(_data_type) = &tokens[3] {
+                is_custom_data_type = true;
+                data_type.push_str(_data_type);
+            } else {
+                print_error("Unprocessible entity for library implementation");
+            }
+        }
+
+        let find_square_parenthesis = tokens
+            .iter()
+            .position(|pred| pred == &Token::OpenSquareBracket);
+
+        if let Some(_square_paren_index) = find_square_parenthesis {
+            let next = &tokens.get(_square_paren_index + 1);
+            if let Some(_next) = next {
+                if let Token::CloseSquareBracket = _next {
+                    is_array = true;
+                } else {
+                    print_error("Fixed size not supported");
+                }
+            }
+        }
+
+        let structured = LibraryImplementation {
+            data_type,
+            is_array,
+            is_custom_data_type,
+            library,
+        };
+
+        return (None, None, None, None, Some(structured));
+    } else if let Token::Mapping = &tokens[0] {
         let structured_mapping = extract_mapping_identifier(&tokens);
-        return (None, None, Some(structured_mapping), None);
+        return (None, None, Some(structured_mapping), None, None);
     } else {
         if let Token::Identifier(_identifier) = &tokens[0] {
             for custom_data_type in custom_data_types {
@@ -790,6 +845,7 @@ pub fn validate_variable(
                     {
                         variable_name = Some(_var_name.to_string());
                     } else {
+                        println!("{:?}", tokens);
                         print_error(&format!("Unprocessible entity {}", text.text))
                     }
                 } else {
@@ -819,10 +875,10 @@ pub fn validate_variable(
         }
 
         if is_custom_error {
-            return (None, Some(text.text), None, None);
+            return (None, Some(text.text), None, None, None);
         }
         if is_event {
-            return (None, None, None, Some(text.text));
+            return (None, None, None, Some(text.text), None);
         }
 
         {
@@ -888,6 +944,6 @@ pub fn validate_variable(
             storage_location: storage,
         };
 
-        return (Some(structured), None, None, None);
+        return (Some(structured), None, None, None, None);
     }
 }

@@ -41,7 +41,8 @@ function test() public {
 - - [x] return type
 - - [x] event
 - - [x] custom errors
-- - [] implementations
+- - [x] implementations
 - - [] functions
+- [] implement named returns
 - [] parse conditional arguments
 - [] parse assignment values

@@ -4,6 +4,7 @@ pub enum Token {
     Identifier(String),
     Contract,
     Library,
+    Using,
     Abstract,
     Emit,
     Call,
@@ -96,6 +97,14 @@ pub enum Token {
     Ampersand,
     True,
     False,
+}
+
+#[derive(Debug)]
+pub struct LibraryImplementation {
+    pub library: String,
+    pub data_type: String,
+    pub is_custom_data_type: bool,
+    pub is_array: bool,
 }
 
 pub enum TerminationType {
@@ -286,6 +295,7 @@ pub struct ContractHeader {
 #[derive(Debug)]
 pub struct ContractIdentifier {
     pub header: ContractHeader,
+    pub implementations: Vec<LibraryImplementation>,
     pub state_variables: Vec<VariableIdentifier>,
     pub mappings: Vec<MappingIdentifier>,
     pub enums: Vec<EnumIdentifier>,

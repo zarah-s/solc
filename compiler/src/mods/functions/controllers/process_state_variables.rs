@@ -3,7 +3,8 @@ use crate::mods::{
     functions::helpers::helpers::{detokenize, print_error, validate_variable},
     types::types::{
         CustomErrorIdentifier, EventIdentifier, EventIdentifierVariants, LibraryIdentifier,
-        LineDescriptions, MappingIdentifier, OpenedBraceType, Token, VariableIdentifier,
+        LibraryImplementation, LineDescriptions, MappingIdentifier, OpenedBraceType, Token,
+        VariableIdentifier,
     },
 };
 
@@ -18,12 +19,13 @@ pub fn extract_global_elements(
     Vec<CustomErrorIdentifier>,
     Vec<MappingIdentifier>,
     Vec<EventIdentifier>,
+    Vec<LibraryImplementation>,
 ) {
     let mut global_variables: Vec<VariableIdentifier> = Vec::new();
     let mut custom_errors: Vec<CustomErrorIdentifier> = Vec::new();
     let mut events: Vec<EventIdentifier> = Vec::new();
     let mut mappings: Vec<MappingIdentifier> = Vec::new();
-
+    let mut lib_implementations: Vec<LibraryImplementation> = Vec::new();
     let mut opened_braces = 0;
     let mut opened_brace_type = OpenedBraceType::None;
     let mut variables: Vec<LineDescriptions> = Vec::new();
@@ -120,6 +122,7 @@ pub fn extract_global_elements(
             Option<String>,
             Option<MappingIdentifier>,
             Option<String>,
+            Option<LibraryImplementation>,
         );
 
         if variable_positions.is_empty() {
@@ -152,10 +155,18 @@ pub fn extract_global_elements(
         } else if let Some(_event) = validated.3 {
             let structured = process_event(_event);
             events.push(structured)
+        } else if let Some(_lib_implementations) = validated.4 {
+            lib_implementations.push(_lib_implementations)
         }
     }
 
-    (global_variables, custom_errors, mappings, events)
+    (
+        global_variables,
+        custom_errors,
+        mappings,
+        events,
+        lib_implementations,
+    )
 }
 
 pub fn process_custom_error(_custom_err: String) -> CustomErrorIdentifier {

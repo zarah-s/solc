@@ -220,7 +220,7 @@ mod tests {
         #[tokio::test]
         async fn test_variable_count() {
             let contents = get_file_contents("test/files/vars/Var.sol").await;
-            let (_vars, _, _, _) = extract_global_elements(
+            let (_vars, _, _, _, _) = extract_global_elements(
                 &contents,
                 &Vec::new(),
                 &Vec::new(),
@@ -233,7 +233,7 @@ mod tests {
         #[tokio::test]
         async fn test_custom_error_count() {
             let contents = get_file_contents("test/files/vars/Error.sol").await;
-            let (_, _errs, _, _) = extract_global_elements(
+            let (_, _errs, _, _, _) = extract_global_elements(
                 &contents,
                 &Vec::new(),
                 &Vec::new(),
@@ -246,7 +246,7 @@ mod tests {
         #[tokio::test]
         async fn test_event_count() {
             let contents = get_file_contents("test/files/vars/Event.sol").await;
-            let (_, _, _, _events) = extract_global_elements(
+            let (_, _, _, _events, _) = extract_global_elements(
                 &contents,
                 &Vec::new(),
                 &Vec::new(),
@@ -259,7 +259,7 @@ mod tests {
         #[tokio::test]
         async fn test_custom_error_intergrity() {
             let contents = get_file_contents("test/files/vars/Error.sol").await;
-            let (_, _errs, _, _) = extract_global_elements(
+            let (_, _errs, _, _, _) = extract_global_elements(
                 &contents,
                 &Vec::new(),
                 &Vec::new(),
@@ -274,7 +274,7 @@ mod tests {
         #[tokio::test]
         async fn test_event_intergrity() {
             let contents = get_file_contents("test/files/vars/Event.sol").await;
-            let (_, _, _, _events) = extract_global_elements(
+            let (_, _, _, _events, _) = extract_global_elements(
                 &contents,
                 &Vec::new(),
                 &Vec::new(),
@@ -287,7 +287,7 @@ mod tests {
         #[tokio::test]
         async fn test_mapping_count() {
             let contents = get_file_contents("test/files/vars/Map.sol").await;
-            let (_, _, _maps, _) = extract_global_elements(
+            let (_, _, _maps, _, _) = extract_global_elements(
                 &contents,
                 &Vec::new(),
                 &Vec::new(),
@@ -355,7 +355,7 @@ mod tests {
                     },
                 },
             ];
-            let (_, _, _maps, _) = extract_global_elements(
+            let (_, _, _maps, _, _) = extract_global_elements(
                 &contents,
                 &Vec::new(),
                 &Vec::new(),
@@ -379,7 +379,7 @@ mod tests {
         #[tokio::test]
         async fn test_variable_dynamic_arr() {
             let contents = get_file_contents("test/files/vars/Var6.sol").await;
-            let (_vars, _, _, _) = extract_global_elements(
+            let (_vars, _, _, _, _) = extract_global_elements(
                 &contents,
                 &Vec::new(),
                 &Vec::new(),
@@ -393,7 +393,7 @@ mod tests {
         #[tokio::test]
         async fn test_variable_fixed_arr() {
             let contents = get_file_contents("test/files/vars/Var6.sol").await;
-            let (_vars, _, _, _) = extract_global_elements(
+            let (_vars, _, _, _, _) = extract_global_elements(
                 &contents,
                 &Vec::new(),
                 &Vec::new(),
@@ -421,7 +421,7 @@ mod tests {
         #[tokio::test]
         async fn test_variable_integrity() {
             let contents = get_file_contents("test/files/vars/Var.sol").await;
-            let (vars, _, _, _) = extract_global_elements(
+            let (vars, _, _, _, _) = extract_global_elements(
                 &contents,
                 &Vec::new(),
                 &Vec::new(),
@@ -1317,7 +1317,7 @@ mod tests {
             .collect();
         let custom_data_types_identifiers: Vec<&str> =
             [enum_identifiers.clone(), struct_identifiers].concat();
-        let (_vars, _, _maps, _) = extract_global_elements(
+        let (_vars, _, _maps, _, _) = extract_global_elements(
             &contents,
             &custom_data_types_identifiers,
             &enum_identifiers,
