@@ -216,13 +216,14 @@ pub async fn compile_source_code(
         let custom_data_types_identifiers: Vec<&str> =
             [enum_identifiers.clone(), struct_identifiers].concat();
 
-        let (state_variables, custom_errors, mappings, events) = extract_global_elements(
-            &_joined,
-            &custom_data_types_identifiers,
-            &enum_identifiers,
-            Vec::new(),
-            &libraries,
-        );
+        let (state_variables, custom_errors, mappings, events, lib_implementations) =
+            extract_global_elements(
+                &_joined,
+                &custom_data_types_identifiers,
+                &enum_identifiers,
+                Vec::new(),
+                &libraries,
+            );
         let (functions, contract_header, _libraries) = extract_functions(
             &_joined,
             &custom_data_types_identifiers,
@@ -248,6 +249,7 @@ pub async fn compile_source_code(
                 mappings,
                 state_variables,
                 structs: structs_tree,
+                implementations: lib_implementations,
             };
 
             compiled[3].push(contract_identifier.header.identifier.to_string());

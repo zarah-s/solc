@@ -33,6 +33,7 @@ function test() public {
 - [x] parse libraries
 - [x] handle imports
 - [x] target this address for `Test(oi).oi()`
+- [x] implement mapping as struct variant
 - [x] implement libraries elements to contract
 - - [x] state variable identifier
 - - [x] local variable
@@ -40,5 +41,8 @@ function test() public {
 - - [x] return type
 - - [x] event
 - - [x] custom errors
+- - [x] implementations
+- - [] functions
+- [] implement named returns
 - [] parse conditional arguments
 - [] parse assignment values

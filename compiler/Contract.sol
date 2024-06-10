@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "./test/files/vars/Error.sol";
-import "./IT.sol";
+// import "./test/files/vars/Error.sol";
+// import "./IT.sol";
 
 // import "./Contract.sol";
 
-import "./test/files/vars/Event.sol";
+// import "./test/files/vars/Event.sol";
 
 contract Test {
     mapping(address => Lib.Str) name;
@@ -66,6 +66,7 @@ library Lib {
 contract FunctionModifier {
     // We will use these variables to demonstrate how to use
     // modifiers.
+    using Lib for Str[];
     address public owner;
     uint256 public x = 10;
     bool public locked;
@@ -153,6 +154,8 @@ contract FunctionModifier {
 
         if (i > 1) {
             decrement(i - 1);
+        } else if (i < 1 - 3) {
+            //
         }
 
         emit Lib.Transfered(msg.sender, address(0), 1);

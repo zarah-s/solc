@@ -22,9 +22,9 @@ use crate::mods::{
         EventIdentifier, FallbackIdentifier, FunctionArm, FunctionArmType, FunctionCall,
         FunctionCallType, FunctionHeader, FunctionIdentifier, FunctionMutability,
         FunctionsIdentifier, InterfaceIdentifier, InterfaceVariants, LibraryIdentifier,
-        LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier, ModifierCall,
-        ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return, ReturnType,
-        Revert, RevertType, StructIdentifier, TerminationType, Token, TuppleAssignment,
+        LibraryImplementation, LineDescriptions, Loop, LoopType, MappingAssign, MappingIdentifier,
+        ModifierCall, ModifierIdentifier, OpenedBraceType, ReceiveIdentifier, Require, Return,
+        ReturnType, Revert, RevertType, StructIdentifier, TerminationType, Token, TuppleAssignment,
         VariableAssign, VariableAssignOperation, VariableAssignType, VariableIdentifier,
         VariableType,
     },
@@ -642,7 +642,7 @@ pub fn extract_functions(
 
                 let _custom_data_types_identifiers: Vec<&str> =
                     [enum_identifiers.clone(), struct_identifiers].concat();
-                let (_, _custom_errors, _, _events) = extract_global_elements(
+                let (_, _custom_errors, _, _events, _) = extract_global_elements(
                     &interface_events_and_errors,
                     &Vec::new(),
                     &Vec::new(),
@@ -2121,8 +2121,10 @@ fn extract_function_block(
                         } else {
                             let global_variables_identifiers: Vec<&String> =
                                 global_variables.iter().map(|pred| &pred.name).collect();
-                            let global_mappings: Vec<String> =
-                                mappings.iter().map(|pred| pred.name.to_owned()).collect();
+                            let global_mappings: Vec<String> = mappings
+                                .iter()
+                                .map(|pred| pred.identifier.to_owned())
+                                .collect();
                             if function_args
                                 .iter()
                                 .map(|pred| &pred.name_)
@@ -2254,7 +2256,7 @@ fn extract_function_block(
                             } else if global_mappings.contains(_identifier) {
                                 let var = mappings
                                     .iter()
-                                    .find(|pred| pred.name == _identifier.to_string());
+                                    .find(|pred| pred.identifier == _identifier.to_string());
                                 if let Some(_var) = var {
                                     let function_scope_variable = extract_function_scope_variable(
                                         None,
@@ -2679,8 +2681,10 @@ fn extract_function_block(
                     } else {
                         let global_variables_identifiers: Vec<&String> =
                             global_variables.iter().map(|pred| &pred.name).collect();
-                        let global_mappings: Vec<String> =
-                            mappings.iter().map(|pred| pred.name.to_owned()).collect();
+                        let global_mappings: Vec<String> = mappings
+                            .iter()
+                            .map(|pred| pred.identifier.to_owned())
+                            .collect();
                         if global_variables_identifiers.contains(&_identifier) {
                             let var = global_variables
                                 .iter()
@@ -3083,11 +3087,12 @@ fn extract_function_block(
                             line: 0,
                         });
 
-                        let (__variables, _, _, _): (
+                        let (__variables, _, _, _, _): (
                             Vec<VariableIdentifier>,
                             Vec<CustomErrorIdentifier>,
                             Vec<MappingIdentifier>,
                             Vec<EventIdentifier>,
+                            Vec<LibraryImplementation>,
                         ) = extract_global_elements(
                             &line_descriptors,
                             custom_data_types,
@@ -3686,7 +3691,7 @@ fn extract_function_scope_variable(
             } else if stringified == "--" {
                 value = format!("{}-1", _identifier)
             } else if stringified.contains("push") || stringified.contains("pop") {
-                let map = mappings.iter().find(|pred| &pred.name == _identifier);
+                let map = mappings.iter().find(|pred| &pred.identifier == _identifier);
                 if let Some(_ret) = map {
                     let map_return = _ret.map.get_return_type();
 
