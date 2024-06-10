@@ -430,6 +430,91 @@ pub fn validate_identifier_regex(identifer: &str, line: i32) -> bool {
     }
 }
 
+pub fn extract_mapping_identifier(tokens: &Vec<Token>) -> MappingIdentifier {
+    let mut pad = 0;
+    let mut mapping = Mapping::new();
+
+    for n in 0..tokens.len() {
+        if pad > n {
+            continue;
+        }
+
+        if let Some(_token) = extract_data_types_from_token(&tokens[n]) {
+            let next = tokens.get(n + 1);
+            if let Some(_next) = next {
+                pad = n + 1;
+                if let Token::Equals = _next {
+                    if let Some(_accross_to_value) = tokens.get(n + 3) {
+                        pad = n + 3;
+
+                        if let Token::Mapping = _accross_to_value {
+                            mapping.insert(Some(detokenize(&tokens[n + 5])), None);
+                            pad = n + 5;
+                        } else {
+                            let _end = &tokens[pad..]
+                                .iter()
+                                .position(|pred| pred == &Token::CloseParenthesis);
+                            if _end.is_none() {
+                                print_error("Unprocessible entity on mapping");
+                            }
+
+                            let mut combo = String::new();
+                            for _token in &tokens[pad..pad + _end.unwrap()] {
+                                combo.push_str(&detokenize(_token))
+                            }
+                            mapping.insert(None, Some(MappingValue::Raw(combo)))
+                        }
+                    }
+                }
+            } else {
+            }
+        } else {
+            if let Token::Mapping = tokens[n] {
+                mapping.insert(Some(detokenize(&tokens[n + 2])), None);
+                pad = n + 2;
+            } else if let Some(_new) = extract_data_types_from_token(&tokens[n]) {
+                mapping.insert(None, Some(MappingValue::Raw(detokenize(&_new))))
+            }
+        }
+    }
+
+    let mut identifier: String = String::new();
+    let mut visibility: Option<Token> = None;
+    match &tokens[tokens.len() - 2] {
+        Token::Identifier(_id) => {
+            identifier = _id.to_owned();
+        }
+        Token::SemiColon => (),
+        _ => {
+            print_error("Unprocessible entity on mapping");
+        }
+    }
+
+    if let Token::CloseParenthesis = tokens[tokens.len() - 3] {
+        visibility = Some(Token::Internal);
+    } else {
+        if let Token::Private | Token::Public | Token::External | Token::Internal =
+            tokens[tokens.len() - 3]
+        {
+            if let Token::External = tokens[tokens.len() - 3] {
+                print_error("Mapping can not be set to external");
+            } else {
+                visibility = Some(tokens[tokens.len() - 3].to_owned())
+            }
+        } else {
+            print_error("Unprocessible entity on mapping");
+        }
+    }
+
+    let structured_mapping = MappingIdentifier {
+        map: mapping,
+        identifier,
+        visibility: visibility.unwrap(),
+    };
+
+    structured_mapping
+}
+
 pub fn extract_custom_data_types_tokens(
     _type: &Token,
     data: &Vec<LineDescriptions>,
@@ -539,89 +624,9 @@ pub fn validate_variable(
     let mut storage: Option<Token> = None;
     let mut is_primitive = true;
     let tokens = LineDescriptions::to_token(&format!("{}", text.text));
-    let mut mapping = Mapping::new();
 
     if let Token::Mapping = &tokens[0] {
-        let mut pad = 0;
-
-        for n in 0..tokens.len() {
-            if pad > n {
-                continue;
-            }
-
-            if let Some(_token) = extract_data_types_from_token(&tokens[n]) {
-                let next = tokens.get(n + 1);
-                if let Some(_next) = next {
-                    pad = n + 1;
-                    if let Token::Equals = _next {
-                        if let Some(_accross_to_value) = tokens.get(n + 3) {
-                            pad = n + 3;
-
-                            if let Token::Mapping = _accross_to_value {
-                                mapping.insert(Some(detokenize(&tokens[n + 5])), None);
-                                pad = n + 5;
-                            } else {
-                                let _end = &tokens[pad..]
-                                    .iter()
-                                    .position(|pred| pred == &Token::CloseParenthesis);
-                                if _end.is_none() {
-                                    print_error("Unprocessible entity on mapping");
-                                }
-
-                                let mut combo = String::new();
-                                for _token in &tokens[pad..pad + _end.unwrap()] {
-                                    combo.push_str(&detokenize(_token))
-                                }
-                                mapping.insert(None, Some(MappingValue::Raw(combo)))
-                            }
-                        }
-                    }
-                } else {
-                }
-            } else {
-                if let Token::Mapping = tokens[n] {
-                    mapping.insert(Some(detokenize(&tokens[n + 2])), None);
-                    pad = n + 2;
-                } else if let Some(_new) = extract_data_types_from_token(&tokens[n]) {
-                    mapping.insert(None, Some(MappingValue::Raw(detokenize(&_new))))
-                }
-            }
-        }
-
-        let mut identifier: String = String::new();
-        let mut visibility: Option<Token> = None;
-        match &tokens[tokens.len() - 2] {
-            Token::Identifier(_id) => {
-                identifier = _id.to_owned();
-            }
-            Token::SemiColon => (),
-            _ => {
-                print_error("Unprocessible entity on mapping");
-            }
-        }
-
-        if let Token::CloseParenthesis = tokens[tokens.len() - 3] {
-            visibility = Some(Token::Internal);
-        } else {
-            if let Token::Private | Token::Public | Token::External | Token::Internal =
-                tokens[tokens.len() - 3]
-            {
-                if let Token::External = tokens[tokens.len() - 3] {
-                    print_error("Mapping can not be set to external");
-                } else {
-                    visibility = Some(tokens[tokens.len() - 3].to_owned())
-                }
-            } else {
-                print_error("Unprocessible entity on mapping");
-            }
-        }
-
-        let structured_mapping = MappingIdentifier {
-            map: mapping,
-            name: identifier,
-            visibility: visibility.unwrap(),
-        };
-
+        let structured_mapping = extract_mapping_identifier(&tokens);
         return (None, None, Some(structured_mapping), None);
     } else {
         if let Token::Identifier(_identifier) = &tokens[0] {

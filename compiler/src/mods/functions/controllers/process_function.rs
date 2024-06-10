@@ -2121,8 +2121,10 @@ fn extract_function_block(
                         } else {
                             let global_variables_identifiers: Vec<&String> =
                                 global_variables.iter().map(|pred| &pred.name).collect();
-                            let global_mappings: Vec<String> =
-                                mappings.iter().map(|pred| pred.name.to_owned()).collect();
+                            let global_mappings: Vec<String> = mappings
+                                .iter()
+                                .map(|pred| pred.identifier.to_owned())
+                                .collect();
                             if function_args
                                 .iter()
                                 .map(|pred| &pred.name_)
@@ -2254,7 +2256,7 @@ fn extract_function_block(
                             } else if global_mappings.contains(_identifier) {
                                 let var = mappings
                                     .iter()
-                                    .find(|pred| pred.name == _identifier.to_string());
+                                    .find(|pred| pred.identifier == _identifier.to_string());
                                 if let Some(_var) = var {
                                     let function_scope_variable = extract_function_scope_variable(
                                         None,
@@ -2679,8 +2681,10 @@ fn extract_function_block(
                     } else {
                         let global_variables_identifiers: Vec<&String> =
                             global_variables.iter().map(|pred| &pred.name).collect();
-                        let global_mappings: Vec<String> =
-                            mappings.iter().map(|pred| pred.name.to_owned()).collect();
+                        let global_mappings: Vec<String> = mappings
+                            .iter()
+                            .map(|pred| pred.identifier.to_owned())
+                            .collect();
                         if global_variables_identifiers.contains(&_identifier) {
                             let var = global_variables
                                 .iter()
@@ -3686,7 +3690,7 @@ fn extract_function_scope_variable(
             } else if stringified == "--" {
                 value = format!("{}-1", _identifier)
             } else if stringified.contains("push") || stringified.contains("pop") {
-                let map = mappings.iter().find(|pred| &pred.name == _identifier);
+                let map = mappings.iter().find(|pred| &pred.identifier == _identifier);
                 if let Some(_ret) = map {
                     let map_return = _ret.map.get_return_type();
 

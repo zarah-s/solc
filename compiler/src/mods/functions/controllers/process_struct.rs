@@ -2,9 +2,10 @@ use regex::Regex;
 
 use crate::mods::{
     functions::helpers::helpers::{
-        detokenize, extract_custom_data_types_tokens, print_error, validate_identifier_regex,
+        detokenize, extract_custom_data_types_tokens, extract_mapping_identifier, print_error,
+        validate_identifier_regex,
     },
-    types::types::{LineDescriptions, StructIdentifier, StructTypes, Token},
+    types::types::{LineDescriptions, StructIdentifier, StructType, Token, VariantType},
 };
 
 pub fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
@@ -12,14 +13,16 @@ pub fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
     let mut struct_identifier: Vec<StructIdentifier> = Vec::new();
     for struct_inst in extracted_structs {
         let mut _identifier: Option<String> = None;
+        let mut is_storage: bool = false;
         if let Token::Identifier(_id) = &struct_inst[1] {
             _identifier = Some(_id.to_string());
         } else {
             print_error("Missing struct identifier!!");
         }
+
         let stripped = &struct_inst[3..struct_inst.len() - 1];
         let splited: Vec<&[Token]> = stripped.split(|pred| pred == &Token::SemiColon).collect();
-        let mut combined_types: Vec<StructTypes> = Vec::new();
+        let mut combined_types: Vec<StructType> = Vec::new();
         let mut skip = 0;
         for (index, splited_param) in splited.iter().filter(|pred| !pred.is_empty()).enumerate() {
             if skip > index {
@@ -108,27 +111,33 @@ pub fn extract_struct(data: &Vec<LineDescriptions>) -> Vec<StructIdentifier> {
                     if validate_identifier_regex(&_identifier, 0) {
                         name_ = Some(_identifier.to_owned());
                     }
+                } else if let Token::Mapping = splited_param[0] {
+                    let structured_mapping: crate::mods::types::types::MappingIdentifier =
+                        extract_mapping_identifier(
+                            &vec![splited_param.to_vec(), vec![Token::SemiColon]].concat(),
+                        );
+                    combined_types.push(StructType::Mapping(structured_mapping));
+                    is_storage = true;
                 } else {
                     print_error(&format!("Invalid struct",))
                 }
             }
 
-            if let None = name_ {
-                print_error(&format!("Syntax error... missing struct identifier  ",))
+            if name_.is_some() {
+                let structured = StructType::Variant(VariantType {
+                    is_array,
+                    name_: name_.unwrap(),
+                    size,
+                    type_: type_.unwrap(),
+                });
+                combined_types.push(structured);
             }
-
-            let structured = StructTypes {
-                is_array,
-                name_: name_.unwrap(),
-                size: size,
-                type_: type_.unwrap(),
-            };
-            combined_types.push(structured);
         }
 
         let struct_build = StructIdentifier {
             identifier: _identifier.unwrap(),
             types: combined_types,
+            is_storage,
         };
         struct_identifier.push(struct_build);
     }

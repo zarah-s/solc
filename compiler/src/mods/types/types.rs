@@ -105,7 +105,7 @@ pub enum TerminationType {
 }
 
 #[derive(Debug, Clone)]
-pub struct StructTypes {
+pub struct VariantType {
     pub type_: String,
     pub name_: String,
     pub size: Option<String>,
@@ -151,9 +151,16 @@ pub enum VariableType {
 }
 
 #[derive(Debug, Clone)]
+pub enum StructType {
+    Mapping(MappingIdentifier),
+    Variant(VariantType),
+}
+
+#[derive(Debug, Clone)]
 pub struct StructIdentifier {
     pub identifier: String,
-    pub types: Vec<StructTypes>,
+    pub is_storage: bool,
+    pub types: Vec<StructType>,
 }
 #[derive(Debug)]
 pub struct EnumIdentifier {
@@ -394,21 +401,21 @@ pub struct MappingAssign {
     pub type_: VariableAssignType,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MappingValue {
     Mapping(Box<Mapping>),
     Raw(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Mapping {
     pub key: Option<String>,
     pub value: Option<MappingValue>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MappingIdentifier {
-    pub name: String,
+    pub identifier: String,
     pub map: Mapping,
     pub visibility: Token,
 }
