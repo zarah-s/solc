@@ -36,13 +36,23 @@ impl LineDescriptions {
         let mut combined_char = String::new();
         let mut lexems: Vec<Token> = Vec::new();
         let mut opened_quotations = 0;
+        let mut opened_quotation_type = String::from("\"");
         let identifier_regex = Regex::new(r"[a-zA-Z_]\w*").unwrap();
         for (index, character) in input.trim().chars().enumerate() {
             if character == '"' || character == '\'' {
                 if opened_quotations == 0 {
                     opened_quotations += 1;
+                    if character == '"' {
+                        opened_quotation_type.clear();
+                        opened_quotation_type = String::from("\"");
+                    } else {
+                        opened_quotation_type.clear();
+                        opened_quotation_type = String::from("'");
+                    }
                 } else {
-                    opened_quotations = 0
+                    if character.to_string() == opened_quotation_type {
+                        opened_quotations = 0;
+                    }
                 }
             }
             if character.is_whitespace() && !combined_char.trim().is_empty() {

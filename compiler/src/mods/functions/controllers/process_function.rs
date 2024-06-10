@@ -1672,6 +1672,8 @@ fn extract_function_params(
                     location_ = Some(Token::Memory);
                 } else if splited_param.contains(&Token::Calldata) {
                     location_ = Some(Token::Calldata);
+                } else if splited_param.contains(&Token::Storage) {
+                    location_ = Some(Token::Storage);
                 } else {
                     print_error(&format!(
                         "Expecting \"memory\" or \"calldata\". {} ",
