@@ -1,265 +1,238 @@
-use std::{collections::HashMap, path::Path};
-
 use crate::mods::{
-    functions::helpers::helpers::print_error,
-    types::types::{
-        ContractIdentifier, ContractType, InterfaceIdentifier, LibraryIdentifier, LineDescriptions,
+    functions::controllers::process_file_contents::process_file_contents,
+    types::{
+        compiler_errors::{CompilerError, SyntaxError},
+        line_descriptors::{LineDescriptions, StringDescriptor},
+        token::{Context, Token, TokenTrait, VecExtension},
     },
 };
 
-use super::{
-    process_enum::extract_enum, process_file_contents::process_file_contents,
-    process_function::extract_functions, process_state_variables::extract_global_elements,
-    process_struct::extract_struct, strip_comments::strip_comments,
-    structure_to_line_descriptors::structure_to_line_descriptors,
-};
+pub async fn compile_source_code(args: Vec<String>) {
+    let parsable_structure = process_file_contents(args).await;
+    let mut imports: Vec<Vec<LineDescriptions<Vec<Token>>>> = Vec::new();
+    let mut libraries: Vec<Vec<LineDescriptions<Vec<Token>>>> = Vec::new();
+    let mut interfaces: Vec<Vec<LineDescriptions<Vec<Token>>>> = Vec::new();
+    let mut contracts: Vec<Vec<LineDescriptions<Vec<Token>>>> = Vec::new();
+    let mut custom_errors: Vec<Vec<LineDescriptions<Vec<Token>>>> = Vec::new();
+    seperate_variants(
+        parsable_structure,
+        &mut imports,
+        &mut interfaces,
+        &mut contracts,
+        &mut libraries,
+        &mut custom_errors,
+    );
+    println!("{:#?}", imports);
+}
 
-pub async fn compile_source_code(
-    args: Vec<String>,
-    abstract_contracts: &mut Vec<ContractIdentifier>,
-    main_contracts: &mut Vec<ContractIdentifier>,
-    libraries: &mut Vec<LibraryIdentifier>,
-    interfaces: &mut Vec<InterfaceIdentifier>,
-    import_tree: &mut HashMap<String, Vec<String>>,
-    compiled: &mut [Vec<String>; 4],
-) -> Result<(), std::io::Error> {
-    if args.len() < 2 {
-        print_error("Mising file path... Run cargo run <file-path>")
-    }
+fn seperate_variants(
+    parsable_structure: Vec<LineDescriptions<String>>,
+    imports: &mut Vec<Vec<LineDescriptions<Vec<Token>>>>,
+    interfaces: &mut Vec<Vec<LineDescriptions<Vec<Token>>>>,
+    contracts: &mut Vec<Vec<LineDescriptions<Vec<Token>>>>,
+    libraries: &mut Vec<Vec<LineDescriptions<Vec<Token>>>>,
+    custom_errors: &mut Vec<Vec<LineDescriptions<Vec<Token>>>>,
+) {
+    let mut is_import_brace = false;
+    let mut opened_braces_count = 0;
+    let mut tokens: Vec<Token> = Vec::new();
 
-    /* VALIDATE FILE FORMAT */
-    if args[1].split(".").last().unwrap() != "sol" {
-        print_error("Unsupported file... Expected \".sol\" file");
-    }
-    let file_path = &args[1];
-    let root_folder = Path::new(&file_path);
-    let parent_folder = Path::new(&args[0]);
+    let mut combined: Vec<LineDescriptions<Vec<Token>>> = Vec::new();
+    let mut context = Context::None;
+    for (parent_index, line_desc) in parsable_structure.iter().enumerate() {
+        let lexems = line_desc.lex();
+        // println!("{:?}", lexems);
+        for (index, token) in lexems.data.iter().enumerate() {
+            tokens.push(token.clone());
+            match token {
+                Token::Pragma => {
+                    if parent_index > 0 {
+                        validate_clash(context, &tokens, &parsable_structure.get(parent_index - 1));
+                    }
+                    context = Context::Header;
+                }
+                Token::Error => {
+                    if parent_index > 0 {
+                        validate_clash(context, &tokens, &parsable_structure.get(parent_index - 1));
+                    }
 
-    {
-        for key in import_tree.keys() {
-            let entries = import_tree.get(key);
-            if let Some(_entries) = entries {
-                let mut current_index = 0;
-                for (index, __entry) in _entries.iter().enumerate() {
-                    if current_index != index {
-                        if *__entry == _entries[current_index] {
-                            print_error("Recursive imports")
+                    context = Context::Error;
+                }
+                Token::Abstract => {
+                    if parent_index > 0 {
+                        validate_clash(context, &tokens, &parsable_structure.get(parent_index - 1));
+                    }
+
+                    context = Context::Contract;
+                }
+                Token::Library => {
+                    if parent_index > 0 {
+                        validate_clash(context, &tokens, &parsable_structure.get(parent_index - 1));
+                    }
+
+                    context = Context::Library;
+                }
+                Token::Import => {
+                    if parent_index > 0 {
+                        validate_clash(context, &tokens, &parsable_structure.get(parent_index - 1));
+                    }
+
+                    context = Context::Import;
+                }
+
+                Token::Interface => {
+                    if parent_index > 0 {
+                        validate_clash(context, &tokens, &parsable_structure.get(parent_index - 1));
+                    }
+
+                    context = Context::Interface;
+                }
+                Token::Contract => {
+                    if let Context::None = context {
+                    } else {
+                        if !tokens.is_empty() {
+                            if tokens.strip_spaces()[0] != Token::Abstract {
+                                println!("{:?}", tokens);
+                                panic!("contr")
+                            }
                         }
                     }
+                    context = Context::Contract;
                 }
-                current_index += 1;
-                if current_index != 0 {}
-            }
-        }
-    }
 
-    let root = &root_folder
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
+                Token::SemiColon => {
+                    if opened_braces_count == 0 {
+                        match context {
+                            Context::Import => {
+                                combined.push(LineDescriptions {
+                                    data: tokens.clone(),
+                                    line: lexems.line,
+                                });
+                                tokens.clear();
+                                imports.push(combined.clone());
+                                combined.clear();
+                            }
+                            Context::Header => {
+                                tokens.clear();
+                            }
 
-    let parent_root = &parent_folder
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
-    {
-        let find = import_tree.get(parent_root);
-        let mut data = Vec::new();
+                            Context::Error => {
+                                combined.push(LineDescriptions {
+                                    data: tokens.clone(),
+                                    line: lexems.line,
+                                });
+                                tokens.clear();
+                                custom_errors.push(combined.clone());
+                                combined.clear();
+                            }
 
-        if find.is_some() {
-            for i in find.unwrap() {
-                data.push(i.clone())
-            }
-        }
-        data.push(root.to_string());
-
-        import_tree.insert(parent_root.to_string(), data);
-    }
-
-    let mut lines_: Vec<LineDescriptions> = Vec::new();
-    let mut stripped_comments = String::new();
-    let mut file_contents = String::new();
-    let _result = process_file_contents(args.clone(), &mut file_contents).await;
-    match _result {
-        Ok(_) => (),
-        Err(err) => panic!("{} {}", err, file_path),
-    }
-    structure_to_line_descriptors(&file_contents, &mut lines_);
-
-    strip_comments(&lines_, &mut stripped_comments);
-    let structured_stripped_compilable_contents: Vec<LineDescriptions> =
-        LineDescriptions::to_struct(stripped_comments);
-
-    let mut opened_braces = 0;
-    let mut combo: Vec<LineDescriptions> = Vec::new();
-    let mut joined: Vec<Vec<LineDescriptions>> = Vec::new();
-    for data in structured_stripped_compilable_contents {
-        let raw = &data.text;
-        combo.push(data.clone());
-
-        if raw.contains("{") {
-            for character in raw.chars() {
-                if character == '{' {
-                    opened_braces += 1;
-                }
-            }
-        }
-
-        if raw.contains("}") {
-            for character in raw.chars() {
-                if character == '}' {
-                    opened_braces -= 1;
-
-                    if opened_braces == 0 {
-                        joined.push(combo.clone());
-                        combo.clear();
+                            _ => {
+                                CompilerError::SyntaxError(SyntaxError::UnexpectedToken(
+                                    &token.to_string(),
+                                ))
+                                .throw_with_file_info("Contract.sol", lexems.line);
+                            }
+                        }
+                        context = Context::None;
                     }
                 }
-            }
-        }
-    }
 
-    let mut imports: Vec<String> = Vec::new();
-
-    for __import in &joined[0] {
-        if __import.text.starts_with("contract")
-            || __import.text.starts_with("abstract")
-            || __import.text.starts_with("library")
-            || __import.text.starts_with("interface")
-        {
-            break;
-        }
-
-        if __import.text.starts_with("import") {
-            let splitted = __import.text.split(" ").collect::<Vec<&str>>();
-            if splitted.len() != 2 {
-                print_error("Invalid import")
-            }
-
-            if splitted[1].is_empty() {
-                print_error("Invalid import")
-            }
-
-            imports.push(splitted[1][1..splitted[1].len() - 2].to_string())
-        }
-    }
-
-    for __import in imports {
-        let joined = root_folder.parent().unwrap().join(&__import);
-
-        let _ = Box::pin(async {
-            let _ = compile_source_code(
-                vec![root.to_string(), joined.to_str().unwrap().to_string()],
-                abstract_contracts,
-                main_contracts,
-                libraries,
-                interfaces,
-                import_tree,
-                compiled,
-            )
-            .await;
-        })
-        .await;
-    }
-
-    for _joined in joined {
-        {
-            let mut should_compile = true;
-            for __joined in &_joined {
-                if __joined.text.starts_with("contract")
-                    || __joined.text.starts_with("library")
-                    || __joined.text.starts_with("interface")
-                {
-                    let splitted = __joined.text.split(" ").collect::<Vec<_>>();
-                    if __joined.text.starts_with("contract") {
-                        if compiled[0].contains(&splitted[1].to_string()) {
-                            should_compile = false
+                Token::OpenBraces => {
+                    if index > 0 {
+                        let stripped = lexems.data.strip_spaces();
+                        let prev = stripped.get(index - 2);
+                        if prev.is_some() && *prev.unwrap() == Token::Import {
+                            is_import_brace = true;
+                        } else {
+                            opened_braces_count += 1;
                         }
-                    } else if __joined.text.starts_with("interface") {
-                        if compiled[1].contains(&splitted[1].to_string()) {
-                            should_compile = false
-                        }
-                    } else if __joined.text.starts_with("library") {
-                        if compiled[2].contains(&splitted[1].to_string()) {
-                            should_compile = false
-                        }
-                    }
-                } else if __joined.text.starts_with("abstract") {
-                    let splitted = __joined.text.split(" ").collect::<Vec<_>>();
-                    if compiled[3].contains(&splitted[1].to_string()) {
-                        should_compile = false
+                    } else {
+                        CompilerError::SyntaxError(SyntaxError::UnexpectedToken("{"))
+                            .throw_with_file_info("Contract.sol", lexems.line);
                     }
                 }
+                Token::CloseBraces => {
+                    if !is_import_brace {
+                        opened_braces_count -= 1;
+                        if opened_braces_count == 0 {
+                            match context {
+                                Context::Library => {
+                                    combined.push(LineDescriptions {
+                                        data: tokens.clone(),
+                                        line: lexems.line,
+                                    });
+                                    tokens.clear();
+
+                                    libraries.push(combined.clone());
+                                    combined.clear();
+                                }
+                                Context::Interface => {
+                                    combined.push(LineDescriptions {
+                                        data: tokens.clone(),
+                                        line: lexems.line,
+                                    });
+                                    tokens.clear();
+
+                                    interfaces.push(combined.clone());
+                                    combined.clear();
+                                }
+
+                                Context::Contract => {
+                                    combined.push(LineDescriptions {
+                                        data: tokens.clone(),
+                                        line: lexems.line,
+                                    });
+                                    tokens.clear();
+
+                                    contracts.push(combined.clone());
+                                    combined.clear();
+                                }
+                                _ => {}
+                            }
+                            context = Context::None;
+                        }
+                    } else {
+                        is_import_brace = false;
+                    }
+                }
+                _ => {}
             }
 
-            if !should_compile {
-                continue;
+            if let Context::None = context {
+                if !tokens.strip_spaces().is_empty() {
+                    CompilerError::SyntaxError(SyntaxError::UnexpectedToken(
+                        &tokens.strip_spaces()[0].to_string(),
+                    ))
+                    .throw_with_file_info("Contract.sol", lexems.line);
+                }
             }
         }
-        let extracted_enums = extract_enum(&_joined);
 
-        let structs_tree = extract_struct(&_joined);
-        let struct_identifiers: Vec<&str> = structs_tree
-            .iter()
-            .map(|pred| pred.identifier.as_str())
-            .collect();
-
-        let enum_identifiers: Vec<&str> = extracted_enums
-            .iter()
-            .map(|pred| pred.identifier.as_str())
-            .collect();
-
-        let custom_data_types_identifiers: Vec<&str> =
-            [enum_identifiers.clone(), struct_identifiers].concat();
-
-        let (state_variables, custom_errors, mappings, events, lib_implementations) =
-            extract_global_elements(
-                &_joined,
-                &custom_data_types_identifiers,
-                &enum_identifiers,
-                Vec::new(),
-                &libraries,
-            );
-        let (functions, contract_header, _libraries) = extract_functions(
-            &_joined,
-            &custom_data_types_identifiers,
-            &state_variables,
-            &enum_identifiers,
-            &mappings,
-            interfaces,
-            &mut compiled[1],
-            &libraries,
-        );
-
-        for _library in _libraries {
-            compiled[2].push(_library.identifier.to_string());
-            libraries.push(_library);
-        }
-        if !contract_header.identifier.trim().is_empty() {
-            let contract_identifier = ContractIdentifier {
-                header: contract_header,
-                custom_errors,
-                enums: extracted_enums,
-                events,
-                functions,
-                mappings,
-                state_variables,
-                structs: structs_tree,
-                implementations: lib_implementations,
-            };
-
-            compiled[3].push(contract_identifier.header.identifier.to_string());
-            if let ContractType::Main = contract_identifier.header.r#type {
-                main_contracts.push(contract_identifier)
-            } else if let ContractType::Abstract = contract_identifier.header.r#type {
-                abstract_contracts.push(contract_identifier)
-            }
+        if !tokens.is_empty() {
+            combined.push(LineDescriptions {
+                line: lexems.line,
+                data: tokens.clone(),
+            });
+            tokens.clear();
         }
     }
+}
 
-    Ok(())
+/* VALIDATES CLASH DUE TO MISSING TOKEN E.G ";" OR "}" */
+fn validate_clash(
+    context: Context,
+    tokens: &Vec<Token>,
+    lexems: &Option<&LineDescriptions<String>>,
+) {
+    if let Some(_lexems) = lexems {
+        if context != Context::None && !tokens.is_empty() {
+            CompilerError::SyntaxError(SyntaxError::MissingToken(match context {
+                Context::Contract | Context::Interface | Context::Library => "}",
+                _ => ";",
+            }))
+            .throw_with_file_info("Contract.sol", _lexems.lex().line);
+        }
+    } else {
+        CompilerError::InternalError("Unprocessible entity").throw();
+    }
 }
