@@ -56,4 +56,33 @@ impl<'a> CompilerError<'a> {
             }
         }
     }
+
+    pub fn throw_with_file_info(&self, file: &str, line: i32) {
+        match &self {
+            CompilerError::LexicalError(lex_error) => {
+                panic!(
+                    "Lexical error: {:?}\n\x1b[4m{file} {line}\x1b[24m",
+                    lex_error
+                );
+            }
+            CompilerError::SyntaxError(syntax_error) => {
+                panic!(
+                    "Syntax error: {:?}\n\x1b[4m{file} {line}\x1b[24m",
+                    syntax_error
+                );
+            }
+            CompilerError::SemanticError(semantic_error) => {
+                panic!(
+                    "Semantic error: {:?}\n\x1b[4m{file} {line}\x1b[24m",
+                    semantic_error
+                );
+            }
+            CompilerError::IOError(io_error) => {
+                panic!("IO error: {:?}\n\x1b[4m{file} {line}\x1b[24m", io_error);
+            }
+            CompilerError::InternalError(message) => {
+                panic!("Internal error: {}\n\x1b[4m{file} {line}\x1b[24m", message);
+            }
+        }
+    }
 }

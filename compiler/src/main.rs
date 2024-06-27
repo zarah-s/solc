@@ -12,7 +12,7 @@ async fn main() {
     /* GET ENVIRONMENT ARGUMENTS */
     let args: Vec<String> = env::args().collect();
 
-    let _ = compile_source_code(args).await.unwrap();
+    let _ = compile_source_code(args).await;
 
     let end_time = time::SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
     println!(

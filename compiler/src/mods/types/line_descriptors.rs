@@ -1,98 +1,32 @@
-#[derive(Debug)]
-pub struct LineDescriptions {
-    pub text: String,
+use super::token::{StringExtension, Token, VecExtension};
+
+#[derive(Debug, Clone)]
+pub struct LineDescriptions<T> {
     pub line: i32,
+    pub data: T,
+}
+pub trait StringDescriptor {
+    fn lex(&self) -> LineDescriptions<Vec<Token>>;
 }
 
-impl LineDescriptions {
-    // pub fn to_string(&self) -> String {
-    //     format!("{}&=>{}%%", self.text, self.line)
-    // }
+pub trait TokenDescriptor {
+    fn detokenize(&self) -> LineDescriptions<String>;
+}
 
-    // pub fn to_struct(value: String) -> Vec<Self> {
-    //     let splited: Vec<&str> = value.split("%%").collect();
-    //     let mut return_value: Vec<Self> = Vec::new();
-    //     for split in splited {
-    //         let val: Vec<&str> = split.split("&=>").collect();
-    //         if !val.first().unwrap().trim().is_empty() {
-    //             return_value.push(Self {
-    //                 text: val.first().unwrap().to_string(),
-    //                 line: val.last().unwrap().parse().unwrap(),
-    //             })
-    //         }
-    //     }
+impl StringDescriptor for LineDescriptions<String> {
+    fn lex(&self) -> LineDescriptions<Vec<Token>> {
+        LineDescriptions {
+            line: self.line,
+            data: self.data.lex(),
+        }
+    }
+}
 
-    //     return_value
-    // }
-
-    // pub fn lex(input: &str) -> Vec<Token> {
-    //     let mut lex: Vec<String> = Vec::new();
-    //     let mut combined_char = String::new();
-    //     let mut lexems: Vec<Token> = Vec::new();
-    //     let mut opened_quotations = 0;
-    //     let identifier_regex = Regex::new(r"[a-zA-Z_]\w*").unwrap();
-    //     for (index, character) in input.trim().chars().enumerate() {
-    //         if character == '"' || character == '\'' {
-    //             if opened_quotations == 0 {
-    //                 opened_quotations += 1;
-    //             } else {
-    //                 opened_quotations = 0
-    //             }
-    //         }
-    //         if character.is_whitespace() && !combined_char.trim().is_empty() {
-    //             if opened_quotations > 0 {
-    //                 combined_char.push(character)
-    //             } else {
-    //                 lex.push(combined_char.trim().to_string());
-    //                 combined_char.clear();
-    //             }
-    //         } else if let Some(_) = SYMBOLS.iter().find(|pred| pred == &&character) {
-    //             if !combined_char.trim().is_empty() {
-    //                 if opened_quotations > 0 {
-    //                     combined_char.push(character)
-    //                 } else {
-    //                     lex.push(combined_char.trim().to_string());
-    //                     combined_char.clear();
-    //                 }
-    //             }
-    //             lex.push(character.to_string());
-    //         } else if let Some(_) = [KEYWORDS.to_vec(), DATA_TYPES.to_vec(), SYMBOLS.to_vec()]
-    //             .concat()
-    //             .iter()
-    //             .find(|pred| pred == &&combined_char.as_str().trim())
-    //         {
-    //             let mut contains = false;
-    //             for data_type in DATA_TYPES {
-    //                 if !data_type.contains(&format!("{}{}", combined_char, character).as_str()) {
-    //                     contains = true;
-    //                     break;
-    //                 }
-    //             }
-
-    //             if contains {
-    //                 combined_char.push(character);
-    //                 continue;
-    //             }
-
-    //             if let Some(_) = identifier_regex.find(character.to_string().as_str()) {
-    //                 combined_char.push(character);
-    //             } else {
-    //                 lex.push(combined_char.trim().to_string());
-    //                 combined_char.clear();
-    //             }
-    //         } else {
-    //             combined_char.push_str(character.to_string().as_str());
-    //             if index == input.trim().len() - 1 {
-    //                 lex.push(combined_char.trim().to_string());
-    //                 combined_char.clear();
-    //             }
-    //         }
-    //     }
-    //     assert!(combined_char.trim().len() == 0);
-    //     for lexed in lex {
-    //         lexems.push(Token::tokenize(&lexed));
-    //     }
-
-    //     lexems
-    // }
+impl TokenDescriptor for LineDescriptions<Vec<Token>> {
+    fn detokenize(&self) -> LineDescriptions<String> {
+        LineDescriptions {
+            line: self.line,
+            data: self.data.to_string(),
+        }
+    }
 }

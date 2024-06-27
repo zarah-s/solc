@@ -1,7 +1,10 @@
-#[derive(Debug)]
+use crate::mods::constants::constants::{DATA_TYPES, INTEGER_SIZES, KEYWORDS, SYMBOLS};
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Identifier(String),
     Contract,
+    Solidity,
     Library,
     Using,
     Abstract,
@@ -54,7 +57,10 @@ pub enum Token {
     Return,
     Memory,
     Uint(Option<u16>),
-
+    Gwei,
+    Days,
+    Weeks,
+    Years,
     Receive,
     Fallback,
     Cron,
@@ -84,24 +90,86 @@ pub enum Token {
     SemiColon,
     Quotation,
     Coma,
-    Pipe,
-    Ampersand,
+    Or,
+    And,
+    Xor,
+    Not,
     True,
     False,
 }
 
 pub trait TokenTrait {
-    fn detokenize(&self) -> String;
+    fn to_string(&self) -> String;
     fn tokenize(input: &str) -> Token;
+    fn lex(input: &str) -> Vec<Token>;
+}
+
+pub trait VecExtension {
+    fn to_string(&self) -> String;
+    fn strip_spaces(&self) -> Self;
 }
 
 pub trait StringExtension {
     fn tokenize(&self) -> Token;
+    fn lex(&self) -> Vec<Token>;
+}
+
+impl VecExtension for Vec<Token> {
+    fn to_string(&self) -> String {
+        let mut stringified = String::new();
+        for _token in self.iter() {
+            stringified.push_str(&_token.to_string())
+        }
+
+        stringified
+    }
+
+    fn strip_spaces(&self) -> Self {
+        let mut result = Vec::new();
+        for token in self.iter() {
+            match token {
+                Token::Space => {}
+                _ => {
+                    result.push(token.to_owned());
+                }
+            }
+        }
+
+        result
+    }
+}
+
+impl VecExtension for Vec<&Token> {
+    fn to_string(&self) -> String {
+        let mut stringified = String::new();
+        for _token in self.iter() {
+            stringified.push_str(&_token.to_string())
+        }
+
+        stringified
+    }
+    fn strip_spaces(&self) -> Self {
+        let mut result = Vec::new();
+        for token in self.iter() {
+            match token {
+                Token::Space => {}
+                _ => {
+                    result.push(token.to_owned());
+                }
+            }
+        }
+
+        result
+    }
 }
 
 impl StringExtension for String {
     fn tokenize(&self) -> Token {
         tokenize(&self)
+    }
+
+    fn lex(&self) -> Vec<Token> {
+        lex(&self)
     }
 }
 
@@ -109,15 +177,45 @@ impl StringExtension for &str {
     fn tokenize(&self) -> Token {
         tokenize(&self)
     }
+    fn lex(&self) -> Vec<Token> {
+        lex(&self)
+    }
+}
+
+impl StringExtension for char {
+    fn tokenize(&self) -> Token {
+        tokenize(&self.to_string().as_str())
+    }
+    fn lex(&self) -> Vec<Token> {
+        lex(&self.to_string().as_str())
+    }
 }
 
 impl TokenTrait for Token {
-    fn detokenize(&self) -> String {
+    fn to_string(&self) -> String {
         detokenize(&self)
     }
 
     fn tokenize(input: &str) -> Token {
         tokenize(input)
+    }
+
+    fn lex(input: &str) -> Vec<Token> {
+        lex(input)
+    }
+}
+
+impl TokenTrait for &Token {
+    fn to_string(&self) -> String {
+        detokenize(&self)
+    }
+
+    fn tokenize(input: &str) -> Token {
+        tokenize(input)
+    }
+
+    fn lex(input: &str) -> Vec<Token> {
+        lex(input)
     }
 }
 
@@ -130,8 +228,13 @@ fn detokenize(input: &Token) -> String {
         Token::From => "from".to_string(),
         Token::Call => "call".to_string(),
         Token::Using => "using".to_string(),
+        Token::Days => "days".to_string(),
+        Token::Weeks => "weeks".to_string(),
+        Token::Years => "years".to_string(),
+        Token::Gwei => "gwei".to_string(),
         Token::Delegatecall => "delegatecall".to_string(),
         Token::Library => "library".to_string(),
+        Token::Solidity => "solidity".to_string(),
         Token::Abstract => "abstract".to_string(),
         Token::Indexed => "indexed".to_string(),
         Token::Modifier => "modifier".to_string(),
@@ -226,8 +329,10 @@ fn detokenize(input: &Token) -> String {
         Token::SemiColon => ";".to_string(),
         Token::Quotation => "\"".to_string(),
         Token::Coma => ".to_string(),".to_string(),
-        Token::Pipe => "|".to_string(),
-        Token::Ampersand => "&".to_string(),
+        Token::Or => "|".to_string(),
+        Token::And => "&".to_string(),
+        Token::Not => "~".to_string(),
+        Token::Xor => "^".to_string(),
         Token::Identifier(val) => val.to_string(),
     }
 }
@@ -235,7 +340,7 @@ fn detokenize(input: &Token) -> String {
 fn tokenize(input: &str) -> Token {
     match input {
         "revert" => Token::Revert,
-        " " => Token::Space,
+        " " | "" => Token::Space,
         "emit" => Token::Emit,
         "pragma" => Token::Pragma,
         "import" => Token::Import,
@@ -249,6 +354,11 @@ fn tokenize(input: &str) -> Token {
         "assert" => Token::Assert,
         "indexed" => Token::Indexed,
         "wei" => Token::Wei,
+        "gwei" => Token::Gwei,
+        "days" => Token::Days,
+        "weeks" => Token::Weeks,
+        "years" => Token::Years,
+        "solidity" => Token::Solidity,
         "interface" => Token::Interface,
         "ether" => Token::Ether,
         "event" => Token::Event,
@@ -316,20 +426,70 @@ fn tokenize(input: &str) -> Token {
         "'" => Token::Quotation,
         "\"" => Token::Quotation,
         "," => Token::Coma,
-        "|" => Token::Pipe,
-        "&" => Token::Ampersand,
+        "|" => Token::Or,
+        "&" => Token::And,
+        "^" => Token::Xor,
+        "~" => Token::Not,
 
-        _other => {
-            if _other.starts_with("bytes") {
-                Token::Bytes(extract_size(_other))
-            } else if _other.starts_with("uint") {
-                Token::Uint(extract_size(_other))
-            } else if _other.starts_with("int") {
-                Token::Int(extract_size(_other))
+        _other => process_dyn(_other),
+    }
+}
+
+fn process_dyn(input_val: &str) -> Token {
+    if input_val.starts_with("bytes") {
+        let chars = input_val.chars().collect::<Vec<_>>();
+        let next = chars.get("bytes".len());
+        if let Some(_next) = next {
+            if _next.is_ascii_digit() {
+                Token::Bytes(extract_size(input_val))
             } else {
-                Token::Identifier(input.to_string())
+                Token::Identifier(input_val.to_string())
             }
+        } else {
+            Token::Bytes(extract_size(input_val))
         }
+    } else if input_val.starts_with("uint") {
+        let chars = input_val.chars().collect::<Vec<_>>();
+        let next = chars.get("uint".len());
+        if let Some(_next) = next {
+            if _next.is_ascii_digit() {
+                let size = extract_size(input_val);
+                if let Some(_size) = size {
+                    if INTEGER_SIZES.contains(&_size) {
+                        return Token::Uint(size);
+                    } else {
+                        return Token::Identifier(input_val.to_string());
+                    }
+                }
+                Token::Uint(size)
+            } else {
+                Token::Identifier(input_val.to_string())
+            }
+        } else {
+            Token::Uint(extract_size(input_val))
+        }
+    } else if input_val.starts_with("int") {
+        let chars = input_val.chars().collect::<Vec<_>>();
+        let next = chars.get("int".len());
+        if let Some(_next) = next {
+            if _next.is_ascii_digit() {
+                let size = extract_size(input_val);
+                if let Some(_size) = size {
+                    if INTEGER_SIZES.contains(&_size) {
+                        return Token::Int(size);
+                    } else {
+                        return Token::Identifier(input_val.to_string());
+                    }
+                }
+                Token::Int(size)
+            } else {
+                Token::Identifier(input_val.to_string())
+            }
+        } else {
+            Token::Int(extract_size(input_val))
+        }
+    } else {
+        Token::Identifier(input_val.to_string())
     }
 }
 
@@ -341,4 +501,125 @@ fn extract_size(s: &str) -> Option<u16> {
     } else {
         number_string.parse::<u16>().ok()
     }
+}
+
+fn lex(input: &str) -> Vec<Token> {
+    let mut combined_strings: Vec<String> = Vec::new();
+    let mut combined_char = String::new();
+    let mut lexems: Vec<Token> = Vec::new();
+    let mut quote = String::new();
+
+    let mut opened_quote = false;
+    let mut data_type_pause = false;
+
+    for (index, character) in input.trim().char_indices() {
+        if character.is_whitespace() {
+            if !combined_char.trim().is_empty() {
+                if opened_quote {
+                    combined_char.push(character)
+                } else {
+                    combined_strings.push(combined_char.trim().to_string());
+                    combined_char.clear();
+                }
+            } else {
+                let chars = input.trim().chars().collect::<Vec<_>>();
+                let next = chars.get(index + 1);
+                if let Some(_next) = next {
+                    if !_next.is_whitespace() {
+                        if opened_quote {
+                            combined_char.push(character)
+                        } else {
+                            assert!(combined_char.trim().is_empty(), "Missing quotation");
+                            combined_strings.push(character.to_string());
+                        }
+                        continue;
+                    }
+                }
+                if opened_quote {
+                    combined_char.push(character);
+                } else {
+                    continue;
+                }
+            }
+        } else if character == '"' || character == '\'' {
+            combined_char.push(character);
+            if opened_quote && quote == character.to_string() {
+                opened_quote = false;
+                quote.clear();
+                combined_strings.push(combined_char.trim().to_string());
+                combined_char.clear();
+            } else {
+                opened_quote = true;
+                quote = character.to_string();
+            }
+        } else if SYMBOLS.contains(&character) {
+            if data_type_pause {
+                combined_strings.push(combined_char.trim().to_string());
+                combined_char.clear();
+                combined_strings.push(character.to_string());
+
+                data_type_pause = false;
+            } else {
+                if opened_quote {
+                    combined_char.push(character);
+                } else {
+                    if combined_char.trim().is_empty() {
+                        combined_strings.push(character.to_string())
+                    } else {
+                        combined_strings.push(combined_char.trim().to_string());
+                        combined_char.clear();
+                        combined_strings.push(character.to_string().trim().to_string())
+                    }
+                }
+            }
+        } else if DATA_TYPES.contains(&format!("{}{}", combined_char.trim(), character).as_str()) {
+            let chars = input.trim().chars().collect::<Vec<_>>();
+            let next = chars.get(index + 1);
+            if let Some(_next) = next {
+                if SYMBOLS.contains(_next) || _next.is_whitespace() {
+                    combined_strings.push(format!("{}{}", combined_char.trim(), character));
+                    combined_char.clear();
+                } else {
+                    data_type_pause = true;
+                    combined_char.push(character)
+                }
+            } else {
+                combined_strings.push(format!("{}{}", combined_char.trim(), character));
+                combined_char.clear();
+            }
+        } else if KEYWORDS.contains(&format!("{}{}", combined_char.trim(), character).as_str()) {
+            let chars = input.trim().chars().collect::<Vec<_>>();
+            let next = chars.get(index + 1);
+            if let Some(_next) = next {
+                if !_next.is_whitespace() && _next.is_alphabetic() {
+                    combined_char.push(character);
+                } else {
+                    combined_strings.push(format!("{}{}", combined_char.trim(), character));
+                    combined_char.clear();
+                }
+            } else {
+                combined_strings.push(format!("{}{}", combined_char.trim(), character));
+                combined_char.clear();
+            }
+        } else {
+            combined_char.push(character);
+        }
+    }
+
+    for combined_string in combined_strings {
+        lexems.push(combined_string.tokenize())
+    }
+
+    lexems
+}
+
+#[derive(PartialEq)]
+pub enum Context {
+    Import,
+    Interface,
+    Library,
+    Header,
+    Contract,
+    Error,
+    None,
 }

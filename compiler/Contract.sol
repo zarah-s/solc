@@ -1,8 +1,31 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.24;c
+
+library Name {
+    //
+    jane owen;}
+
+
+import {IERC20} from "./IT.sol";
+import "./IT.sol";
+
+error Oi();
+
+interface IT {
+    struct uint2566 {
+        string id;
+        uint2344 id;
+    }
+
+    function oi() {
+        uint2566 i;
+    }
+}
 
 contract ReceiveEther {
     string sdf = "This is /*not*/ a comment";
+    uint256[] i;
+    /*sdfsdf*/ uint j;
 
     /*
     Which function is called, fallback() or receive()?
@@ -51,3 +74,7 @@ contract SendEther {
         require(sent, "Failed to send Ether");
     }
 }
+
+abstract contract Yds {}
+
+import "../IT.sol";
