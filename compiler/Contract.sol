@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;c
+pragma solidity ^0.8.24;
 
 library Name {
     //
-    jane owen;}
-
+    jane owen;
+}
 
 import {IERC20} from "./IT.sol";
 import "./IT.sol";

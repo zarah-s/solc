@@ -22,7 +22,7 @@ pub async fn compile_source_code(args: Vec<String>) {
         &mut libraries,
         &mut custom_errors,
     );
-    println!("{:#?}", interfaces);
+    println!("{:#?}", imports);
 }
 
 fn seperate_variants(
@@ -41,6 +41,7 @@ fn seperate_variants(
     let mut context = Context::None;
     for (parent_index, line_desc) in parsable_structure.iter().enumerate() {
         let lexems = line_desc.lex();
+        // println!("{:?}", lexems);
         for (index, token) in lexems.data.iter().enumerate() {
             tokens.push(token.clone());
             match token {
@@ -198,9 +199,11 @@ fn seperate_variants(
             }
 
             if let Context::None = context {
-                if !tokens.is_empty() {
-                    CompilerError::SyntaxError(SyntaxError::UnexpectedToken(&token.to_string()))
-                        .throw_with_file_info("Contract.sol", lexems.line);
+                if !tokens.strip_spaces().is_empty() {
+                    CompilerError::SyntaxError(SyntaxError::UnexpectedToken(
+                        &tokens.strip_spaces()[0].to_string(),
+                    ))
+                    .throw_with_file_info("Contract.sol", lexems.line);
                 }
             }
         }
@@ -230,6 +233,6 @@ fn validate_clash(
             .throw_with_file_info("Contract.sol", _lexems.lex().line);
         }
     } else {
-        CompilerError::SyntaxError(SyntaxError::SyntaxError("Unprocessible entity")).throw();
+        CompilerError::InternalError("Unprocessible entity").throw();
     }
 }

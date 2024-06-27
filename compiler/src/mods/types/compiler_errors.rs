@@ -40,19 +40,19 @@ impl<'a> CompilerError<'a> {
     pub fn throw(&self) {
         match &self {
             CompilerError::LexicalError(lex_error) => {
-                panic!("Lexical error: {:?}", lex_error);
+                panic!("\x1b[31mLexical error: {:?}\x1b[0m", lex_error);
             }
             CompilerError::SyntaxError(syntax_error) => {
-                panic!("Syntax error: {:?}", syntax_error);
+                panic!("\x1b[31mSyntax error: {:?}\x1b[0m", syntax_error);
             }
             CompilerError::SemanticError(semantic_error) => {
-                panic!("Semantic error: {:?}", semantic_error);
+                panic!("\x1b[31mSemantic error: {:?}\x1b[0m", semantic_error);
             }
             CompilerError::IOError(io_error) => {
-                panic!("IO error: {:?}", io_error);
+                panic!("\x1b[31mIO error: {:?}\x1b[0m", io_error);
             }
             CompilerError::InternalError(message) => {
-                panic!("Internal error: {}", message);
+                panic!("\x1b[31mInternal error: {}\x1b[0m", message);
             }
         }
     }
@@ -61,27 +61,33 @@ impl<'a> CompilerError<'a> {
         match &self {
             CompilerError::LexicalError(lex_error) => {
                 panic!(
-                    "Lexical error: {:?}\n\x1b[4m{file} {line}\x1b[24m",
+                    "\x1b[31mLexical error: {:?}\x1b[0m\n\x1b[4m{file} {line}\x1b[24m",
                     lex_error
                 );
             }
             CompilerError::SyntaxError(syntax_error) => {
                 panic!(
-                    "Syntax error: {:?}\n\x1b[4m{file} {line}\x1b[24m",
+                    "\x1b[31mSyntax error: {:?}\x1b[0m\n\x1b[4m{file} {line}\x1b[24m",
                     syntax_error
                 );
             }
             CompilerError::SemanticError(semantic_error) => {
                 panic!(
-                    "Semantic error: {:?}\n\x1b[4m{file} {line}\x1b[24m",
+                    "\x1b[31mSemantic error: {:?}\x1b[0m\n\x1b[4m{file} {line}\x1b[24m",
                     semantic_error
                 );
             }
             CompilerError::IOError(io_error) => {
-                panic!("IO error: {:?}\n\x1b[4m{file} {line}\x1b[24m", io_error);
+                panic!(
+                    "\x1b[31mIO error: {:?}\x1b[0m\n\x1b[4m{file} {line}\x1b[24m",
+                    io_error
+                );
             }
             CompilerError::InternalError(message) => {
-                panic!("Internal error: {}\n\x1b[4m{file} {line}\x1b[24m", message);
+                panic!(
+                    "\x1b[31mInternal error: {}\x1b[0m\n\x1b[4m{file} {line}\x1b[24m",
+                    message
+                );
             }
         }
     }

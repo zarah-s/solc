@@ -340,7 +340,7 @@ fn detokenize(input: &Token) -> String {
 fn tokenize(input: &str) -> Token {
     match input {
         "revert" => Token::Revert,
-        " " | "" => Token::Space,
+        " " => Token::Space,
         "emit" => Token::Emit,
         "pragma" => Token::Pragma,
         "import" => Token::Import,
@@ -603,8 +603,14 @@ fn lex(input: &str) -> Vec<Token> {
             }
         } else {
             combined_char.push(character);
+            if index == input.trim().len() - 1 {
+                combined_strings.push(combined_char.trim().to_string());
+                combined_char.clear();
+            }
         }
     }
+
+    assert!(combined_char.is_empty(), "Internal Error");
 
     for combined_string in combined_strings {
         lexems.push(combined_string.tokenize())
